@@ -4,6 +4,9 @@ var reactDOM = require("react-dom");
 import { Editor, IProps } from "./components/Editor";
 import * as monaco from 'monaco-editor';
 
+/**
+* Json Editor Class to construct the monaco editor and it's properties.
+*/
 
 export class JsonEditor implements ComponentFramework.StandardControl<IInputs, IOutputs> {
 
@@ -17,8 +20,6 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
     constructor() {
 
     }
-
-    
 
     /**
      * Used to initialize the control instance. Controls can kick off remote server calls and other initialization actions here.
@@ -39,19 +40,14 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
      */
 
-    //JsonEditor
-
-    //change the code to value.
-
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         this._value = context.parameters.Value.raw || undefined;
         //this.editorInstance.getAction('editor.action.formatDocument').run() 
         let props: IProps = {
-            value: context.parameters.Value.raw || undefined,
-            language: "json",
-            onChange: this.notifyChange.bind(this)            
+            value: this._value,
+            onChange: this.notifyChange.bind(this)
         }
-        reactDOM.render(React.createElement(Editor, props), this._container)
+        reactDOM.render(React.createElement(Editor, props), this._container);
     }
 
     /**
@@ -72,6 +68,9 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         reactDOM.unmountComponentAtNode(this._container);
     }
 
+    /**
+     * A PCF Control notifies the changes of its outputs with the notifyOutputChanged method
+     */
     private notifyChange(value: string | undefined) {
         this._value = value;
         this._notifyOutputChanged();

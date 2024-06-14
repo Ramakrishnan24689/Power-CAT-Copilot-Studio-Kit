@@ -2,7 +2,6 @@ import Monaco from "@monaco-editor/react";
 
 export interface IProps {
     value: string | undefined;
-    language: string;
     onChange: (code: string | undefined) => void;
 }
 
@@ -26,7 +25,7 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
           }}
         onMount={async(editor)=>
             {
-                editor.onMouseMove((e) => {
+                editor.onMouseMove(() => {
                     {
                         setTimeout(function(){
                           editor.getAction('editor.action.formatDocument').run();
