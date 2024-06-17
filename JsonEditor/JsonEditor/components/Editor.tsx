@@ -1,4 +1,4 @@
-import Monaco from "@monaco-editor/react";
+import Monaco, {loader} from "@monaco-editor/react";
 
 export interface IProps {
     value: string | undefined;
@@ -9,18 +9,21 @@ export interface IProps {
     allocatedHeight: number;
 }
 
-export function formatJSON(val: string) {
-    try {
-      const res = JSON.parse(val);
-      return JSON.stringify(res, null, 2)
-    } catch {
-      const errorJson = {
-        "error": `${val}`
-      }
-      return JSON.stringify(errorJson, null, 2)
-    }
-  }
-
+loader.init().then((monaco) => {
+    monaco.editor.defineTheme('myTheme', {
+        base: 'vs',
+        inherit: true,
+        rules: [
+            // {
+            //     background: '#00FF00',
+            //     token: ""
+            // }
+        ],
+        colors: {
+            'editor.background': '#f5f5f5'
+        },
+    });
+});
 export const Editor: React.FunctionComponent<IProps> = (props) => {
 
     function handleEditorChange(value: string | undefined, event: any) {
@@ -31,6 +34,7 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
         className="jsonEditor"
         defaultLanguage='json'
         defaultValue={props.value}
+        theme="myTheme"
         onChange={handleEditorChange}
         options={{
             wordWrap: "on",
@@ -43,17 +47,7 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
           }}
         onMount={async(editor)=>
             {
-                // const updateHeight = () =>
-                //     {
-                //         const contentHeight = Math.min(1000, editor.getContentHeight());
                 editor.layout({width: props.allocatedWidth , height: props.allocatedHeight});
-                //     }
-                // editor.onDidContentSizeChange((e) =>
-                // {
-                //     updateHeight();
-                // });
-                //updateHeight();
-
                 editor.onMouseMove((e) => {
                     {
                         setTimeout(function(){
