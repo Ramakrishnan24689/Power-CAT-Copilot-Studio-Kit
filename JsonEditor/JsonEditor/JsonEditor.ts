@@ -3,9 +3,10 @@ import * as React from "react";
 var reactDOM = require("react-dom");
 import { Editor, IProps } from "./components/Editor";
 import * as monaco from 'monaco-editor';
-import { json } from "stream/consumers";
 
-
+/**
+* Json Editor Class to construct the monaco editor and it's properties.
+*/
 export class JsonEditor implements ComponentFramework.StandardControl<IInputs, IOutputs> {
 
     private _container: HTMLDivElement;
@@ -19,7 +20,6 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
     constructor() {
 
     }
-
 
 
     /**
@@ -57,7 +57,6 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         //this.editorInstance.getAction('editor.action.formatDocument').run() 
         let props: IProps = {
             value: context.parameters.Value.raw || undefined,
-            language: "json",
             onChange: this.notifyChange.bind(this),
             readOnly: context.mode.isControlDisabled,
             allocatedWidth: allocatedWidth,
@@ -84,14 +83,12 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         reactDOM.unmountComponentAtNode(this._container);
     }
 
+    /**
+     * A PCF Control notifies the changes of its outputs with the notifyOutputChanged method
+     */
+
     private notifyChange(value: string | undefined) {
         this._value = value;
         this._notifyOutputChanged();
     }
-
-    // private jsonDataFormat(jsonData: string | undefined)
-    // {
-    //    const data = JsonFormatter({json: jsonData, jsonStyle: {}});
-    //    alert(data);
-    // }
 }
