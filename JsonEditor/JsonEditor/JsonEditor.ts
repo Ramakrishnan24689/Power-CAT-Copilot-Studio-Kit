@@ -3,23 +3,24 @@ import * as React from "react";
 var reactDOM = require("react-dom");
 import { Editor, IProps } from "./components/Editor";
 import * as monaco from 'monaco-editor';
+import { json } from "stream/consumers";
 
-/**
-* Json Editor Class to construct the monaco editor and it's properties.
-*/
 
 export class JsonEditor implements ComponentFramework.StandardControl<IInputs, IOutputs> {
 
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
     private _value: string | undefined;
-    editorInstance: monaco.editor.IStandaloneCodeEditor
+    editorInstance: monaco.editor.IStandaloneCodeEditor;
+    context: ComponentFramework.Context<IInputs>;
     /**
      * Empty constructor.
      */
     constructor() {
 
     }
+
+
 
     /**
      * Used to initialize the control instance. Controls can kick off remote server calls and other initialization actions here.
@@ -30,8 +31,10 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param container If a control is marked control-type='standard', it will receive an empty div element within which it can render its content.
      */
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
+        this.context = context;
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
+        context.mode.trackContainerResize(true);
     }
 
 
@@ -40,14 +43,27 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
      */
 
+    //JsonEditor
+
+    //change the code to value.
+
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         this._value = context.parameters.Value.raw || undefined;
+        this.context = context;
+        context.mode.trackContainerResize(true);
+        const allocatedWidth = parseInt(context.mode.allocatedWidth as unknown as string);
+        const allocatedHeight = parseInt(context.mode.allocatedHeight as unknown as string);
+        
         //this.editorInstance.getAction('editor.action.formatDocument').run() 
         let props: IProps = {
-            value: this._value,
-            onChange: this.notifyChange.bind(this)
+            value: context.parameters.Value.raw || undefined,
+            language: "json",
+            onChange: this.notifyChange.bind(this),
+            readOnly: context.mode.isControlDisabled,
+            allocatedWidth: allocatedWidth,
+            allocatedHeight: allocatedHeight
         }
-        reactDOM.render(React.createElement(Editor, props), this._container);
+        reactDOM.render(React.createElement(Editor, props), this._container)
     }
 
     /**
@@ -68,11 +84,14 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         reactDOM.unmountComponentAtNode(this._container);
     }
 
-    /**
-     * A PCF Control notifies the changes of its outputs with the notifyOutputChanged method
-     */
     private notifyChange(value: string | undefined) {
         this._value = value;
         this._notifyOutputChanged();
     }
+
+    // private jsonDataFormat(jsonData: string | undefined)
+    // {
+    //    const data = JsonFormatter({json: jsonData, jsonStyle: {}});
+    //    alert(data);
+    // }
 }
