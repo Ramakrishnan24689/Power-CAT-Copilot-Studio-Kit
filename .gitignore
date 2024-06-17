@@ -1,0 +1,14 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/Powercat-Copilotstudio-Accelerator
+/.vs
+/POWERCAT/POWERCAT/.vs/POWERCAT
+/POWERCAT/POWERCAT/packages
+/POWERCAT/POWERCAT/POWERCAT.Plugins/bin/Debug
+/POWERCAT/POWERCAT/POWERCAT.Plugins/obj/Debug
+/POWERCAT/POWERCAT/POWERCAT.Webresources/bin/Debug
+/POWERCAT/POWERCAT/POWERCAT.Webresources/obj/Debug
+/POWERCAT/.vs/POWERCAT
+/POWERCAT/POWERCAT/POWERCAT.Webresources/.vs
