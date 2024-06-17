@@ -42,9 +42,9 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
         onMount={async(editor)=>
             {
                 editor.layout({width: props.allocatedWidth , height: props.allocatedHeight});
-                editor.onMouseMove(() => {
+                editor.onMouseMove(()=>{
                     {
-                        setTimeout(function(){
+                        setTimeout(()=>{
                           editor.getAction('editor.action.formatDocument').run();
                         },30);
                     }
