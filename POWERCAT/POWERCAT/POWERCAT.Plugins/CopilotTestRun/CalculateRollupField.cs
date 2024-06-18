@@ -33,6 +33,8 @@ namespace POWERCAT.Plugins.CopilotTestRun
 
             try
             {
+                tracingService.Trace("CalculateRollupField initiating..");
+
                 // Create the CalculateRollupFieldRequest with the target entity and field name
                 CalculateRollupFieldRequest calRollupRequest = new CalculateRollupFieldRequest
                 {
