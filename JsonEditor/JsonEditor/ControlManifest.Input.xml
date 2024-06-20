@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="JsonEditor" version="1.0.0" display-name-key="Json Editor" description-key="Json Editor" control-type="standard" >
+  <control namespace="PowerCAT" constructor="JsonEditor" version="1.2.3" display-name-key="Json Editor" description-key="Json Editor" control-type="standard" >
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
-    <property name="Value" display-name-key="PCFJsonEditor_Display_Key" description-key="Code_Desc_Key" of-type="Multiple" usage="bound" required="true" />
+    <property name="Value" display-name-key="Value" description-key="Field Value" of-type="Multiple" usage="bound" required="true" />
+    <property name="Height" display-name-key="JsonEditor Height" description-key="Editor Height" of-type="Whole.None" usage="input" required="false" />
     <resources>
       <code path="index.ts" order="1"/>
       <resx path="strings/CodeEditor.1033.resx" version="1.0.0" />

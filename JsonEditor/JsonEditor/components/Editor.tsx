@@ -4,8 +4,7 @@ export interface IProps {
     value: string | undefined;
     onChange: (code: string | undefined) => void;
     readOnly: boolean;
-    allocatedWidth: number;
-    allocatedHeight: number;
+    EditorHeight: number
 }
 
 loader.init().then((monaco) => {
@@ -24,8 +23,7 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
         props.onChange(value);
     }
     return<Monaco
-        height="30vh"
-        className="jsonEditor"
+        height={(props.EditorHeight).toString() + "vh"}
         defaultLanguage='json'
         defaultValue={props.value}
         theme="myTheme"
@@ -36,12 +34,11 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
             formatOnType: true,
             autoIndent: "full",
             formatOnPaste: true,
-            automaticLayout: true,
-            readOnly: props.readOnly
+            readOnly: props.readOnly,
+            scrollBeyondLastLine: false
           }}
         onMount={async(editor)=>
             {
-                editor.layout({width: props.allocatedWidth , height: props.allocatedHeight});
                 editor.onMouseMove(()=>{
                     {
                         setTimeout(()=>{

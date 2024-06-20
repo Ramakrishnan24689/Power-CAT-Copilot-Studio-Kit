@@ -34,7 +34,6 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         this.context = context;
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
-        context.mode.trackContainerResize(true);
     }
 
 
@@ -43,26 +42,16 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
      */
 
-    //JsonEditor
-
-    //change the code to value.
-
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         this._value = context.parameters.Value.raw || undefined;
         this.context = context;
-        context.mode.trackContainerResize(true);
-        const allocatedWidth = parseInt(context.mode.allocatedWidth as unknown as string);
-        const allocatedHeight = parseInt(context.mode.allocatedHeight as unknown as string);
-        
-        //this.editorInstance.getAction('editor.action.formatDocument').run() 
         let props: IProps = {
             value: context.parameters.Value.raw || undefined,
             onChange: this.notifyChange.bind(this),
             readOnly: context.mode.isControlDisabled,
-            allocatedWidth: allocatedWidth,
-            allocatedHeight: allocatedHeight
+            EditorHeight: context.parameters.Height.raw || 25,
         }
-        reactDOM.render(React.createElement(Editor, props), this._container)
+        reactDOM.render(React.createElement(Editor, props), this._container);
     }
 
     /**
