@@ -2,7 +2,6 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import * as React from "react";
 var reactDOM = require("react-dom");
 import { Editor, IProps } from "./components/Editor";
-import * as monaco from 'monaco-editor';
 
 /**
 * Json Editor Class to construct the monaco editor and it's properties.
@@ -11,19 +10,11 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
 
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
-    private _value: string | undefined;
-    private _editorInstance: monaco.editor.IStandaloneCodeEditor;
-    private _context: ComponentFramework.Context<IInputs>;
+    private _value: string | undefined
     private _entityName: string;
     private _entityId: string;
     private _clientUrl: string;
     private _fileColumnLogicalName: string;
-    /**
-     * Empty constructor.
-     */
-    constructor() {
-
-    }
 
 
     /**
@@ -35,14 +26,14 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param container If a control is marked control-type='standard', it will receive an empty div element within which it can render its content.
      */
 
-    public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
-        this._context = context;
+    public async init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): Promise<void> {
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
         this._entityName = (<any>context).page.entityTypeName;
         this._entityId = (<any>context).page.entityId;
         this._clientUrl = (<any>context).page.getClientUrl();
-        this._fileColumnLogicalName = this._context.parameters.fileColumnLogicalName.raw || "";
+        this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
+
     }
 
 
@@ -56,15 +47,13 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
     /**
      * Added the logic to provide the file column logical name which will call the API to fetch the data and show details in the value field if the file column is selected true and have read only field else it will take the custom data provided by the user.
      */
-
-        let isReadOnly = false;
-        this._context = context;
-        if(context.parameters.FileColumn.raw === "True")
+      let isReadOnly = false;
+      if(context.parameters.FileColumn.raw === "True")
         {       
           this._value = await this.getFileContent() || "";
           isReadOnly = true;
         }
-        else
+      else
         {
           this._value = context.parameters.Value.raw || "";
         }
@@ -89,13 +78,11 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
           const increment = 4194304;
 
           const url = `${this._clientUrl}/api/data/v9.2/${this._entityName}s(${this._entityId})/${this._fileColumnLogicalName}/$value`;
-          console.log(`URL: ${url}`);
           let finalContent = "";
           let fileSize = 0;
           let fileName = "";
     
           while (startBytes <= fileSize) {
-            console.log(`startBytes: ${startBytes} fileSize: ${fileSize}`);
             const response = await fetch(url, {
               method: "GET",
               headers: {
@@ -116,11 +103,14 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
                 fileName = response.headers.get("x-ms-file-name") ?? "0";
               }
             }
+            else
+            {
+              break;
+            }
           }
     
           return finalContent;
         } catch (error) {
-          console.error("Error getting file content:", error);
           throw error; // Rethrow the error to be handled in the updateView method
         }
       }
