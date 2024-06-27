@@ -12,8 +12,8 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
     private _value: string | undefined;
-    editorInstance: monaco.editor.IStandaloneCodeEditor;
-    context: ComponentFramework.Context<IInputs>;
+    private _editorInstance: monaco.editor.IStandaloneCodeEditor;
+    private _context: ComponentFramework.Context<IInputs>;
     private _entityName: string;
     private _entityId: string;
     private _clientUrl: string;
@@ -36,13 +36,13 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      */
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
-        this.context = context;
+        this._context = context;
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
         this._entityName = (<any>context).page.entityTypeName;
         this._entityId = (<any>context).page.entityId;
         this._clientUrl = (<any>context).page.getClientUrl();
-        this._fileColumnLogicalName = this.context.parameters.fileColumnLogicalName.raw || "";
+        this._fileColumnLogicalName = this._context.parameters.fileColumnLogicalName.raw || "";
     }
 
 
@@ -58,7 +58,7 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      */
 
         let isReadOnly = false;
-        this.context = context;
+        this._context = context;
         if(context.parameters.FileColumn.raw === "True")
         {       
           this._value = await this.getFileContent() || "";
