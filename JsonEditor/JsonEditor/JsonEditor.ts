@@ -33,7 +33,6 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         this._entityId = (<any>context).page.entityId;
         this._clientUrl = (<any>context).page.getClientUrl();
         this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
-
     }
 
 
@@ -48,15 +47,12 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * Added the logic to provide the file column logical name which will call the API to fetch the data and show details in the value field if the file column is selected true and have read only field else it will take the custom data provided by the user.
      */
       let isReadOnly = false;
-      if(context.parameters.FileColumn.raw === "True")
-        {       
-          this._value = await this.getFileContent() || "";
-          isReadOnly = true;
-        }
-      else
-        {
-          this._value = context.parameters.Value.raw || "";
-        }
+      if (context.parameters.FileColumn.raw === "True") {
+        this._value = (await this.getFileContent()) || "";
+        isReadOnly = true;
+      } else {
+        this._value = context.parameters.Value.raw || "";
+      }
         
         let props: IProps = {
             value: this._value,
