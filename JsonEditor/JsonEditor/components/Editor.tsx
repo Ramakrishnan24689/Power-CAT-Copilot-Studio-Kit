@@ -56,7 +56,6 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
             formatOnType: true,
             autoIndent: "full",
             formatOnPaste: true,
-            //readOnly: props.readOnly,
             scrollBeyondLastLine: false
           }}
         
