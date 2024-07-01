@@ -1,7 +1,7 @@
 import Monaco, {loader} from "@monaco-editor/react";
 
 export interface IProps {
-    value: string | undefined
+    value: string | undefined;
     onChange: (code: string | undefined) => void;
     readOnly: boolean;
     EditorHeight: number
