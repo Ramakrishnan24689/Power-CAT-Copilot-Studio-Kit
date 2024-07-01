@@ -28,15 +28,6 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
         defaultValue={props.value}
         theme="myTheme"
         onChange={handleEditorChange}
-        options={{
-            wordWrap: "on",
-            lineHeight: 28,
-            formatOnType: true,
-            autoIndent: "full",
-            formatOnPaste: true,
-            readOnly: props.readOnly,
-            scrollBeyondLastLine: false
-          }}
         onMount={async(editor)=>
             {
                 editor.onMouseMove(()=>{
@@ -45,8 +36,28 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
                           editor.getAction('editor.action.formatDocument').run();
                         },30);
                     }
+
+                    if(props.readOnly)
+                        {
+                            props.readOnly = false;
+                            editor.getAction('editor.action.formatDocument').run();
+                            setTimeout(()=>{
+                                editor.updateOptions({ readOnly: true});
+                              },30);
+                              
+                        }
                 })
+                
             }
         }
+        options={{
+            wordWrap: "on",
+            lineHeight: 18,
+            formatOnType: true,
+            autoIndent: "full",
+            formatOnPaste: true,
+            scrollBeyondLastLine: false
+          }}
+        
     />;
 };

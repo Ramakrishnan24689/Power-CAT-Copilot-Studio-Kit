@@ -2,7 +2,6 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import * as React from "react";
 var reactDOM = require("react-dom");
 import { Editor, IProps } from "./components/Editor";
-import * as monaco from 'monaco-editor';
 
 /**
 * Json Editor Class to construct the monaco editor and it's properties.
@@ -11,15 +10,11 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
 
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
-    private _value: string | undefined;
-    editorInstance: monaco.editor.IStandaloneCodeEditor;
-    context: ComponentFramework.Context<IInputs>;
-    /**
-     * Empty constructor.
-     */
-    constructor() {
-
-    }
+    private _value: string | undefined
+    private _entityName: string;
+    private _entityId: string;
+    private _clientUrl: string;
+    private _fileColumnLogicalName: string;
 
 
     /**
@@ -30,10 +25,14 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param state A piece of data that persists in one session for a single user. Can be set at any point in a controls life cycle by calling 'setControlState' in the Mode interface.
      * @param container If a control is marked control-type='standard', it will receive an empty div element within which it can render its content.
      */
-    public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
-        this.context = context;
+
+    public async init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): Promise<void> {
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
+        this._entityName = (<any>context).page.entityTypeName;
+        this._entityId = (<any>context).page.entityId;
+        this._clientUrl = (<any>context).page.getClientUrl();
+        this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
     }
 
 
@@ -42,17 +41,75 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
      */
 
-    public updateView(context: ComponentFramework.Context<IInputs>): void {
-        this._value = context.parameters.Value.raw || undefined;
-        this.context = context;
+    public async updateView(context: ComponentFramework.Context<IInputs>): Promise<void> {
+
+    /**
+     * Added the logic to provide the file column logical name which will call the API to fetch the data and show details in the value field if the file column is selected true and have read only field else it will take the custom data provided by the user.
+     */
+      let isReadOnly = false;
+      if (context.parameters.FileColumn.raw === "True") {
+        this._value = (await this.getFileContent()) || "";
+        isReadOnly = true;
+      } else {
+        this._value = context.parameters.Value.raw || "";
+      }
+        
         let props: IProps = {
-            value: context.parameters.Value.raw || undefined,
+            value: this._value,
             onChange: this.notifyChange.bind(this),
-            readOnly: context.mode.isControlDisabled,
+            readOnly: isReadOnly || context.mode.isControlDisabled,
             EditorHeight: context.parameters.Height.raw || 25,
         }
         reactDOM.render(React.createElement(Editor, props), this._container);
     }
+
+
+    /**
+     * The logic is added to get the data from the API and store the value in the control field based on the file column logical name.
+     */
+
+    private async getFileContent(): Promise<string> {
+        try {
+          let startBytes = 0;
+          const increment = 4194304;
+
+          const url = `${this._clientUrl}/api/data/v9.2/${this._entityName}s(${this._entityId})/${this._fileColumnLogicalName}/$value`;
+          let finalContent = "";
+          let fileSize = 0;
+          let fileName = "";
+    
+          while (startBytes <= fileSize) {
+            const response = await fetch(url, {
+              method: "GET",
+              headers: {
+                Range: `bytes=${startBytes}-${startBytes + increment - 1}`,
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0",
+                "If-None-Match": "null",
+                Accept: "application/json",
+              },
+            });
+    
+            if (response.status === 206) {
+              const content = await response.text();
+              finalContent += content;
+              startBytes += increment;
+              if (fileSize === 0) {
+                fileSize = parseInt(response.headers.get("x-ms-file-size") ?? "0");
+                fileName = response.headers.get("x-ms-file-name") ?? "0";
+              }
+            }
+            else
+            {
+              break;
+            }
+          }
+    
+          return finalContent;
+        } catch (error) {
+          throw error; // Rethrow the error to be handled in the updateView method
+        }
+      }
 
     /**
      * It is called by the framework prior to a control receiving new data.
