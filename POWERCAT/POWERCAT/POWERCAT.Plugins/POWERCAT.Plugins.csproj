@@ -90,6 +90,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
+    <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

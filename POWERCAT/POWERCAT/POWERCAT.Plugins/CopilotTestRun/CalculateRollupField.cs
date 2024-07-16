@@ -1,4 +1,7 @@
-﻿using Microsoft.Crm.Sdk.Messages;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using System;
 
