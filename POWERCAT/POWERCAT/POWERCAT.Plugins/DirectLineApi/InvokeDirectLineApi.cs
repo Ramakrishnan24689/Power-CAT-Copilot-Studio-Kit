@@ -31,6 +31,7 @@ namespace POWERCAT.Plugins.DirectLineApi
             // Obtain the execution context from the service provider.  
             IPluginExecutionContext context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
 
+            // Set HttpClient instance
             _httpClient = new HttpClient();
 
             // Check the stage - Main operation

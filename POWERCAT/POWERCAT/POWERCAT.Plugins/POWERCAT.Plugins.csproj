@@ -89,6 +89,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ApplicationInsightsApi\InvokeApplicationInsightsApi.cs" />
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
     <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
