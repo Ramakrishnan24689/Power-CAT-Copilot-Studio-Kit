@@ -122,7 +122,7 @@ namespace POWERCAT.Plugins.ApplicationInsightsApi
             string body = $"{{ \"query\": \"{escapedQuery}\" }}";
             StringContent content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            HttpResponseMessage response = await _httpClient.PostAsync("https://api.applicationinsights.io/v1/apps/" + applicationId + "/query?timespan=PT1H", content);
+            HttpResponseMessage response = await _httpClient.PostAsync("https://api.applicationinsights.io/v1/apps/" + applicationId + "/query", content);
             if (response.IsSuccessStatusCode)
             {
                 return await response.Content.ReadAsStringAsync();
