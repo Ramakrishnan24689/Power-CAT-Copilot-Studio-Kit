@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "POWERCAT.Plugins", "POWERCA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "POWERCAT.Webresources", "POWERCAT.Webresources\POWERCAT.Webresources.csproj", "{7AFF4C56-D7D9-465D-92FC-6E72A9E917C2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "POWERCAT.UnitTests", "POWERCAT.UnitTests\POWERCAT.UnitTests.csproj", "{23E0BE5F-DDDD-4DFD-9B62-611CEF287E42}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{7AFF4C56-D7D9-465D-92FC-6E72A9E917C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7AFF4C56-D7D9-465D-92FC-6E72A9E917C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7AFF4C56-D7D9-465D-92FC-6E72A9E917C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23E0BE5F-DDDD-4DFD-9B62-611CEF287E42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23E0BE5F-DDDD-4DFD-9B62-611CEF287E42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23E0BE5F-DDDD-4DFD-9B62-611CEF287E42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23E0BE5F-DDDD-4DFD-9B62-611CEF287E42}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
