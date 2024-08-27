@@ -30,7 +30,9 @@ class TestRunExecutorService {
         clientId: clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
         redirectUri: clientUrl,
-        postLogoutRedirectUri: window.location.href,
+      },
+      cache: {
+        cacheLocation: "memoryStorage",
       },
     };
     this.publicClientApplication = new PublicClientApplication(msalConfig);
@@ -82,9 +84,9 @@ class TestRunExecutorService {
       const user = await Xrm.WebApi.retrieveRecord(
         "systemuser",
         globalContext.userSettings.userId,
-        "?$select=internalemailaddress"
+        "?$select=domainname"
       );
-      return user.internalemailaddress;
+      return user.domainname;
     } catch (error) {
       throw new Error(
         "Failed to retrieve user email address. Error Message: " + error.message
@@ -126,7 +128,8 @@ class TestRunExecutorService {
    */
   private async invokeDataverseAction(
     copilotConfigurationId: string,
-    accessToken: string | null
+    accessToken: string | null,
+    testRunWarningMessage: string | null
   ): Promise<void> {
     try {
       const copilotTestSetId = this.formContext
@@ -183,6 +186,14 @@ class TestRunExecutorService {
           "TESTRUN_ACTION_NOTIFICATION"
         );
         this.removeNotification("TESTRUN_ACTION_NOTIFICATION");
+        if (testRunWarningMessage !== null) {
+          this.formContext.ui.setFormNotification(
+            testRunWarningMessage,
+            "WARNING",
+            "TESTRUN_WARNING_NOTIFICATION"
+          );
+          this.removeNotification("TESTRUN_WARNING_NOTIFICATION");
+        }
       } else {
         throw new Error("Failed to execute the action.");
       }
@@ -200,7 +211,7 @@ class TestRunExecutorService {
   private removeNotification(uniqueId: string) {
     setTimeout(() => {
       this.formContext.ui.clearFormNotification(uniqueId);
-    }, 7000);
+    }, 12000);
   }
 
   /**
@@ -212,6 +223,8 @@ class TestRunExecutorService {
     const formContext = executionContext.getFormContext();
     let accessToken = null;
     let testRunExecutorService: TestRunExecutorService;
+    let testRunWarningMessage: string = null;
+
     // Run only on create form
     if (formContext.ui.getFormType() !== 1) {
       return;
@@ -243,11 +256,14 @@ class TestRunExecutorService {
         accessToken = await testRunExecutorService.getAccessTokenByMSAL(
           globalContext
         );
+        testRunWarningMessage =
+          "This test set is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
       }
 
       await testRunExecutorService.invokeDataverseAction(
         copilotConfigId,
-        accessToken
+        accessToken,
+        testRunWarningMessage
       );
     } catch (error) {
       formContext.ui.setFormNotification(
