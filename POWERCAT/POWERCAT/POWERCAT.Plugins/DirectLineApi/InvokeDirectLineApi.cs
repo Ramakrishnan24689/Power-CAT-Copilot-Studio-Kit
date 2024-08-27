@@ -6,6 +6,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace POWERCAT.Plugins.DirectLineApi
@@ -58,7 +59,7 @@ namespace POWERCAT.Plugins.DirectLineApi
                 string conversationId = string.Empty;
                 string tokenResponse = string.Empty;
                 #endregion
-
+               
                 //Invoke apis based on message name
                 switch (messageName)
                 {
@@ -88,6 +89,11 @@ namespace POWERCAT.Plugins.DirectLineApi
                         botFrameworkUri = (string)context.InputParameters["cat_BotFrameworkUri"];
                         conversationId = (string)context.InputParameters["cat_ConverationId"];
                         tokenResponse = GetResponseAsync(token, botFrameworkUri, conversationId).Result;
+                        break;
+                    case "cat_BotUserAuthentication":
+                        string sasUrl = (string)context.InputParameters["cat_SasUrl"];
+                        string accessToken = (string)context.InputParameters["cat_AccessToken"];
+                        tokenResponse = BotUserAuthenticationAsync(sasUrl, accessToken).Result;
                         break;
                     default:
                         tracingService.Trace("The plug-in is not associated with the expected message.");
@@ -188,6 +194,21 @@ namespace POWERCAT.Plugins.DirectLineApi
                 return await response.Content.ReadAsStringAsync();
             }
             return $"Error: {response.StatusCode} - {response.ReasonPhrase}\nResponse:\n{await response.Content.ReadAsStringAsync()}";
+        }
+
+        /// <summary>
+        /// Authenticate user with bot asynchronously.
+        /// </summary>
+        /// <param name="sasUrl">Sas Url.</param>
+        /// <param name="accessToken">Access Token.</param>
+        /// <returns>The token response.</returns>
+        private async Task<String> BotUserAuthenticationAsync(string sasUrl, string accessToken)
+        {
+            var body = new { token = accessToken };
+            var jsonBody = JsonSerializer.Serialize(body);
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            HttpResponseMessage response = await _httpClient.PostAsync(sasUrl, content);
+            return $"Status Code: {response.StatusCode}";
         }
     }
 }
