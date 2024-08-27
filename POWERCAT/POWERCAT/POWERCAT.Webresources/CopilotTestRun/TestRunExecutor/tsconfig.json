@@ -1,0 +1,12 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "target": "ES6",
+    "outDir": "dist",
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "types": ["xrm"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "**/*.spec.ts", "dist"]
+}
