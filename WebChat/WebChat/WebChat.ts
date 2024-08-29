@@ -1,6 +1,6 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import * as React from "react";
-import * as ReactDOM from "react-dom/client"; // Using ReactDOM from React 18
+import * as ReactDOM from "react-dom/client";
 import BotTranscript from "./Components/BotTranscript";
 import Transcript from "./src/model/Transcript";
 
@@ -62,12 +62,13 @@ export class WebChat implements ComponentFramework.StandardControl<IInputs, IOut
         return {}; // No data to save
     }
 
-    /**
-     * Cleans up the control by unmounting the React component.
-     */
     public notifyOutputChanged(): void {
         // No data output changes to notify
     }
+
+    /**
+     * Cleans up the control by unmounting the React component.
+     */
 
     public destroy(): void {
         if (this._root) {
