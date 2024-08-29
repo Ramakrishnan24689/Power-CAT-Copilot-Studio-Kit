@@ -34,8 +34,9 @@ export class WebChat implements ComponentFramework.StandardControl<IInputs, IOut
         this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
 
         // Set container styles for scrolling
-        this._container.style.height = "500px";
+        this._container.style.height = "600px";
         this._container.style.overflowY = "auto";
+        this._container.style.backgroundColor = "#f7f7f7";
 
         // Initialize the React root for React 18
         this._root = ReactDOM.createRoot(this._container);
@@ -51,19 +52,23 @@ export class WebChat implements ComponentFramework.StandardControl<IInputs, IOut
      */
     public async updateView(context: ComponentFramework.Context<IInputs>): Promise<void> {
         this._transcript = (await this.getFileContent()) || {};
-        this.renderComponent();
+        this.renderComponent(); // Only rendering the component, no data saving
     }
 
     /**
      * Returns the outputs of the control.
      */
     public getOutputs(): IOutputs {
-        return {};
+        return {}; // No data to save
     }
 
     /**
      * Cleans up the control by unmounting the React component.
      */
+    public notifyOutputChanged(): void {
+        // No data output changes to notify
+    }
+
     public destroy(): void {
         if (this._root) {
             this._root.unmount(); // Unmount the component

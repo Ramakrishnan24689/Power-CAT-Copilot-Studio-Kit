@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="JsonEditor" version="12.7.4" display-name-key="Json Editor" description-key="Json Editor" control-type="standard" >
+  <control namespace="PowerCAT" constructor="JsonEditor" version="13.5.0" display-name-key="Json Editor" description-key="Json Editor" control-type="standard" >
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
-    <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="bound" required="true" />
+    <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="input" required="true" />
     <type-group name="strings">
       <type>SingleLine.Text</type> 
       <type>SingleLine.TextArea</type> 
