@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="PowerCAT" constructor="WebChat" version="3.11.0" display-name-key="WebChat" description-key="WebChat description" control-type="standard">
+    
+    <!-- External service usage -->
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    
+    <!-- Property for bound value -->
+    <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="input" required="true" />
+    
+    <!-- Type group definition for strings -->
+    <type-group name="strings">
+      <type>SingleLine.Text</type>
+      <type>SingleLine.TextArea</type>
+      <type>Multiple</type>
+    </type-group>
+    
+    <!-- Property for file column logical name -->
+    <property name="fileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
+    
+    <!-- Resource files -->
+    <resources>
+      <code path="index.ts" order="1"/>
+      <css path="Components/css/BotTranscriptStyle.css" order="1" />
+    </resources>
+  </control>
+</manifest>
