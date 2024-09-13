@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Microsoft.Identity.Client;
 using Microsoft.Xrm.Sdk;
 using System;
 using System.Net.Http;
@@ -91,18 +92,25 @@ namespace POWERCAT.Plugins.ApplicationInsightsApi
         /// <param name="tenantId">Tenant Id.</param>
         /// <param name="clientId">Azure Application Client Id.</param>
         /// <param name="clientSecret">Azure Application Client Secret.</param>
-        /// <returns>The api response with access token.</returns>
+        /// <returns>The access token.</returns>
         private async Task<String> GenerateAppInsightsAccessTokenAsync(string tenantId, string clientId, string clientSecret)
         {
-            string body = $"grant_type=client_credentials&client_id={clientId}&resource=https://api.loganalytics.io&client_secret={clientSecret}";
-            HttpContent content = new StringContent(body, Encoding.UTF8, "application/x-www-form-urlencoded");
-            HttpResponseMessage response = await _httpClient.PostAsync("https://login.microsoftonline.com/" + tenantId + "/oauth2/token", content);
-            
-            if (response.IsSuccessStatusCode)
+            string authority = $"https://login.microsoftonline.com/{tenantId}";
+            string[] scopes = new string[] { "https://api.applicationinsights.io/.default" };
+            IConfidentialClientApplication app = ConfidentialClientApplicationBuilder.Create(clientId)
+                .WithClientSecret(clientSecret)
+                .WithAuthority(new Uri(authority))
+                .Build();
+
+            try
             {
-                return await response.Content.ReadAsStringAsync();
+                AuthenticationResult result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
+                return result.AccessToken;
             }
-            return $"Error: {response.StatusCode} - {response.ReasonPhrase}\nResponse:\n{await response.Content.ReadAsStringAsync()}";
+            catch (MsalServiceException ex)
+            {
+                throw new InvalidPluginExecutionException("Failed to get access token." + ex.Message);
+            }
         }
 
         /// <summary>

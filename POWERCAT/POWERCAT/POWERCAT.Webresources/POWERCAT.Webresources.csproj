@@ -46,5 +46,8 @@
   <ItemGroup>
     <Content Include="CopilotTestRun\copilottestrun_main.js" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="BotAuthenticationService\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
