@@ -23,7 +23,7 @@ function hideAndShowConversationKPISettings(executionContext) {
 
         setFieldRequirements(formContext, ["cat_copilotid", "cat_dataverseurl"], "required");
 
-    } else {
+    } else if(configurationTypeValue === 1) {
         kpiSection.setVisible(false);
         toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, true); 
 
@@ -33,6 +33,12 @@ function hideAndShowConversationKPISettings(executionContext) {
         formContext.getAttribute("cat_trackedvariables").setValue(null);
 
         hideAndShowFields(executionContext);
+    }
+    else {
+      
+        kpiSection.setVisible(false);
+        toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, false); 
+
     }
 }
 
@@ -49,7 +55,7 @@ function hideAndShowFields(executionContext) {
 
     if (configurationTypeValue === 2) {
         section.setVisible(false); 
-    } else {
+    } else if (configurationTypeValue === 1) {
         const controls = [
             { controlName: "cat_dataverseurl1", fieldName: "cat_dataverseurl", requiredLevel: isEnrichedWithTranscripts ? "required" : "none", value: isEnrichedWithTranscripts ? null : "" },
             { controlName: "cat_iscopyfulltranscriptenabled1", fieldName: "cat_iscopyfulltranscriptenabled", requiredLevel: "none", value: isEnrichedWithTranscripts ? null : false }
@@ -69,8 +75,6 @@ function hideAndShowFields(executionContext) {
                 }
             }
         });
-
-        section.setVisible(true); 
     }
 }
 

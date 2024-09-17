@@ -48,9 +48,6 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
             onMount={async (editor) => {
                 editorRef.current = editor; // Store the editor instance in the ref
 
-                // Automatically format the document immediately after the editor is mounted
-                editor.getAction('editor.action.formatDocument').run();
-
                 // Handle mouse movement within the editor
                 editor.onMouseMove(() => {
                     // Automatically format the document after a brief delay
