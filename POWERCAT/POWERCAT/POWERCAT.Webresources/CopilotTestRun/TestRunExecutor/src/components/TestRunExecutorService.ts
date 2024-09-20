@@ -262,7 +262,7 @@ class TestRunExecutorService {
           copilotConfig.cat_scope
         );
         testRunWarningMessage =
-          "This copilot configuration is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
+          "This agent configuration is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
       }
 
       await testRunExecutorService.invokeDataverseAction(
