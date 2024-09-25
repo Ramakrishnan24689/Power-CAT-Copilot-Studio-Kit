@@ -124,7 +124,9 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @returns An empty object as there are no bound outputs in this control.
      */
     public getOutputs(): IOutputs {
-        return {}; // No outputs to return
+        return {
+            Value: this._value ?? ""
+        };
     }
 
     /**

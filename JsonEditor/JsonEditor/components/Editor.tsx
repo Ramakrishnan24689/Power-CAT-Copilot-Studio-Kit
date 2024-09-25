@@ -24,17 +24,24 @@ loader.init().then((monaco) => {
 // Functional component representing the custom Monaco editor
 export const Editor: React.FunctionComponent<IProps> = (props) => {
     const editorRef = React.useRef<any>(null); // Reference to the editor instance
+    const valueRef = React.useRef(props.value); // Track the external value
 
     // Handle changes in the editor and pass the updated value to the parent component
     function handleEditorChange(value: string | undefined) {
         props.onChange(value);
     }
 
-    // Effect to update the editor value and options when props change
+    // Effect to update the editor value only when the external prop changes
     React.useEffect(() => {
-        if (editorRef.current) {
-            editorRef.current.setValue(props.value || ''); // Set editor value to the provided prop value
-            editorRef.current.updateOptions({ readOnly: props.readOnly }); // Update read-only mode based on props
+        if (editorRef.current && valueRef.current !== props.value) {
+            const editor = editorRef.current;
+            const selection = editor.getSelection(); // Get the current cursor position
+
+            editor.setValue(props.value || ''); // Set editor value to the provided prop value
+            editor.setSelection(selection); // Restore the cursor position
+            editor.updateOptions({ readOnly: props.readOnly }); // Update read-only mode
+
+            valueRef.current = props.value; // Update the ref to the current prop value
         }
     }, [props.value, props.readOnly]); // Depend on value and readOnly props for re-rendering
 
