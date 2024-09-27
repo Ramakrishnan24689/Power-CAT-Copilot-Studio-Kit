@@ -14,7 +14,7 @@ import AdaptiveCardRenderer from "./AdaptiveCardRenderer";
 
 // Define the props for the BotTranscript component
 interface BotTranscriptProps {
-    transcript: Transcript; // Transcript data, containing bot and user activities
+    transcript: Transcript; 
 }
 
 // Functional component to render the bot transcript
@@ -33,7 +33,7 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
             day: "numeric",
             hour: "numeric",
             minute: "numeric",
-            hour12: true, // Display in 12-hour format
+            hour12: true, 
         });
     };
 
@@ -47,11 +47,11 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
      */
     const renderMessageContent = (activity: Activity) => {
         if (activity.text) {
-            // If the message contains text, render it using ReactMarkdown with support for GFM (GitHub Flavored Markdown)
+            // Render markdown text content
             return (
                 <ReactMarkdown
                     children={activity.text}
-                    remarkPlugins={[remarkGfm]} // Enable support for GitHub Flavored Markdown
+                    remarkPlugins={[remarkGfm]} 
                     components={{
                         p: ({ node, ...props }) => <p {...props} className="message-text" />, // Paragraphs
                         h1: ({ node, ...props }) => <h1 {...props} className="message-text" />, // Headers
@@ -63,52 +63,49 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
                 />
             );
         } else if (activity.value) {
-            // If the message contains key-value pairs (e.g., data from a form submission), render the values excluding unwanted keys
+            // Render key-value pairs, excluding 'actionSubmitId'
             const filteredValues = Object.entries(activity.value).filter(
-                ([key, _]) => key !== 'actionSubmitId' // Exclude 'actionSubmitId' from the display
+                ([key, _]) => key !== 'actionSubmitId' 
             );
 
             return (
                 <div className="message-text">
-                    {/* Display all key-value pairs except 'actionSubmitId' */}
                     {filteredValues.map(([key, value], index) => (
                         <div key={index}>{value}</div>
                     ))}
                 </div>
             );
         } else {
-            return null; // If no text or value is present, return null
+            return null; 
         }
     };
 
     return (
         <div className="transcript-container">
             <div className="transcript">
-                {/* Iterate over transcript activities and filter out only 'message' type activities */}
                 {transcript.activities && transcript.activities
                     .filter(activity => activity.type === 'message') // Filter to show only message activities
                     .map((activity: Activity, index: number) => (
                         <div key={index} className={`message ${activity.from.role === 1 ? 'user' : 'bot'}`}>
-                            {/* Render the avatar image based on whether the sender is the bot or the user */}
+                            {/* Render the avatar based on sender (user/bot) */}
                             <img
                                 src={activity.from.role === 0 ? 'WebResources/cat_/powercat/img/webchatbotavatar.svg' : 'WebResources/cat_/powercat/img/webchatuseravatar.svg'}
                                 alt={`${activity.from.role === 0 ? 'Bot' : 'User'} avatar`}
                                 className="avatar"
                             />
                             <div className="message-content">
-                                {/* Render the message content, either text or value */}
                                 {renderMessageContent(activity)}
 
-                                {/* If there are any attachments, such as adaptive cards, render them */}
+                                {/* Render adaptive card attachments if present */}
                                 {activity.attachments && activity.attachments.length > 0 && activity.attachments.map((attachment, idx) => (
                                     <div key={idx} className="adaptive-card-wrapper">
                                         {attachment.contentType === 'application/vnd.microsoft.card.adaptive' && (
-                                            <AdaptiveCardRenderer card={attachment.content} /> // Render the adaptive card
+                                            <AdaptiveCardRenderer card={attachment.content} />
                                         )}
                                     </div>
                                 ))}
 
-                                {/* Display the timestamp of the message */}
+                                {/* Display the timestamp */}
                                 <div className="message-timestamp">
                                     {formatTimestamp(activity.timestamp)}
                                 </div>
