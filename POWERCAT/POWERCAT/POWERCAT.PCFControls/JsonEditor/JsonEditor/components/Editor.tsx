@@ -1,68 +1,74 @@
 import Monaco, { loader } from "@monaco-editor/react";
 import * as React from "react";
 
+/**
+ * Editor Component
+ * 
+ * This component represents a custom Monaco editor that allows users to edit JSON or other code formats.
+ * It supports read-only mode, dynamic content updates, and formatting options.
+ */
+
 // Define the properties interface for the Editor component
 export interface IProps {
-    value: string | undefined; // The current code value displayed in the editor
-    onChange: (code: string | undefined) => void; // Callback function to handle changes in the editor content
-    readOnly: boolean; // Flag to determine if the editor is in read-only mode
-    EditorHeight: number; // Height of the editor in viewport height units (vh)
+    value: string | undefined;
+    onChange: (code: string | undefined) => void;
+    readOnly: boolean;
+    EditorHeight: number;
 }
 
 // Initialize and define a custom theme for the Monaco editor
 loader.init().then((monaco) => {
     monaco.editor.defineTheme('myTheme', {
-        base: 'vs', // Base theme (vs: Visual Studio light theme)
-        inherit: true, // Inherit base theme rules
-        rules: [], // Custom rules can be added here
+        base: 'vs',
+        inherit: true,
+        rules: [],
         colors: {
-            'editor.background': '#f5f5f5' // Set editor background color
-        },
+            'editor.background': '#f5f5f5'
+        }
     });
 });
 
 // Functional component representing the custom Monaco editor
 export const Editor: React.FunctionComponent<IProps> = (props) => {
-    const editorRef = React.useRef<any>(null); // Reference to the editor instance
-    const valueRef = React.useRef(props.value); // Track the external value
+    const editorRef = React.useRef<any>(null);
+    const valueRef = React.useRef(props.value);
 
     // Handle changes in the editor and pass the updated value to the parent component
     function handleEditorChange(value: string | undefined) {
         props.onChange(value);
     }
 
-    // Effect to update the editor value only when the external prop changes
+    // Update editor value and options when external props change
     React.useEffect(() => {
         if (editorRef.current && valueRef.current !== props.value) {
             const editor = editorRef.current;
-            const selection = editor.getSelection(); // Get the current cursor position
 
-            editor.setValue(props.value || ''); // Set editor value to the provided prop value
-            editor.setSelection(selection); // Restore the cursor position
-            editor.updateOptions({ readOnly: props.readOnly }); // Update read-only mode
-
-            valueRef.current = props.value; // Update the ref to the current prop value
+            // Preserve cursor position after update
+            const selection = editor.getSelection(); 
+            editor.setValue(props.value || ''); 
+            editor.setSelection(selection); 
+            editor.updateOptions({ readOnly: props.readOnly });
+            valueRef.current = props.value;
         }
-    }, [props.value, props.readOnly]); // Depend on value and readOnly props for re-rendering
+    }, [props.value, props.readOnly]);
 
     return (
         <Monaco
-            height={`${props.EditorHeight}vh`} // Set editor height based on the provided prop
-            defaultLanguage="json" // Default language mode for the editor
-            value={props.value} // Initial value of the editor content
-            theme="myTheme" // Apply the custom theme defined earlier
-            onChange={handleEditorChange} // Handle editor content change events
+            height={`${props.EditorHeight}vh`}
+            defaultLanguage="json"
+            value={props.value}
+            theme="myTheme"
+            onChange={handleEditorChange}
             onMount={async (editor) => {
-                editorRef.current = editor; // Store the editor instance in the ref
+                editorRef.current = editor;
 
-                // Handle mouse movement within the editor
+                // Auto-format the document on mouse movement
                 editor.onMouseMove(() => {
-                    // Automatically format the document after a brief delay
                     setTimeout(() => {
                         editor.getAction('editor.action.formatDocument').run();
                     }, 30);
 
-                    // Temporarily disable read-only mode to allow formatting, then re-enable it
+                    // Temporarily allow formatting in read-only mode
                     if (props.readOnly) {
                         props.readOnly = false;
                         editor.getAction('editor.action.formatDocument').run();
@@ -73,12 +79,12 @@ export const Editor: React.FunctionComponent<IProps> = (props) => {
                 });
             }}
             options={{
-                wordWrap: "on", // Enable word wrapping in the editor
-                lineHeight: 18, // Set line height for better readability
-                formatOnType: true, // Automatically format code while typing
-                autoIndent: "full", // Automatically adjust indentation
-                formatOnPaste: true, // Automatically format code when pasting
-                scrollBeyondLastLine: false // Disable scrolling beyond the last line for a cleaner UI
+                wordWrap: "on",
+                lineHeight: 18,
+                formatOnType: true,
+                autoIndent: "full",
+                formatOnPaste: true,
+                scrollBeyondLastLine: false
             }}
         />
     );

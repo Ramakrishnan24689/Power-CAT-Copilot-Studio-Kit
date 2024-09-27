@@ -15,20 +15,15 @@ interface AdaptiveCardRendererProps {
 }
 
 const AdaptiveCardRenderer: React.FC<AdaptiveCardRendererProps> = ({ card }) => {
+
   // Reference to the container div where the Adaptive Card will be rendered
   const containerRef = useRef<HTMLDivElement>(null);
 
   // useEffect hook to handle the rendering of the Adaptive Card
   useEffect(() => {
-    // Ensure the container reference is available
     if (containerRef.current) {
-      // Create a new Adaptive Card instance
       const adaptiveCard = new AdaptiveCards.AdaptiveCard();
-      
-      // Parse the provided card content
       adaptiveCard.parse(card);
-
-      // Clear the container before appending the new content
       containerRef.current.innerHTML = '';
       
       // Render the card and append it to the container
@@ -43,7 +38,7 @@ const AdaptiveCardRenderer: React.FC<AdaptiveCardRendererProps> = ({ card }) => 
         });
       }
     }
-  }, [card]); // Dependency array ensures the effect runs when the card content changes
+  }, [card]); 
 
   // Render a div to serve as the container for the Adaptive Card
   return <div ref={containerRef} />;

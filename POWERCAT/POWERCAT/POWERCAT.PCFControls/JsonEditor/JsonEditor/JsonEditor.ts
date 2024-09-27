@@ -7,14 +7,14 @@ import { Editor, IProps } from "./components/Editor";
  * JsonEditor Class to construct and manage the Monaco editor within a PowerApps component framework (PCF) control.
  */
 export class JsonEditor implements ComponentFramework.StandardControl<IInputs, IOutputs> {
-    private _container: HTMLDivElement; // Container for rendering the React component
-    private _notifyOutputChanged: () => void; // Callback to notify the framework when the output changes
-    private _value: string | undefined; // Current value of the editor content
-    private _entityName: string; // Name of the entity in context
-    private _entityId: string; // ID of the current entity record
-    private _clientUrl: string; // URL of the current environment
-    private _fileColumnLogicalName: string; // Logical name of the file column in the entity
-    private _isReadOnly: boolean = false; // Flag to indicate if the editor should be read-only
+    private _container: HTMLDivElement;
+    private _notifyOutputChanged: () => void;
+    private _value: string | undefined;
+    private _entityName: string;
+    private _entityId: string;
+    private _clientUrl: string;
+    private _fileColumnLogicalName: string;
+    private _isReadOnly: boolean = false;
 
     /**
      * Initializes the control instance. This is called by the framework when the control is created.
@@ -35,7 +35,7 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
         this._entityId = (context as any).page.entityId;
         this._clientUrl = (context as any).page.getClientUrl();
         this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
-
+        
         // Initial render of the component
         await this.updateView(context);
     }
@@ -45,19 +45,18 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param context The entire property bag available to the control via Context Object.
      */
     public async updateView(context: ComponentFramework.Context<IInputs>): Promise<void> {
-        // Check if the file column has content
         if (context.parameters.FileColumn.raw === "True") {
             try {
-                this._value = await this.getFileContent(); // Fetch the file content
+                this._value = await this.getFileContent();
                 this._isReadOnly = true; // Set editor to read-only mode for file content
             } catch (error) {
-                console.error("Error fetching file content:", error); // Log any errors that occur during content fetching
+                console.error("Error fetching file content:", error);
             }
         } else {
-            this._value = context.parameters.Value.raw || ""; // Use the provided value if no file content is found
-            this._isReadOnly = false; // Set editor to editable mode
+            this._value = context.parameters.Value.raw || "";
+            this._isReadOnly = false;
         }
-        this.renderComponent(context); // Render the editor with the updated data
+        this.renderComponent(context);
     }
 
     /**
@@ -66,18 +65,17 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     private async getFileContent(): Promise<string> {
         try {
-            let startBytes = 0; // Start byte for range-based fetching
-            const increment = 4194304; // Incremental byte range for each fetch (4MB)
+            let startBytes = 0;
+            const increment = 4194304; // 4MB
             const url = `${this._clientUrl}/api/data/v9.2/${this._entityName}s(${this._entityId})/${this._fileColumnLogicalName}/$value`;
-            let finalContent = ""; // Final content of the file
-            let fileSize = 0; // Total file size
+            let finalContent = "";
+            let fileSize = 0;
 
-            // Fetch the file content in chunks until the entire file is retrieved
             while (startBytes <= fileSize) {
                 const response = await fetch(url, {
                     method: "GET",
                     headers: {
-                        Range: `bytes=${startBytes}-${startBytes + increment - 1}`, // Fetch a specific byte range
+                        Range: `bytes=${startBytes}-${startBytes + increment - 1}`,
                         "OData-MaxVersion": "4.0",
                         "OData-Version": "4.0",
                         "If-None-Match": "null",
@@ -85,21 +83,22 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
                     },
                 });
 
-                if (response.status === 206) { // Partial content status
+                if (response.status === 206) { // Partial content
                     const content = await response.text();
-                    finalContent += content; // Append content to final result
-                    startBytes += increment; // Move to the next byte range
+                    finalContent += content;
+                    startBytes += increment;
+
                     if (fileSize === 0) {
-                        fileSize = parseInt(response.headers.get("x-ms-file-size") ?? "0"); // Get the total file size
+                        fileSize = parseInt(response.headers.get("x-ms-file-size") ?? "0");
                     }
                 } else {
-                    break; // Exit loop if no more content is available
+                    break;
                 }
             }
 
             return finalContent;
         } catch (error) {
-            throw error; // Rethrow the error to be handled by the calling method
+            throw error;
         }
     }
 
@@ -109,13 +108,12 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     private renderComponent(context: ComponentFramework.Context<IInputs>): void {
         const props: IProps = {
-            value: this._value, // Current content of the editor
-            onChange: this.notifyChange.bind(this), // Bind the change handler to notify the framework of changes
-            readOnly: this._isReadOnly || context.mode.isControlDisabled, // Determine if the editor should be read-only
-            EditorHeight: context.parameters.Height.raw || 25, // Editor height based on provided parameter
+            value: this._value,
+            onChange: this.notifyChange.bind(this),
+            readOnly: this._isReadOnly || context.mode.isControlDisabled,
+            EditorHeight: context.parameters.Height.raw || 25,
         };
 
-        // Render the Editor component into the container
         ReactDOM.render(React.createElement(Editor, props), this._container);
     }
 
@@ -134,7 +132,7 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * Used to unmount and clean up the React component.
      */
     public destroy(): void {
-        ReactDOM.unmountComponentAtNode(this._container); // Clean up the React component
+        ReactDOM.unmountComponentAtNode(this._container);
     }
 
     /**
@@ -142,7 +140,7 @@ export class JsonEditor implements ComponentFramework.StandardControl<IInputs, I
      * @param value The new value from the editor.
      */
     private notifyChange(value: string | undefined) {
-        this._value = value; // Update the internal value
-        this._notifyOutputChanged(); // Notify the framework that the value has changed
+        this._value = value;
+        this._notifyOutputChanged();
     }
 }
