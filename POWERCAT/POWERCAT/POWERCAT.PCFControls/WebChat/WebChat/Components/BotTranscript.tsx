@@ -9,12 +9,12 @@ import AdaptiveCardRenderer from "./AdaptiveCardRenderer";
  * BotTranscript Component
  * 
  * This component is responsible for rendering a transcript of bot and user messages in a chat interface.
- * It supports markdown formatting for message text and renders adaptive card attachments.
+ * It supports markdown formatting for message text and renders adaptive card and OAuth card attachments.
  */
 
 // Define the props for the BotTranscript component
 interface BotTranscriptProps {
-    transcript: Transcript; 
+    transcript: Transcript;
 }
 
 // Functional component to render the bot transcript
@@ -33,39 +33,36 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
             day: "numeric",
             hour: "numeric",
             minute: "numeric",
-            hour12: true, 
+            hour12: true,
         });
     };
 
     /**
      * Renders the content of a message.
-     * 
-     * Depending on the type of message, this function will either render markdown text or key-value pairs (if present).
+     * This could be either markdown text or key-value pairs (if present).
      * 
      * @param activity The activity object containing the message details.
      * @returns The JSX for the message content.
      */
     const renderMessageContent = (activity: Activity) => {
         if (activity.text) {
-            // Render markdown text content
             return (
                 <ReactMarkdown
                     children={activity.text}
-                    remarkPlugins={[remarkGfm]} 
+                    remarkPlugins={[remarkGfm]}
                     components={{
-                        p: ({ node, ...props }) => <p {...props} className="message-text" />, // Paragraphs
-                        h1: ({ node, ...props }) => <h1 {...props} className="message-text" />, // Headers
+                        p: ({ node, ...props }) => <p {...props} className="message-text" />,
+                        h1: ({ node, ...props }) => <h1 {...props} className="message-text" />,
                         h2: ({ node, ...props }) => <h2 {...props} className="message-text" />,
                         h3: ({ node, ...props }) => <h3 {...props} className="message-text" />,
-                        code: ({ node, ...props }) => <code {...props} className="message-text" />, // Code blocks
-                        blockquote: ({ node, ...props }) => <blockquote {...props} className="message-text" />, // Blockquotes
+                        code: ({ node, ...props }) => <code {...props} className="message-text" />,
+                        blockquote: ({ node, ...props }) => <blockquote {...props} className="message-text" />,
                     }}
                 />
             );
         } else if (activity.value) {
-            // Render key-value pairs, excluding 'actionSubmitId'
             const filteredValues = Object.entries(activity.value).filter(
-                ([key, _]) => key !== 'actionSubmitId' 
+                ([key, _]) => key !== 'actionSubmitId'
             );
 
             return (
@@ -76,8 +73,25 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
                 </div>
             );
         } else {
-            return null; 
+            return null;
         }
+    };
+
+    /**
+     * Renders OAuth card if present.
+     * 
+     * @param content The content of the OAuth card.
+     * @returns JSX for rendering OAuth card.
+     */
+    const renderOAuthCard = (content: any) => {
+        return (
+            <div className="oauth-card">
+                <p>{content.text}</p>
+                <span className="oauth-button" style={{ pointerEvents: 'none', cursor: 'default' }}>
+                    {content.buttons[0].title}
+                </span>
+            </div>
+        );
     };
 
     return (
@@ -94,18 +108,23 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
                                 className="avatar"
                             />
                             <div className="message-content">
+                                {/* Render message content (Markdown or key-value pairs) */}
                                 {renderMessageContent(activity)}
 
-                                {/* Render adaptive card attachments if present */}
+                                {/* Render adaptive or OAuth card attachments if present */}
                                 {activity.attachments && activity.attachments.length > 0 && activity.attachments.map((attachment, idx) => (
                                     <div key={idx} className="adaptive-card-wrapper">
                                         {attachment.contentType === 'application/vnd.microsoft.card.adaptive' && (
                                             <AdaptiveCardRenderer card={attachment.content} />
                                         )}
+
+                                        {attachment.contentType === 'application/vnd.microsoft.card.oauth' && (
+                                            renderOAuthCard(attachment.content)
+                                        )}
                                     </div>
                                 ))}
 
-                                {/* Display the timestamp */}
+                                {/* Display the message timestamp */}
                                 <div className="message-timestamp">
                                     {formatTimestamp(activity.timestamp)}
                                 </div>
