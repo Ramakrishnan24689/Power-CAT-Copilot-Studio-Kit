@@ -248,3 +248,36 @@ function generateConversationKPI(formContext, selectedEntityTypeName) {
         }, 8000);
     });
 }
+
+/**
+ * @function showSyncFilesDialog
+ * @description Opens a custom page dialog for syncing files with parameters in a Model-Driven App.
+ * @param {object} formContext - The form context.
+ * @param {string} selectedEntityTypeName - The name of the selected entity.
+ */
+function showSyncFilesDialog(formContext, selectedEntityTypeName) {
+    var pageInput = {
+        pageType: "custom",
+        name: "cat_syncfilesprompt_819c3",
+        entityName: selectedEntityTypeName,
+        recordId: formContext.data.entity.getId(),
+    };
+    var navigationOptions = {
+        target: 2,
+        position: 1,
+        height: 330,
+        width: 540,
+        title: "Sync Files",
+    };
+    Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (error) {
+        alert(error.message);
+        formContext.ui.setFormNotification(
+            "Error syncing files: " + error.message,
+            "ERROR",
+            "SYNCFILESERROR"
+        );
+        setTimeout(function () {
+            formContext.ui.clearFormNotification("SYNCFILESERROR");
+        }, 8000);
+    });
+}
