@@ -87,12 +87,17 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
         return (
             <div className="oauth-card">
                 <p>{content.text}</p>
-                <span className="oauth-button" style={{ pointerEvents: 'none', cursor: 'default' }}>
+                <a
+                    href="#"
+                    onClick={(e) => e.preventDefault()}
+                    style={{ color: 'blue', textDecoration: 'underline', cursor: 'default' }}
+                >
                     {content.buttons[0].title}
-                </span>
+                </a>
             </div>
         );
     };
+    
 
     return (
         <div className="transcript-container">

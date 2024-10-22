@@ -34,7 +34,7 @@ export class WebChat implements ComponentFramework.StandardControl<IInputs, IOut
         this._fileColumnLogicalName = context.parameters.fileColumnLogicalName.raw || "";
 
         // Set container styles for scrolling
-        this._container.style.height = "600px";
+        this._container.style.height = "532px";
         this._container.style.overflowY = "auto";
         this._container.style.backgroundColor = "#f7f7f7";
 
