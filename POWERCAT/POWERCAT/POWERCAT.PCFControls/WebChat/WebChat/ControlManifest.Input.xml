@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="WebChat" version="4.2.2" display-name-key="WebChat" description-key="WebChat description" control-type="standard">
+  <control namespace="PowerCAT" constructor="WebChat" version="4.2.4" display-name-key="WebChat" description-key="WebChat description" control-type="standard">
     
     <!-- External service usage -->
     <external-service-usage enabled="false">
