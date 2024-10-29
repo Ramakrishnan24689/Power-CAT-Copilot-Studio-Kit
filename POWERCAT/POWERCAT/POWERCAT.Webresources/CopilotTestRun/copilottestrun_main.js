@@ -1,3 +1,5 @@
+"use strict";
+
 /**
  * @function executeTestRunAction parent function to execute action based on command label.
  * @primaryControl Get the formContext.
