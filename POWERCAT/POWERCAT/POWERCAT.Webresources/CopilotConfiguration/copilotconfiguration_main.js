@@ -48,7 +48,6 @@ function hideAndShowConversationKPISettings(executionContext) {
         // Show the Conversation Transcripts section
         conversationTranscriptsSection.setVisible(true); 
         toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, true);
-        formContext.getAttribute("cat_trackedvariables").setValue(null);
     }
 
     // Check if configuration type includes 'File Synchronization' (3)
@@ -265,9 +264,9 @@ function showSyncFilesDialog(formContext, selectedEntityTypeName) {
     var navigationOptions = {
         target: 2,
         position: 1,
-        height: 330,
+        height: 370,
         width: 540,
-        title: "Sync Files",
+        title: " ",
     };
     Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (error) {
         alert(error.message);
