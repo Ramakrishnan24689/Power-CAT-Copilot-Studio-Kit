@@ -43,15 +43,19 @@ class TestRunExecutorService {
    * @function getAccessTokenByMSAL
    * @description Retrieves an access token using MSAL.
    * @param globalContext - Dynamics 365 global context.
+   * @param scope - Scope for the access token.
    * @returns Access token.
    */
-  async getAccessTokenByMSAL(globalContext: any): Promise<string> {
+  async getAccessTokenByMSAL(
+    globalContext: any,
+    scope: string
+  ): Promise<string> {
     try {
       // Get the current user's email ID
       const emailID: string = await this.getCurrentUserEmailID(globalContext);
 
       const ssoRequest: { scopes: string[]; loginHint?: string } = {
-        scopes: ["openid", "profile"],
+        scopes: [scope],
         loginHint: emailID,
       };
 
@@ -242,7 +246,7 @@ class TestRunExecutorService {
       const copilotConfig = await Xrm.WebApi.retrieveRecord(
         "cat_copilotconfiguration",
         copilotConfigId,
-        "?$select=cat_clientid,cat_tenantid,cat_userauthenticationcode"
+        "?$select=cat_clientid,cat_tenantid,cat_userauthenticationcode,cat_scope"
       );
 
       testRunExecutorService = new TestRunExecutorService(
@@ -254,10 +258,11 @@ class TestRunExecutorService {
       // Run only if end-user authentication is enabled
       if (copilotConfig.cat_userauthenticationcode === 2) {
         accessToken = await testRunExecutorService.getAccessTokenByMSAL(
-          globalContext
+          globalContext,
+          copilotConfig.cat_scope
         );
         testRunWarningMessage =
-          "This test set is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
+          "This agent configuration is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
       }
 
       await testRunExecutorService.invokeDataverseAction(
