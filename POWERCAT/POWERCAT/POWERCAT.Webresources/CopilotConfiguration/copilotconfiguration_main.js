@@ -55,13 +55,12 @@ function hideAndShowConversationKPISettings(executionContext) {
     );
   }
 
-  // Check if configuration type includes 'Test Automation' (1)
-  if (configurationTypeValues.includes(1)) {
-    // Show the Conversation Transcripts section
-    conversationTranscriptsSection.setVisible(true);
-    toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, true);
-    formContext.getAttribute("cat_trackedvariables").setValue(null);
-  }
+    // Check if configuration type includes 'Test Automation' (1)
+    if (configurationTypeValues.includes(1)) {
+        // Show the Conversation Transcripts section
+        conversationTranscriptsSection.setVisible(true); 
+        toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, true);
+    }
 
   // Check if configuration type includes 'File Synchronization' (3)
   if (configurationTypeValues.includes(3)) {
@@ -371,9 +370,9 @@ function showSyncFilesDialog(formContext, selectedEntityTypeName) {
   const navigationOptions = {
     target: 2,
     position: 1,
-    height: 330,
+    height: 370,
     width: 540,
-    title: "Sync Files",
+    title: " ",
   };
   Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (
     error
