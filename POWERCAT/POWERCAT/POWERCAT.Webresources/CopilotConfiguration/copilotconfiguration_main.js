@@ -353,47 +353,20 @@ function generateConversationKPI(formContext, selectedEntityTypeName) {
     });
 }
 
+
 /**
- * @function showSyncFilesDialog
- * @description Opens a custom page dialog for syncing files with parameters in a Model-Driven App.
- * @param {object} formContext - The form context.
- * @param {string} selectedEntityTypeName - The name of the selected entity.
+ * @function showSyncFilesDialog function to display dialog for file sync process, calls the custom action for sync process.
+ * @formContext Get the formContext.
  */
-/*function showSyncFilesDialog(formContext, selectedEntityTypeName) {
-  "use strict";
-  const pageInput = {
-    pageType: "custom",
-    name: "cat_syncfilesprompt_819c3",
-    entityName: selectedEntityTypeName,
-    recordId: formContext.data.entity.getId(),
-  };
-  const navigationOptions = {
-    target: 2,
-    position: 1,
-    height: 370,
-    width: 540,
-    title: " ",
-  };
-  Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (
-    error
-  ) {
-    formContext.ui.setFormNotification(
-      "Error syncing files: " + error.message,
-      "ERROR",
-      "SYNCFILESERROR"
-    );
-    setTimeout(function () {
-      formContext.ui.clearFormNotification("SYNCFILESERROR");
-    }, 8000);
-  });
-}*/
 function showSyncFilesDialog(formContext) {
     var confirmStrings = {
         text: "This action processes all the file indexer configurations for this agent, and synchronizes files from SharePoint to Copilot Studio as knowledge sources. Please note that at the end of the synchronization process, the agent in question will be published to take new knowledge sources in use.Are you sure you want to proceed with the file synchronization process?", title: "Confirm File Synchronization"
     };
+    let copilotConfigurationId = formContext.data.entity.getId();
     var confirmOptions = { height: 280, width: 450 };
     let actionExecutionRequest = createExecutionRequest(
-        "cat_RunSyncFiles"
+        "cat_RunSyncFiles",
+        copilotConfigurationId
     );
     let successMessage = "Files sync is in progress.";
     Xrm.Navigation.openConfirmDialog(confirmStrings, confirmOptions).then(
@@ -445,14 +418,27 @@ function showSyncFilesDialog(formContext) {
     );
 }
 
-function createExecutionRequest(operationName) {
+/**
+ * @function createExecutionRequest create an execution request with all required parameters.
+ * @operationName operation name.
+ * @copilotConfigurationId Copilot Configuration Id
+ * @returns execution request.
+ */
+function createExecutionRequest(operationName, copilotConfigurationId) {
     "use strict";
     const executionRequest = {
+        CopilotConfigurationId: copilotConfigurationId,
         getMetadata: function () {
             return {
                 boundParameter: null,
                 operationType: 0,
                 operationName: operationName,
+                parameterTypes: {
+                    CopilotConfigurationId: {
+                        typeName: "Edm.String",
+                        structuralProperty: 1
+                    }
+                }
             };
         },
     };
@@ -470,6 +456,7 @@ function createExecutionRequest(operationName) {
 function displayNotification(formContext, message, type, uniqueId) {
     "use strict";
     formContext.ui.setFormNotification(message, type, uniqueId);
+
 }
 
 /**
