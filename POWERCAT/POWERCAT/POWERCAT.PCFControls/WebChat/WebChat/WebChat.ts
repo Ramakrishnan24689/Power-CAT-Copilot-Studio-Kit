@@ -37,7 +37,7 @@ export class WebChat
       context.parameters.fileColumnLogicalName.raw || "";
 
     // Set container styles for scrolling
-    this._container.style.height = "781px";
+    this._container.style.height = "70.5vh";
     this._container.style.overflowY = "auto";
     this._container.style.backgroundColor = "#f7f7f7";
 
