@@ -50,11 +50,11 @@ namespace POWERCAT.Plugins.ConversationKpi
 
             if (processedDetails.All(p => p.Outcome.Contains("Resolved"))){
                 globalSessionDetail.GlobalOutcome = 2;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("HandOff")) > 1){
+            }else if (processedDetails.Count(p => p.Outcome.Contains("HandOff")) >= 1){
                 globalSessionDetail.GlobalOutcome = 4;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("Resolved")) > 1){
+            }else if (processedDetails.Count(p => p.Outcome.Contains("Resolved")) >= 1){
                 globalSessionDetail.GlobalOutcome = 3;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("Abandoned")) > 1){
+            }else if (processedDetails.Count(p => p.Outcome.Contains("Abandoned")) >= 1){
                 globalSessionDetail.GlobalOutcome = 5;
             }else{
                 globalSessionDetail.GlobalOutcome = 1;

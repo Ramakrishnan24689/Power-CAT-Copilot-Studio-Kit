@@ -11,34 +11,56 @@ using Microsoft.Xrm.Sdk.Messages;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Plugin class to generate Conversation KPIs
+    /// </summary>
     public class ConversationKpiMain : IPlugin
     {
-        public delegate void CallbackFunction(ExecuteMultipleResponse responseWithResults, ITracingService tracingService);
+        public delegate void CallbackFunction(ExecuteMultipleResponse responseWithResults);
 
-        IOrganizationService organizationService;
-        ITracingService tracingService;
+        /// <summary>
+        /// Represents a private instance of the IOrganizationService.
+        /// </summary>
+        IOrganizationService _organizationService;
+        /// <summary>
+        /// Represents a private instance of the ITracingService.
+        /// </summary>
+        ITracingService _tracingService;
 
-        private string upsertDuration = "";
-        private string createDuration = "";
-
-
+        /// <summary>
+        /// Executes the plugin logic.
+        /// </summary>
+        /// <param name="serviceProvider">The service provider.</param>
         public void Execute(IServiceProvider serviceProvider)
         {
             // Obtain the tracing service
-            tracingService = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
-            DateTime startTime = DateTime.UtcNow;
+            _tracingService = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
+            
+            // Obtain the execution context from the service provider.  
+            IPluginExecutionContext context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
+            // Obtain the organization factory service from the service provider.
+            IOrganizationServiceFactory factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
+            // Use the factory to generate the organization service.
+            _organizationService = factory.CreateOrganizationService(context.UserId);
 
+            _tracingService.Trace("Plugin Execution Started..");
+            // Check the stage - Main operation
+            if (context.Stage.Equals(30))
+            {
+                // Generate Conversation KPIs
+                GenerateConversationKpis(context);
+            }                
+        }
+
+        /// <summary>
+        /// Generate Conversation KPIs based on Agent conversation transcripts
+        /// </summary>
+        /// <param name="context">Plugin context.</param>
+        private void GenerateConversationKpis(IPluginExecutionContext context) 
+        { 
             try
-            {                
-                // Obtain the execution context from the service provider.  
-                IPluginExecutionContext context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
-                // Obtain the organization factory service from the service provider.
-                IOrganizationServiceFactory factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
-                // Use the factory to generate the organization service.
-                organizationService = factory.CreateOrganizationService(context.UserId);
-
-                tracingService.Trace("Plugin Execution Started..");
-
+            {
+                // Prepare fetch xml based on Agent Transcript Ids
                 string agentTranscriptsIds = context.InputParameters["cat_AgenttranscriptsIds"] as string;
                 string[] agentTranscriptsIdsArray = JsonConvert.DeserializeObject<string[]>(agentTranscriptsIds);
                 string valuesXml = string.Join("", agentTranscriptsIdsArray.Select(id => $"<value>{id}</value>"));
@@ -60,14 +82,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                                     </fetch>";
                 fetchXml = string.Format(fetchXml, valuesXml);
 
-                DateTime begin = DateTime.UtcNow;
                 // Retrieve the transcripts
-                EntityCollection agentTranscriptList = organizationService.RetrieveMultiple(new FetchExpression(fetchXml));
-                DateTime retrieveMultipleTime = DateTime.UtcNow;
-                tracingService.Trace($"RerieveMultiple execution duration: {(retrieveMultipleTime - begin).TotalSeconds:F2} seconds");
+                EntityCollection agentTranscriptList = _organizationService.RetrieveMultiple(new FetchExpression(fetchXml));
+                _tracingService.Trace($"RerieveMultiple count: {agentTranscriptList.Entities.Count}");
 
-                tracingService.Trace($"RerieveMultiple count: {agentTranscriptList.Entities.Count}");
-
+                // Process transcripts
                 List<ProcessDetails> processDetailsList = new List<ProcessDetails>();
                 ProcessSessionInsight processSessionInsight = new ProcessSessionInsight();
                 ProcessTrackedVariables processTrackedVariables = new ProcessTrackedVariables();
@@ -76,22 +95,13 @@ namespace POWERCAT.Plugins.ConversationKpi
                 ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                 ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
 
-                tracingService.Trace("Loop started");
                 foreach (Entity agentTranscript in agentTranscriptList.Entities)
                 {
                     Guid agentTranscriptId = agentTranscript.Id;
                     string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
                     string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                     string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
-                    tracingService.Trace("Loop started1");
                     TranscriptModel model = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
-                    tracingService.Trace("Loop started2");
-                    string test1 = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString();
-                        tracingService.Trace("Loop started3");
-                    string test2 = agentTranscript.GetAttributeValue<string>("cat_agentid");
-                    tracingService.Trace("Loop started4");
-                    DateTime test3 = (DateTime)agentTranscript["cat_conversationdate"];
-                    tracingService.Trace("Loop started4");
 
                     ProcessDetails processDetails = new ProcessDetails
                     {
@@ -108,62 +118,49 @@ namespace POWERCAT.Plugins.ConversationKpi
                         TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(model, conversationId),
                         GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(model, conversationId),
                     };
-                    tracingService.Trace("Loop started3");
                     processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                     processDetailsList.Add(processDetails);
-                    tracingService.Trace("Loop started4");
                 }
-                DateTime calKPIs = DateTime.UtcNow;
-                tracingService.Trace($"Creating KPIs execution duration: {(calKPIs - retrieveMultipleTime).TotalSeconds:F2} seconds");
 
+                // Upsert Conversation KPIs
                 EntityCollection entitiesToUpsert = GetCollectionOfEntitiesToCreate(processDetailsList);
-                tracingService.Trace($"entitiesToUpsert: {entitiesToUpsert.Entities.Count}");
-
-                DateTime creatingCollections = DateTime.UtcNow;
-                tracingService.Trace($"Creating collections execution duration: {(creatingCollections - calKPIs).TotalSeconds:F2} seconds");
-
                 ExecuteBatchRequests(entitiesToUpsert, UpdateAgentTranScriptStatus);
-                DateTime excuteBatchesTime = DateTime.UtcNow;
-                tracingService.Trace($"Executing both ExcuteMultiple duration: {(excuteBatchesTime - creatingCollections).TotalSeconds:F2} seconds");
 
-                // End Time
-                DateTime endTime = DateTime.UtcNow;
-
-                TimeSpan duration = endTime - startTime;
-                tracingService.Trace($"Upsert duration: {upsertDuration} seconds");
-                tracingService.Trace($"Update duration: {createDuration} seconds");
-                tracingService.Trace($"Plugin execution duration: {duration.TotalSeconds:F2} seconds");
-                context.OutputParameters["cat_TotalDuration"] = $"Total Duration: {duration.TotalSeconds}";
+                _tracingService.Trace("Plugin execution completed");
             }
             catch (InvalidPluginExecutionException ex)
             {
-                tracingService.Trace($"Exception: {ex.Message}");
-                throw; // Re-throw the exception to maintain the plugin behavior
+                _tracingService.Trace($"Exception: {ex.Message}");
+                throw;
             }
             catch (DivideByZeroException ex)
             {
-                tracingService.Trace($"Error: Division by zero. Details: {ex.Message}");
+                _tracingService.Trace($"Error: Division by zero. Details: {ex.Message}");
             }
             catch (FormatException ex)
             {
-                tracingService.Trace($"Error: Invalid format. Details: {ex.Message}");
+                _tracingService.Trace($"Error: Invalid format. Details: {ex.Message}");
             }
             catch (Exception ex)
             {
-                tracingService.Trace($"An unexpected error occurred. Details: {ex.Message}");
+                _tracingService.Trace($"An unexpected error occurred in method GenerateConversationKpis. Details: {ex.Message}");
             }
             finally
             {
-                tracingService.Trace("Plugin execution finished.");
+                _tracingService.Trace("Plugin execution finished.");
             }
         }
 
-        public void UpdateAgentTranScriptStatus(ExecuteMultipleResponse responseWithResults, ITracingService tracingService)
+        /// <summary>
+        /// Updates Agent Transcript status based on Upsert operation response
+        /// </summary>
+        /// <param name="responseWithResults">Conversation KPI Upsert operation response.</param>
+        private void UpdateAgentTranScriptStatus(ExecuteMultipleResponse responseWithResults)
         {
             try
             {
+                // Update status
                 EntityCollection agentTransciptList = new EntityCollection();
-
                 foreach (ExecuteMultipleResponseItem item in responseWithResults.Responses)
                 {
                     Entity entity = new Entity("cat_agenttranscripts")
@@ -177,7 +174,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     else
                     {
                         entity["cat_workflowstatus"] = new OptionSetValue(3); // Failed
-                        entity["cat_workflowerror"] = item.Fault.Message;
+                        entity["cat_workflowerror"] = item.Fault.Message;     // Error details
                     }
                     agentTransciptList.Entities.Add(entity);
                 }
@@ -185,17 +182,18 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
             catch (Exception ex)
             {
-                tracingService.Trace($"An error occurred in method UpdateAgentTranScriptStatus. Details: {ex.Message}");
+                _tracingService.Trace($"An error occurred in method UpdateAgentTranScriptStatus. Details: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Creating the collection of record for doing bulk insert
+        /// Collect Conversation KPI entities
         /// </summary>
-        /// <param name="processDetailsList"></param>
+        /// <param name="processDetailsList">Conversation KPI details</param>
         /// <returns>Entity Collection</returns>
         public EntityCollection GetCollectionOfEntitiesToCreate(List<ProcessDetails> processDetailsList)
         {
+            // Create Conversation KPI entity collection
             EntityCollection entityCollection = new EntityCollection();
             try
             {
@@ -226,11 +224,16 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
             catch (Exception ex)
             {
-                tracingService.Trace($"An error occurred in method GetCollectionOfEntitiesToCreate. Details: {ex.Message}");
+                _tracingService.Trace($"An error occurred in method GetCollectionOfEntitiesToCreate. Details: {ex.Message}");
             }
             return entityCollection;
         }
 
+        /// <summary>
+        /// Common method for ExecuteMultipleRequests
+        /// </summary>
+        /// <param name="entityCollection"> Entity collection for update/upsert </param
+        /// <param name="callback"> Callback function </param>
         public void ExecuteBatchRequests(EntityCollection entityCollection,
             CallbackFunction callback)
         {
@@ -249,45 +252,30 @@ namespace POWERCAT.Plugins.ConversationKpi
                     Requests = new OrganizationRequestCollection()
                 };
 
-                bool flag = false;
-                // Add a Create / Update Request for each entity to the request collection.
+                // Add a Create/Update Request for each entity to the request collection.
                 foreach (var entity in entityCollection.Entities)
                 {
                     if (entity.Id != Guid.Empty)
                     {
-                        flag = true;
                         UpdateRequest updateRequest = new UpdateRequest { Target = entity };
                         requestWithResults.Requests.Add(updateRequest);
                     }
                     else
                     {
-                        flag = false;
                         UpsertRequest request = new UpsertRequest() { Target = entity };
                         requestWithResults.Requests.Add(request);
                     }
                 }
 
-                DateTime start = DateTime.UtcNow;
                 // Execute all the requests in the request collection using a single web method call.
                 ExecuteMultipleResponse responseWithResults =
-                    (ExecuteMultipleResponse)organizationService.Execute(requestWithResults);
+                    (ExecuteMultipleResponse)_organizationService.Execute(requestWithResults);
 
-                DateTime end = DateTime.UtcNow;
-
-                if (!flag)
-                {
-                    upsertDuration = (end - start).TotalSeconds.ToString();
-                }
-                else
-                {
-                    createDuration = (end - start).TotalSeconds.ToString();
-                }
-
-                callback?.Invoke(responseWithResults, tracingService);
+                callback?.Invoke(responseWithResults);
             }
             catch (Exception ex)
             {
-                tracingService.Trace($"An error occurred in method ExecuteBatchRequests. Details: {ex.Message}");
+                _tracingService.Trace($"An error occurred in method ExecuteBatchRequests. Details: {ex.Message}");
             }
         }
     }

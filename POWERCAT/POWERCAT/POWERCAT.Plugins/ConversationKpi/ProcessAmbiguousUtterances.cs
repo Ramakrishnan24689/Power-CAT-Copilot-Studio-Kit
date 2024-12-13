@@ -30,6 +30,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                    //traverse through each intent and add to intentCandidates
                    if (currentElement?.value?.intents != null)
                    {
+                       intentCandidates.Clear();
                        foreach (var intent in currentElement.value.intents)
                        {
                            intentCandidates.Add(new IntentCandidates
