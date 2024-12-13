@@ -1,0 +1,104 @@
+import React from "react";
+import ReactWebChat, { createDirectLine } from "botframework-webchat";
+import {
+  Spinner,
+  MessageBar,
+  MessageBarBody,
+} from "@fluentui/react-components";
+
+interface BotProps {
+  userQuery: string;
+  tokenEndpoint: string;
+  styleOptions: any;
+}
+
+const BotControl: React.FC<BotProps> = ({
+  userQuery,
+  tokenEndpoint,
+  styleOptions,
+}) => {
+  const [directLine, setDirectLine] = React.useState<any>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    async function createDirectline() {
+      try {
+        // Extract environment endpoint and API version from the token endpoint
+        const environmentEndPoint = tokenEndpoint.slice(
+          0,
+          tokenEndpoint.indexOf("/powervirtualagents")
+        );
+        const apiVersion = tokenEndpoint
+          .slice(tokenEndpoint.indexOf("api-version"))
+          .split("=")[1];
+        const regionalChannelSettingsURL = `${environmentEndPoint}/powervirtualagents/regionalchannelsettings?api-version=${apiVersion}`;
+
+        // Fetch regional channel settings
+        const regionalResponse = await fetch(regionalChannelSettingsURL);
+        if (!regionalResponse.ok) {
+          throw new Error(
+            `Failed to fetch regional channel settings. HTTP status: ${regionalResponse.status}`
+          );
+        }
+        const data = await regionalResponse.json();
+        const regionalChannelURL = data.channelUrlsById.directline;
+
+        // Fetch token for DirectLine
+        const response = await fetch(tokenEndpoint);
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch token. HTTP status: ${response.status}`
+          );
+        }
+        const conversationInfo = await response.json();
+        const directline = createDirectLine({
+          token: conversationInfo.token,
+          domain: `${regionalChannelURL}v3/directline`,
+        });
+        setDirectLine(directline);
+      } catch (err: any) {
+        // Set error state if any error occurs
+        setError(err.message);
+      }
+    }
+
+    setError(null);
+    createDirectline();
+  }, [tokenEndpoint]);
+
+  // Post user query to bot
+  React.useEffect(() => {
+    if (directLine && userQuery) {
+      directLine
+        .postActivity({
+          type: "message",
+          text: userQuery,
+        })
+        .subscribe({
+          error: (err: any) => {
+            // Handle error when posting activity
+            setError(`Failed to send message: ${err.message}`);
+          },
+        });
+    }
+  }, [directLine, userQuery]);
+
+  return (
+    <div className="webChatContainer">
+      {error ? (
+        <MessageBar intent="error">
+          <MessageBarBody>{error}</MessageBarBody>
+        </MessageBar>
+      ) : directLine ? (
+        <ReactWebChat
+          directLine={directLine}
+          styleOptions={JSON.parse(styleOptions)}
+        />
+      ) : (
+        <Spinner label="Loading..." className="loadingSpinner" />
+      )}
+    </div>
+  );
+};
+
+export default BotControl;

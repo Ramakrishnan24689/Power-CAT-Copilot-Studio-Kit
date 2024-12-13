@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="PowerCAT" constructor="ChatBot" version="0.0.4" display-name-key="ChatBot" description-key="ChatBot description" control-type="standard" >
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
+    <property name="UserQuery" display-name-key="User Query" description-key="User Query" of-type="SingleLine.Text" usage="input" required="true" />
+    <property name="TokenEndpoint" display-name-key="Token Endpoint" description-key="Token Endpoint" of-type="SingleLine.Text" usage="input" required="true" />
+    <property name="StyleOptions" display-name-key="Style Options" description-key="Style Options" of-type="SingleLine.Text" usage="input" required="true" />
+    <resources>
+      <code path="index.ts" order="1"/>
+      <css path="./Components/css/styles.css" order="1" />
+    </resources>
+  </control>
+</manifest>

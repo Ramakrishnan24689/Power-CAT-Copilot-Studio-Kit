@@ -48,10 +48,14 @@
       <HintPath>..\packages\Microsoft.CrmSdk.CoreAssemblies.9.0.2.42\lib\net462\Microsoft.Xrm.Sdk.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
     </Reference>
+    <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
     <Reference Include="System.DirectoryServices" />
     <Reference Include="System.DirectoryServices.AccountManagement" />
@@ -97,6 +101,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApplicationInsightsApi\InvokeApplicationInsightsApi.cs" />
+    <Compile Include="ConversationKpi\ConversationKpiMain.cs" />
+    <Compile Include="ConversationKpi\OutputModel.cs" />
+    <Compile Include="ConversationKpi\ProcessAmbiguousUtterances.cs" />
+    <Compile Include="ConversationKpi\ProcessGenerativeAnswersArray.cs" />
+    <Compile Include="ConversationKpi\ProcessSessionInsight.cs" />
+    <Compile Include="ConversationKpi\ProcessTrackedVariables.cs" />
+    <Compile Include="ConversationKpi\ProcessTraversedComponents.cs" />
+    <Compile Include="ConversationKpi\ProcessUnrecognizedUtterances.cs" />
+    <Compile Include="ConversationKpi\TranscriptModel.cs" />
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
     <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
