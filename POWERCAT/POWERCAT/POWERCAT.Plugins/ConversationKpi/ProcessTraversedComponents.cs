@@ -47,8 +47,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                 {
                     SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
                     ComponentType = "Topic",
-                    Trigger = GetTrigger(currentElement.valueType),
-                    ComponentID = GetComponentID(currentElement.valueType, currentElement.value)
+                    Trigger = GetTrigger(currentElement.valueType, currentElement.name),
+                    ComponentID = GetComponentID(currentElement.valueType, currentElement.value, currentElement.name)
                 });
             }
 
@@ -59,13 +59,15 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// Get trigger type based on value type
         /// </summary>
         /// <param name="valueType">Value Type</param>
+        /// <param name="name">Name to check Conversation Start event</param>
         /// <returns>Trigger Type</returns>
-        public static string GetTrigger(string valueType)
+        public static string GetTrigger(string valueType, string name)
         {
+            if (name == "startConversation")
+                return "Conversation Start";
+
             switch (valueType)
             {
-                case "startConversation":
-                    return "Conversation Start";
                 case "IntentRecognition":
                     return "Intent Recognition";
                 case "DialogRedirect":
@@ -83,9 +85,13 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="valueType">Value Type</param
         /// <param name="value">Activity Value</param>
+        /// <param name="name">Name to check Conversation Start event</param>
         /// <returns>Component Id</returns>
-        string GetComponentID(string valueType, dynamic value)
+        string GetComponentID(string valueType, dynamic value, string name)
         {
+            if (name == "startConversation")
+                return null;
+
             switch (valueType)
             {
                 case "startConversation":

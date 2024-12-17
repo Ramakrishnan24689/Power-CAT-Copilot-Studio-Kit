@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="ChatBot" version="0.0.4" display-name-key="ChatBot" description-key="ChatBot description" control-type="standard" >
+  <control namespace="PowerCAT" constructor="ChatBot" version="0.0.5" display-name-key="ChatBot" description-key="ChatBot description" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
