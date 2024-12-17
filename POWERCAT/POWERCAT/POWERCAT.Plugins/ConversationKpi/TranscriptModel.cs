@@ -7,8 +7,14 @@ using System.Collections.Generic;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    public class TranscriptModel
+    {
+        public List<Activity> activities { get; set; }
+    }
+
     public class Activity
     {
+        public int index;         
         public string valueType { get; set; }
         public string type { get; set; }
         public int timestamp { get; set; }
@@ -129,11 +135,6 @@ namespace POWERCAT.Plugins.ConversationKpi
     {
         public int Type { get; set; }
         public string Title { get; set; }
-    }
-
-    public class TranscriptModel
-    {
-        public List<Activity> activities { get; set; }
     }
 
     public class TokenExchangeResource

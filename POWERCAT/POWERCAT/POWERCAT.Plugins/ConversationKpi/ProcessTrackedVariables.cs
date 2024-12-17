@@ -7,45 +7,53 @@ using System.Linq;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Class module for Tracked Variables
+    /// </summary>
     public class ProcessTrackedVariables
     {
-        public List<TrackedVariable> ProcessForTrackedVariables(TranscriptModel model, string variableNames, string conversationId)
+        /// <summary>
+        /// Generate Tracked Variables KPIs
+        /// </summary>
+        /// <param name="model">Transcript Activity Model</param>
+        /// <param name="conversationId">Conversation Id</param>
+        /// <returns>Tracked Variables List</returns>
+        public List<TrackedVariable> ProcessForTrackedVariables(List<Activity> model, string variableNames, string conversationId)
         {
-            //Filter data from transcript having only VariableAssignment and SessionInfo
-            var transcriptData = model.activities
-                       .Where(activity =>
-                        activity.valueType == "VariableAssignment")
-                      .ToList();
+            // Check for variableNames
+            if (string.IsNullOrEmpty(variableNames)){
+                return new List<TrackedVariable>();
+            }
 
-            // Convert variableNames to an array
-            string[] variableNamesArray = JsonConvert.DeserializeObject<string[]>(variableNames);
+            // Parse variable names into a HashSet
+            var variableNamesSet = new HashSet<string>(JsonConvert.DeserializeObject<string[]>(variableNames));
 
-            List<TrackedVariable> trackedVariables = new List<TrackedVariable>();
+            // Filter VariableAssignment activities
+            var transcriptActivities = model
+                .Where(activity => activity.valueType == "VariableAssignment" && variableNamesSet.Contains(activity.value.id))
+                .ToList();
 
-            // Loop through each variable in variableArray
-            foreach (var variableName in variableNamesArray)
+            // Preprocess SessionInfo activities and sort it for efficient lookups
+            var sessionInfoActivities = model
+                .Where(activity => activity.valueType == "SessionInfo")
+                .OrderBy(activity => activity.index)
+                .ToList();
+
+            // Process tracked variables
+            var trackedVariables = new List<TrackedVariable>();
+            foreach (var currentElement in transcriptActivities)
             {
-                transcriptData
-                            .Where(activity => activity.value.id == variableName)
-                            .ToList()
-                            .ForEach(currentElement =>
-                            {
-                                // Get Next SessionInfo timestamp
-                                var sessionInfoElements = model.activities
-                                    .Where(activity => activity.valueType == "SessionInfo" && activity.timestamp >= currentElement.timestamp)
-                                    .OrderBy(activity => activity.timestamp)
-                                    .ToList();
+                // Find the next SessionInfo after currentElement.index
+                var nextSession = sessionInfoActivities
+                    .FirstOrDefault(session => session.index > currentElement.index);
 
-                                // Add the tracked variable to the list
-                                trackedVariables.Add(new TrackedVariable
-                                {
-                                    SessionID = $"{conversationId}-" +
-                                                $"{sessionInfoElements.FirstOrDefault()?.timestamp}" +
-                                                $"-{sessionInfoElements.FirstOrDefault()?.id}",
-                                    VariableName = currentElement.value.id ?? string.Empty,
-                                    VariableValue = currentElement.value?.newValue ?? string.Empty
-                                });
-                            });
+                // Add to tracked variables
+                trackedVariables.Add(new TrackedVariable
+                {
+                    SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    VariableName = currentElement.value.id,
+                    VariableValue = currentElement.value.newValue ?? string.Empty
+                });
             }
 
             return trackedVariables;

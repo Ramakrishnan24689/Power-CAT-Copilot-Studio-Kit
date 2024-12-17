@@ -16,6 +16,12 @@ namespace POWERCAT.Plugins.ConversationKpi
     /// </summary>
     public class ConversationKpiMain : IPlugin
     {
+        private string upsertDuration = "";
+        private string createDuration = "";
+
+        /// <summary>
+        /// Callback function for processing KPI response
+        /// </summary>
         public delegate void CallbackFunction(ExecuteMultipleResponse responseWithResults);
 
         /// <summary>
@@ -33,14 +39,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="serviceProvider">The service provider.</param>
         public void Execute(IServiceProvider serviceProvider)
         {
-            // Obtain the tracing service
             _tracingService = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
-            
-            // Obtain the execution context from the service provider.  
             IPluginExecutionContext context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
-            // Obtain the organization factory service from the service provider.
             IOrganizationServiceFactory factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
-            // Use the factory to generate the organization service.
             _organizationService = factory.CreateOrganizationService(context.UserId);
 
             _tracingService.Trace("Plugin Execution Started..");
@@ -60,6 +61,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         { 
             try
             {
+                DateTime startTime = DateTime.UtcNow;
                 // Prepare fetch xml based on Agent Transcript Ids
                 string agentTranscriptsIds = context.InputParameters["cat_AgenttranscriptsIds"] as string;
                 string[] agentTranscriptsIdsArray = JsonConvert.DeserializeObject<string[]>(agentTranscriptsIds);
@@ -74,6 +76,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_conversationid' />
                                         <attribute name='cat_trackedvariables' />
                                         <filter type='and'>
+                                          <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
+                                          <condition attribute='partitionid' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
                                             {0}
                                           </condition>
@@ -82,51 +86,75 @@ namespace POWERCAT.Plugins.ConversationKpi
                                     </fetch>";
                 fetchXml = string.Format(fetchXml, valuesXml);
 
+                DateTime begin = DateTime.UtcNow;
                 // Retrieve the transcripts
                 EntityCollection agentTranscriptList = _organizationService.RetrieveMultiple(new FetchExpression(fetchXml));
                 _tracingService.Trace($"RerieveMultiple count: {agentTranscriptList.Entities.Count}");
+                DateTime retrieveMultipleTime = DateTime.UtcNow;
+                _tracingService.Trace($"RerieveMultiple execution duration: {(retrieveMultipleTime - begin).TotalSeconds:F2} seconds");
 
-                // Process transcripts
-                List<ProcessDetails> processDetailsList = new List<ProcessDetails>();
-                ProcessSessionInsight processSessionInsight = new ProcessSessionInsight();
-                ProcessTrackedVariables processTrackedVariables = new ProcessTrackedVariables();
-                ProcessUnrecognizedUtterances processUnrecognizedUtterances = new ProcessUnrecognizedUtterances();
-                ProcessAmbiguousUtterances processAmbiguousUtterances = new ProcessAmbiguousUtterances();
-                ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
-                ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
 
-                foreach (Entity agentTranscript in agentTranscriptList.Entities)
+                if (agentTranscriptList.Entities.Count > 0)
                 {
-                    Guid agentTranscriptId = agentTranscript.Id;
-                    string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
-                    string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
-                    string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
-                    TranscriptModel model = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
+                    // Process transcripts
+                    List<ProcessDetails> processDetailsList = new List<ProcessDetails>();
+                    ProcessSessionInsight processSessionInsight = new ProcessSessionInsight();
+                    ProcessTrackedVariables processTrackedVariables = new ProcessTrackedVariables();
+                    ProcessUnrecognizedUtterances processUnrecognizedUtterances = new ProcessUnrecognizedUtterances();
+                    ProcessAmbiguousUtterances processAmbiguousUtterances = new ProcessAmbiguousUtterances();
+                    ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
+                    ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
 
-                    ProcessDetails processDetails = new ProcessDetails
+                    foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
-                        AgentTranscriptId = agentTranscriptId,
-                        AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
-                        AgentId = agentTranscript.GetAttributeValue<string>("cat_agentid"),
-                        ConversationId = conversationId,
-                        ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
-                        SessionDetails = processSessionInsight.ProcessTranscript(conversationId, model),
-                        ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(model),
-                        TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(model, trackedVaribales, conversationId),
-                        UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(model, conversationId),
-                        AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(model, conversationId),
-                        TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(model, conversationId),
-                        GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(model, conversationId),
-                    };
-                    processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
-                    processDetailsList.Add(processDetails);
+                        Guid agentTranscriptId = agentTranscript.Id;
+                        string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
+                        string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
+                        string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
+                        TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
+
+                        // Add the index to each model
+                        var indexedModels = transcriptModel.activities.Select((model, index) =>
+                        {
+                            model.index = index;
+                            return model;
+                        }).ToList();
+
+                        ProcessDetails processDetails = new ProcessDetails
+                        {
+                            AgentTranscriptId = agentTranscriptId,
+                            AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
+                            AgentId = agentTranscript.GetAttributeValue<string>("cat_agentid"),
+                            ConversationId = conversationId,
+                            ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
+                            SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId),
+                            ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
+                            TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId),
+                            UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId),
+                            AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId),
+                            TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId),
+                            GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId),
+                        };
+                        processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
+                        processDetailsList.Add(processDetails);
+                    }
+                    DateTime calKPIs = DateTime.UtcNow;
+                    _tracingService.Trace($"Creating KPIs execution duration: {(calKPIs - retrieveMultipleTime).TotalSeconds:F2} seconds");
+
+
+                    // Upsert Conversation KPIs
+                    EntityCollection entitiesToUpsert = GetCollectionOfEntitiesToCreate(processDetailsList);
+                    DateTime creatingCollections = DateTime.UtcNow;
+                    _tracingService.Trace($"Creating collections execution duration: {(creatingCollections - calKPIs).TotalSeconds:F2} seconds");
+
+                    ExecuteBatchRequests(entitiesToUpsert, UpdateAgentTranScriptStatus);
+                    DateTime excuteBatchesTime = DateTime.UtcNow;
+                    _tracingService.Trace($"Executing batches execution duration: {(excuteBatchesTime - creatingCollections).TotalSeconds:F2} seconds");
+                    // End Time
+                    DateTime endTime = DateTime.UtcNow;
+                    TimeSpan duration = endTime - startTime;
+                    _tracingService.Trace($"Plugin execution duration: {duration.TotalSeconds:F2} seconds");
                 }
-
-                // Upsert Conversation KPIs
-                EntityCollection entitiesToUpsert = GetCollectionOfEntitiesToCreate(processDetailsList);
-                ExecuteBatchRequests(entitiesToUpsert, UpdateAgentTranScriptStatus);
-
-                _tracingService.Trace("Plugin execution completed");
             }
             catch (InvalidPluginExecutionException ex)
             {
@@ -157,6 +185,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="responseWithResults">Conversation KPI Upsert operation response.</param>
         private void UpdateAgentTranScriptStatus(ExecuteMultipleResponse responseWithResults)
         {
+            _tracingService.Trace("Inside UpdateAgentTranScriptStatus.");
             try
             {
                 // Update status
@@ -193,6 +222,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <returns>Entity Collection</returns>
         public EntityCollection GetCollectionOfEntitiesToCreate(List<ProcessDetails> processDetailsList)
         {
+            _tracingService.Trace("Inside GetCollectionOfEntitiesToCreate.");
             // Create Conversation KPI entity collection
             EntityCollection entityCollection = new EntityCollection();
             try
@@ -237,6 +267,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public void ExecuteBatchRequests(EntityCollection entityCollection,
             CallbackFunction callback)
         {
+            _tracingService.Trace("Inside ExecuteBatchRequests.");
             try
             {
                 // Create an ExecuteMultipleRequest object.

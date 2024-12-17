@@ -1,67 +1,90 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Class module for Unrecognized Utterances
+    /// </summary>
     public class ProcessUnrecognizedUtterances
     {
-        public List<UnrecognizedUtterances> ProcessForUnrecognizedUtterances(TranscriptModel model, string conversationId)
+        /// <summary>
+        /// Generate Unrecognized Utterances KPIs
+        /// </summary>
+        /// <param name="model">Transcript Activity Model</param>
+        /// <param name="conversationId">Conversation Id</param>
+        /// <returns>Unrecognized Utterances List</returns>
+        public List<UnrecognizedUtterances> ProcessForUnrecognizedUtterances(List<Activity> model, string conversationId)
         {
-            var transcriptData = model.activities
-            .Where(activity =>
-             activity.valueType == "UnknownIntent" ||
-             activity.valueType == "GPTAnswer" ||
-            (activity.channelData != null && activity.channelData.pvagptfeedback != null))
-           .ToList();
+            // Filter activities
+            var transcriptActivities = model
+                                .Where(activity =>
+                                    activity.valueType == "UnknownIntent" || activity.valueType == "GPTAnswer" ||
+                                    (activity.channelData != null && activity.channelData.pvagptfeedback != null) ||
+                                    activity.valueType == "SessionInfo")
+                                .OrderBy(activity => activity.index)
+                                .ToList();
 
-            List<UnrecognizedUtterances> unrecognizedUtterances = new List<UnrecognizedUtterances>();
+            // Preprocess SessionInfo activities and sort it for efficient lookups
+            var sessionInfoActivities = transcriptActivities
+                .Where(activity => activity.valueType == "SessionInfo")
+                .OrderBy(activity => activity.index)
+                .ToList();
 
-            // Get Next SessionInfo Elements After UnknownIntent
-            transcriptData
-           .Where(activity => activity.valueType == "UnknownIntent").ToList()
-           .ForEach(currentElement =>
-           {
-               // Get Next SessionInfo Timestamp
-               var sessionInfoElements = model.activities
-                  .Where(activity => activity.valueType == "SessionInfo" && activity.timestamp >= currentElement.timestamp)
-                  .OrderBy(activity => activity.timestamp).ToList();
 
-               // Get Next UnknownIntent
-               var nextElement = model.activities
-                   .Where(activity => activity.valueType == "UnknownIntent" &&
-                               activity.timestamp > currentElement.timestamp)
-                   .OrderBy(activity => activity.timestamp)
-                   .FirstOrDefault();
+            var unknownIntentActivities = transcriptActivities
+                .Where(activity => activity.valueType == "UnknownIntent")
+                .ToList();
 
-               // Get GPTAnswer state
-               var gptAnswerState = model.activities
-                                   .Where(activity => activity.valueType == "GPTAnswer" &&
-                                    activity.timestamp >= currentElement.timestamp &&
-                                    (nextElement == null || activity.timestamp < nextElement.timestamp))
-                                   .FirstOrDefault();
+            var gptAnswerActivities = transcriptActivities
+                .Where(activity => activity.valueType == "GPTAnswer")
+                .ToList();
 
-                // Get GPTFeedback
-               var gptFeedback = model.activities
-                                   .Where(activity => activity?.channelData?.pvagptfeedback != null &&
-                                    activity.timestamp >= currentElement.timestamp &&
-                                    (nextElement == null || activity.timestamp < nextElement.timestamp))
-                                   .FirstOrDefault();
+            var gptFeedbackActivities = transcriptActivities
+                .Where(activity => activity.channelData?.pvagptfeedback != null)
+                .ToList();
 
-               unrecognizedUtterances.Add(new UnrecognizedUtterances
-               {
-                   SessionID = $"{conversationId}-{sessionInfoElements.FirstOrDefault()?.timestamp}" +
-                               $"-{sessionInfoElements.FirstOrDefault()?.id}",
-                   UnrecognizedUtterance = currentElement?.value?.userQuery,
-                   Status = gptAnswerState?.value.gptAnswerState.Length > 0 ? gptAnswerState?.value?.gptAnswerState : "Fallback",
-                   UsedGenerativeAnswer = gptAnswerState?.value.gptAnswerState.Length > 0,
-                   UsedAIKnowledge = gptFeedback?.channelData?.pvagptfeedback?.triggeredGptFallback,
-               });
-           });
-           return unrecognizedUtterances;
+            // Prepare result list
+            var unrecognizedUtterances = new List<UnrecognizedUtterances>();
+
+            // Traverse Unknown Intents
+            foreach (var currentElement in unknownIntentActivities)
+            {
+                // Find the next SessionInfo after currentElement.index
+                var nextSession = sessionInfoActivities
+                    .FirstOrDefault(session => session.index > currentElement.index);
+
+                // Find the next UnknownIntent element
+                var nextUnknownIntent = unknownIntentActivities
+                    .FirstOrDefault(activity => activity.index > currentElement.index);
+
+                // Find the relevant GPTAnswer state
+                var gptAnswerState = gptAnswerActivities
+                                    .FirstOrDefault(activity => activity.index > currentElement.index &&
+                                        (nextUnknownIntent == null || activity.index < nextUnknownIntent.index));
+
+                bool isgptAnswerStatePresent = gptAnswerState?.value.gptAnswerState.Length > 0;
+
+                // Find the relevant GPTFeedback
+                var gptFeedback = gptFeedbackActivities
+                                  .FirstOrDefault(activity => activity.index > currentElement.index &&
+                                        (nextUnknownIntent == null || activity.index < nextUnknownIntent.index));
+
+                // Add to the result
+                unrecognizedUtterances.Add(new UnrecognizedUtterances
+                {
+                    SessionID = $"{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
+                    UnrecognizedUtterance = currentElement?.value?.userQuery,
+                    Status = isgptAnswerStatePresent ? gptAnswerState.value.gptAnswerState : "Fallback",
+                    UsedGenerativeAnswer = isgptAnswerStatePresent,
+                    UsedAIKnowledge = gptFeedback?.channelData?.pvagptfeedback?.triggeredGptFallback,
+                });
+            }
+
+            return unrecognizedUtterances;
         }
     }
 }

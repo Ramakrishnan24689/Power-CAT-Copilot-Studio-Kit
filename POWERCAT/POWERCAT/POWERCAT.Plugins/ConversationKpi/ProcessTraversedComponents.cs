@@ -6,46 +6,60 @@ using System.Linq;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Class module for Traversed Components
+    /// </summary>
     public class ProcessTraversedComponents
     {
-        public List<TraversedComponents> ProcessForTraversedComponents(TranscriptModel model, string conversationId)
+        /// <summary>
+        /// Generate Traversed Components KPIs
+        /// </summary>
+        /// <param name="model">Transcript Activity Model</param>
+        /// <param name="conversationId">Conversation Id</param>
+        /// <returns>Traversed Components List</returns>
+        public List<TraversedComponents> ProcessForTraversedComponents(List<Activity> model, string conversationId)
         {
+            // Filter and preprocess relevant activities
+            var transcriptActivities = model
+                .Where(activity =>
+                    activity.valueType == "IntentRecognition" ||
+                    activity.valueType == "DialogRedirect" ||
+                    activity.valueType == "UnknownIntent" ||
+                    activity.name == "startConversation")
+                .OrderBy(activity => activity.index)
+                .ToList();
 
-            var transcriptData = model.activities
-                        .Where(activity => activity.valueType == "IntentRecognition"
-                                           || activity.valueType == "DialogRedirect"
-                                           || activity.valueType == "UnknownIntent"
-                                           || activity.valueType == "SessionInfo"
-                                           || activity.name == "startConversation")
-                      .ToList();
+            // Preprocess SessionInfo activities and sort it for efficient lookups
+            var sessionInfoActivities = model
+                .Where(activity => activity.valueType == "SessionInfo")
+                .OrderBy(activity => activity.index)
+                .ToList();
 
-            List<TraversedComponents> traversedComponents = new List<TraversedComponents>();
+            // Process relevant activities
+            var traversedComponents = new List<TraversedComponents>();
+            foreach (var currentElement in transcriptActivities)
+            {
+                // Find the next SessionInfo after currentElement.index
+                var nextSession = sessionInfoActivities
+                    .FirstOrDefault(session => session.index > currentElement.index);
 
-            transcriptData.Where(activity => activity.name == "startConversation" || (activity.valueType == "DialogRedirect" ||
-                                    activity.valueType == "UnknownIntent" || activity.valueType == "IntentRecognition"))
-                       .ToList()
-                       .ForEach(currentElement =>
-                       {
-                           // Get Next SessionInfo timestamp
-                           var sessionInfoElements = model.activities
-                               .Where(activity => activity.valueType == "SessionInfo" && activity.timestamp >= currentElement.timestamp)
-                               .OrderBy(activity => activity.timestamp)
-                               .ToList();
-
-                           // Add the tracked variable to the list
-                           traversedComponents.Add(new TraversedComponents
-                           {
-                               SessionID = $"{conversationId}-{sessionInfoElements.FirstOrDefault()?.timestamp}-" +
-                                           $"{sessionInfoElements.FirstOrDefault()?.id}",
-                               ComponentType = "Topic",
-                               Trigger = GetTrigger(currentElement.valueType),
-                               ComponentID = GetComponentID(currentElement.valueType, currentElement.value)
-                           });
-                       });
+                traversedComponents.Add(new TraversedComponents
+                {
+                    SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    ComponentType = "Topic",
+                    Trigger = GetTrigger(currentElement.valueType),
+                    ComponentID = GetComponentID(currentElement.valueType, currentElement.value)
+                });
+            }
 
             return traversedComponents;
         }
 
+        /// <summary>
+        /// Get trigger type based on value type
+        /// </summary>
+        /// <param name="valueType">Value Type</param>
+        /// <returns>Trigger Type</returns>
         public static string GetTrigger(string valueType)
         {
             switch (valueType)
@@ -64,6 +78,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return string.Empty;
         }
 
+        /// <summary>
+        /// Get Component Id
+        /// </summary>
+        /// <param name="valueType">Value Type</param
+        /// <param name="value">Activity Value</param>
+        /// <returns>Component Id</returns>
         string GetComponentID(string valueType, dynamic value)
         {
             switch (valueType)
@@ -77,7 +97,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 case "UnknownIntent":
                     return null;
                 default:
-                    return "Unknown-Component";
+                    return string.Empty;
             }
         }
     }

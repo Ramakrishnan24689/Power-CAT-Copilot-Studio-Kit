@@ -3,83 +3,92 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Class module for Session Insights
+    /// </summary>
     public class ProcessSessionInsight
     {
-        public List<SessionDetail> ProcessTranscript(string conversationId, TranscriptModel model)
+        /// <summary>
+        /// Generate Session Insights KPIs
+        /// </summary>
+        /// <param name="model">Transcript Activity Model</param>
+        /// <param name="conversationId">Conversation Id</param>
+        /// <returns>Session Details List.</returns>
+        public List<SessionDetail> ProcessTranscript(List<Activity> model, string conversationId)
         {
-            //Filtering the SessionInfo details.
-            List<SessionDetail> session = model.activities
-                                          .Where(activity => activity.valueType == "SessionInfo" && activity.value != null)
-                                          .Select(activity => new SessionDetail
-                                          {
-                                              SessionID = $"{conversationId}-{activity.timestamp}-{activity.id}",
-                                              Engagement = activity.value.type,
-                                              Outcome = activity.value.outcome,
-                                              CSAT = activity.value.csatScore,
-                                              TurnCount = activity.value.turnCount,
-                                              ImpliedSuccess = activity.value.impliedSuccess,
-                                              StartTimeUtc = DateTimeOffset.Parse(activity.value.startTimeUtc.ToString()).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                                              EndTimeUtc = DateTimeOffset.Parse(activity.value?.endTimeUtc.ToString()).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                                              OutcomeReason = activity.value.outcomeReason,
-                                          }).ToList();
-
-            return session;
-
+            return model
+                .Where(activity => activity.valueType == "SessionInfo" && activity.value != null)
+                .Select(activity => new SessionDetail
+                {
+                    SessionID = $"{conversationId}-{activity.timestamp}-{activity.id}",
+                    Engagement = activity.value.type,
+                    Outcome = activity.value.outcome,
+                    CSAT = activity.value.csatScore,
+                    TurnCount = activity.value.turnCount,
+                    ImpliedSuccess = activity.value.impliedSuccess,
+                    StartTimeUtc = DateTimeOffset.Parse(activity.value.startTimeUtc?.ToString())
+                        .ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    EndTimeUtc = DateTimeOffset.Parse(activity.value.endTimeUtc?.ToString())
+                        .ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    OutcomeReason = activity.value.outcomeReason
+                })
+                .ToList();
         }
 
-        public GlobalSessionDetail GetGlobalDetails(List<SessionDetail> processedDetails)
+        /// <summary>
+        /// Get Global Session Details
+        /// </summary>
+        /// <param name="sessionDetails">Session Details</param>
+        /// <returns>Global Session Details List</returns>
+        public GlobalSessionDetail GetGlobalDetails(List<SessionDetail> sessionDetails)
         {
-            //Calculating the global values for a transcript
-            GlobalSessionDetail globalSessionDetail = new GlobalSessionDetail
+            int csatCount = sessionDetails.Count(s => s.CSAT > 0);
+            double totalCsat = sessionDetails.Sum(s => s.CSAT ?? 0);
+            int totalTurnCount = (int)sessionDetails.Sum(s => s.TurnCount);
+
+            // Calculate GlobalOutcome in priority order
+            int globalOutcome = sessionDetails.All(p => p.Outcome.Contains("Resolved")) ? 2 :
+                                sessionDetails.Any(p => p.Outcome.Contains("HandOff")) ? 4 :
+                                sessionDetails.Any(p => p.Outcome.Contains("Resolved")) ? 3 :
+                                sessionDetails.Any(p => p.Outcome.Contains("Abandoned")) ? 5 : 1;
+
+            return new GlobalSessionDetail
             {
-                SessionCount = processedDetails.Count,
-                TotalCsat = processedDetails.Sum(s => s.CSAT),
-                CsatCount = processedDetails.Count(s => s.CSAT > 0),
-                TotalTurnCount = processedDetails.Sum(s => s.TurnCount),
-                AvgCsat = 0
+                SessionCount = sessionDetails.Count,
+                TotalCsat = totalCsat,
+                CsatCount = csatCount,
+                TotalTurnCount = totalTurnCount,
+                AvgCsat = csatCount > 0 ? Math.Round(totalCsat / csatCount, 2) : 0,
+                GlobalOutcome = globalOutcome
             };
-
-            if (globalSessionDetail.CsatCount > 0 && globalSessionDetail.TotalCsat > 0){
-                globalSessionDetail.AvgCsat = Math.Round((globalSessionDetail.TotalCsat / globalSessionDetail.CsatCount) ?? 0, 2);
-            }
-
-            if (processedDetails.All(p => p.Outcome.Contains("Resolved"))){
-                globalSessionDetail.GlobalOutcome = 2;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("HandOff")) >= 1){
-                globalSessionDetail.GlobalOutcome = 4;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("Resolved")) >= 1){
-                globalSessionDetail.GlobalOutcome = 3;
-            }else if (processedDetails.Count(p => p.Outcome.Contains("Abandoned")) >= 1){
-                globalSessionDetail.GlobalOutcome = 5;
-            }else{
-                globalSessionDetail.GlobalOutcome = 1;
-            }
-            return globalSessionDetail;
         }
 
+        /// <summary>
+        /// Get Conversation Details
+        /// </summary>
+        /// <param name="model">Transcript Model</param>
+        /// <returns>Conversation Details List</returns>
         public ConversationInfoDetail ProcessConversationInfoDetails(TranscriptModel model)
         {
-            var firstElement = model?.activities?.FirstOrDefault();
-            var lastElement = model?.activities?.LastOrDefault();
-            string userId = string.Empty;
-            userId = model.activities
-                   .Where(activity => activity.from != null && (activity.from.role == 1))
-                   .Select(activity => activity.from.id)
-                   .FirstOrDefault() ?? string.Empty;
+            if (model?.activities == null || !model.activities.Any())
+                return null;
 
-            ConversationInfoDetail conversationInfoDetails =
-                                       new ConversationInfoDetail
-                                       {
-                                           Timestamp = firstElement?.timestamp,
-                                           ConversationDuration = lastElement?.timestamp - firstElement?.timestamp,
-                                           UserId = userId
-                                       };
-            return conversationInfoDetails;
+            var firstElement = model.activities.First();
+            var lastElement = model.activities.Last();
+
+            string userId = model.activities
+                .FirstOrDefault(activity => activity.from?.role == 1)?.from?.id ?? string.Empty;
+
+            return new ConversationInfoDetail
+            {
+                Timestamp = firstElement.timestamp,
+                ConversationDuration = lastElement.timestamp - firstElement.timestamp,
+                UserId = userId
+            };
         }
     }
 }

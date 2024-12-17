@@ -6,51 +6,56 @@ using System.Linq;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
+    /// <summary>
+    /// Class module for Ambiguous Utterances
+    /// </summary>
     public class ProcessAmbiguousUtterances
     {
-        public List<AmbiguousUtterances> ProcessForAmbiguousUtterances(TranscriptModel model, string conversationId)
+        /// <summary>
+        /// Generate Ambiguous Utterances KPIs
+        /// </summary>
+        /// <param name="model">Transcript Activity Model</param>
+        /// <param name="conversationId">Conversation Id</param>
+        /// <returns>Ambiguous Utterances List</returns>
+        public List<AmbiguousUtterances> ProcessForAmbiguousUtterances(List<Activity> model, string conversationId)
         {
-            List<AmbiguousUtterances> ambiguousUtterances = new List<AmbiguousUtterances>();
-            List<IntentCandidates> intentCandidates = new List<IntentCandidates>();
+            var ambiguousUtterances = new List<AmbiguousUtterances>();
 
-            var transcriptData = model.activities
-                       .Where(activity =>
-                        activity.valueType == "IntentCandidates")
-                      .ToList();
-            
-            transcriptData
-               .Where(activity => activity.valueType == "IntentCandidates").ToList()
-               .ForEach(currentElement =>
-               {
-                   // Get Next SessionInfo timestamp
-                   var sessionInfoElements = model.activities
-                          .Where(activity => activity.valueType == "SessionInfo" && activity.timestamp >= currentElement.timestamp)
-                          .OrderBy(activity => activity.timestamp).ToList();
+            // Pre-filter IntentCandidates and SessionInfo
+            var transcriptActivities = model
+                .Where(activity => activity.valueType == "IntentCandidates")
+                .ToList();
 
-                   //traverse through each intent and add to intentCandidates
-                   if (currentElement?.value?.intents != null)
-                   {
-                       intentCandidates.Clear();
-                       foreach (var intent in currentElement.value.intents)
-                       {
-                           intentCandidates.Add(new IntentCandidates
-                           {
-                               IntentId = intent?.intentId,
-                               Title = intent?.intentScore?.properties?.Title,
-                               IntentScore = intent?.intentScore?.score                               
-                           });
-                       }
-                   }
-                   ambiguousUtterances.Add(new AmbiguousUtterances
-                   {
-                       SessionID = $"{conversationId}-{sessionInfoElements.FirstOrDefault()?.timestamp}"
-                                        + $"-{sessionInfoElements.FirstOrDefault()?.id}",
-                       IntentCandidatesId = currentElement?.id,
-                       AmbiguousUtterance = currentElement?.value?.triggerUtterance,
-                       IntentCandidates = intentCandidates
-                   });
+            // Preprocess SessionInfo activities and sort it for efficient lookups
+            var sessionInfoActivities = model
+                .Where(activity => activity.valueType == "SessionInfo")
+                .OrderBy(activity => activity.index)
+                .ToList();
 
-               });
+            foreach (var currentElement in transcriptActivities)
+            {
+                // Find the next SessionInfo after currentElement.index
+                var nextSession = sessionInfoActivities
+                    .FirstOrDefault(session => session.index > currentElement.index);
+
+                // Build the list of intent candidates
+                var intentCandidates = currentElement?.value?.intents?
+                    .Select(intent => new IntentCandidates
+                    {
+                        IntentId = intent?.intentId,
+                        Title = intent?.intentScore?.properties?.Title,
+                        IntentScore = intent?.intentScore?.score
+                    }).ToList() ?? new List<IntentCandidates>();
+
+                // Add the ambiguous utterance entry
+                ambiguousUtterances.Add(new AmbiguousUtterances
+                {
+                    SessionID = $"{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
+                    IntentCandidatesId = currentElement?.id,
+                    AmbiguousUtterance = currentElement?.value?.triggerUtterance,
+                    IntentCandidates = intentCandidates
+                });
+            }
 
             return ambiguousUtterances;
         }
