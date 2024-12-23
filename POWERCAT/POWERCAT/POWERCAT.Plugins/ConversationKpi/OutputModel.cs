@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 
@@ -23,27 +24,6 @@ namespace POWERCAT.Plugins.ConversationKpi
         public DateTime ConversationDate { get; set; }
     }
 
-    public class ConversationInfoDetail
-    {
-        public int? ConversationDuration { get; set; }
-        public int? Timestamp { get; set; }
-        public string UserId { get; set; }
-    }
-
-    public class SessionDetail
-    {
-        public string SessionID { get; set; }
-        public string StartTimeUtc { get; set; }
-        public string EndTimeUtc { get; set; }
-        public string Engagement { get; set; }
-        public string Outcome { get; set; }
-        public int? TurnCount { get; set; }
-        public int? CSAT { get; set; }
-        public bool? ImpliedSuccess { get; set; }
-        public string OutcomeReason { get; set; }
-
-    }
-
     public class GlobalSessionDetail
     {
         public double? AvgCsat { get; set; }
@@ -54,49 +34,110 @@ namespace POWERCAT.Plugins.ConversationKpi
         public int? TotalTurnCount { get; set; }
     }
 
+    public class ConversationInfoDetail
+    {
+        public int? ConversationDuration { get; set; }
+        public int? Timestamp { get; set; }
+        public string UserId { get; set; }
+    }
+
+    public class SessionDetail
+    {
+        [JsonProperty("Session ID", Order = 1)]
+        public string SessionID { get; set; }
+        [JsonProperty("Engagement", Order = 2)]
+        public string Engagement { get; set; }
+        [JsonProperty("Outcome", Order = 3)]
+        public string Outcome { get; set; }
+        [JsonProperty("CSAT", Order = 4)]
+        public int? CSAT { get; set; }
+        [JsonProperty("Turn Count", Order = 5)]
+        public int? TurnCount { get; set; }
+        [JsonProperty("Implied Success", Order = 6)]
+        public bool? ImpliedSuccess { get; set; }
+        [JsonProperty("Start Time (UTC)", Order = 7)]
+        public string StartTimeUtc { get; set; }
+        [JsonProperty("End Time (UTC)", Order = 8)]
+        public string EndTimeUtc { get; set; }
+        [JsonProperty("Outcome Reason", Order = 9)]
+        public string OutcomeReason { get; set; }
+    }
+
     public class TraversedComponents
     {
+        [JsonProperty("Session ID")]
         public string SessionID { get; set; }
+        [JsonProperty("Component Type")]
         public string ComponentType { get; set; }
         public string Trigger { get; set; }
+        [JsonProperty("Component ID")]
         public string ComponentID { get; set; }
     }
 
     public class GenerativeAnswers
     {
+        [JsonProperty("Session ID")]
         public string SessionID { get; set; }
+        [JsonProperty("User Query")]
         public string UserQuery { get; set; }
+        [JsonProperty("Generated Answer")]
         public string GeneratedAnswer { get; set; }
         public string Status { get; set; }
+        [JsonProperty("Used AI Knowledge")]
         public bool? UsedAIKnowledge { get; set; }
     }
 
     public class TrackedVariable
     {
+        [JsonProperty("Session ID")]
         public string SessionID { get; set; }
+        [JsonProperty("Name")]
         public string VariableName { get; set; }
+        [JsonProperty("Value")]
         public string VariableValue { get; set; }
     }
 
     public class UnrecognizedUtterances
     {
+        [JsonProperty("Session ID")]
         public string SessionID { get; set; }
+        [JsonProperty("Unrecognized Utterance")]
         public string UnrecognizedUtterance { get; set; }
         public string Status { get; set; }
+        [JsonProperty("Used Generative Answer")]
         public bool UsedGenerativeAnswer { get; set; }
+        [JsonProperty("Used AI Knowledge")]
         public bool? UsedAIKnowledge { get; set; }
     }
     public class AmbiguousUtterances
     {
+        [JsonProperty("Session ID")]
         public string SessionID { get; set; }
+        [JsonProperty("Intent Candidates ID")]
         public string IntentCandidatesId { get; set; }
-        public string AmbiguousUtterance  { get; set; }
+        [JsonProperty("Ambiguous Utterance")]
+        public string AmbiguousUtterance { get; set; }
+        [JsonProperty("Intent Candidates")]
         public List<IntentCandidates> IntentCandidates { get; set; } = new List<IntentCandidates>();
     }
     public class IntentCandidates
     {
+        [JsonProperty("Intent Id")]
         public string IntentId { get; set; }
         public string Title { get; set; }
+        [JsonProperty("Intent Score")]
         public double? IntentScore { get; set; }
+    }
+
+    public class ConversationTranscriptModel
+    {
+        public string ConversationId { get; set; }
+        public string Content { get; set; }        
+        public DateTime ConversationStartTime { get; set; }
+        public string AgentId { get; set; }
+        public string AgentConfigurationId { get; set; }
+        public string ConversationTranscriptId { get; set; }        
+        public string TrackedVariables { get; set; }
+        public string Name { get; set; }
     }
 }
