@@ -13,9 +13,8 @@
     "refreshTypes": "pcf-scripts refreshTypes"
   },
   "dependencies": {
-    "@fluentui/react-components": "^9.56.2",
-    "botframework-webchat": "^4.18.0",
-    "botframework-webchat-fluent-theme": "^4.18.0"
+    "@types/to-json-schema": "^0.2.1",
+    "to-json-schema": "^0.2.5"
   },
   "devDependencies": {
     "@microsoft/eslint-plugin-power-apps": "^0.2.51",
@@ -27,6 +26,10 @@
     "eslint-plugin-promise": "^7.1.0",
     "pcf-scripts": "^1",
     "pcf-start": "^1",
-    "typescript": "^5.7.2"
+    "typescript": "^4.9.5",
+    "@types/react": "^16.8",
+    "@types/jest": "^27.4.0",
+    "jest": "^27.4.7",
+    "ts-jest": "^27.1.3"
   }
 }

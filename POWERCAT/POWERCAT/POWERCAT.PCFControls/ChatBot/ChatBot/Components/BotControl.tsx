@@ -1,5 +1,6 @@
 import React from "react";
 import ReactWebChat, { createDirectLine } from "botframework-webchat";
+import { FluentThemeProvider } from "botframework-webchat-fluent-theme";
 import {
   Spinner,
   MessageBar,
@@ -73,13 +74,21 @@ const BotControl: React.FC<BotProps> = ({
         .postActivity({
           type: "message",
           text: userQuery,
+          textFormat: "plain",
         })
         .subscribe({
           error: (err: any) => {
-            // Handle error when posting activity
             setError(`Failed to send message: ${err.message}`);
           },
         });
+
+      // Listen for incoming messages and convert them to plain text
+      directLine.activity$.subscribe((activity: any) => {
+        if (activity.type === "message" && activity.textFormat === "markdown") {
+          activity.text = activity.text.replace(/[*_~`#>[\]()!-]/g, ""); // Remove Markdown syntax
+          activity.textFormat = "plain"; // Update the text format
+        }
+      });
     }
   }, [directLine, userQuery]);
 
@@ -90,10 +99,12 @@ const BotControl: React.FC<BotProps> = ({
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       ) : directLine ? (
-        <ReactWebChat
-          directLine={directLine}
-          styleOptions={JSON.parse(styleOptions)}
-        />
+        <FluentThemeProvider>
+          <ReactWebChat
+            directLine={directLine}
+            styleOptions={JSON.parse(styleOptions)}
+          />
+        </FluentThemeProvider>
       ) : (
         <Spinner label="Loading..." className="loadingSpinner" />
       )}
