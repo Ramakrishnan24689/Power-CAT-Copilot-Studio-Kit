@@ -8,9 +8,10 @@
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props')" />
 
   <PropertyGroup>
-    <Name>WebChatPCF</Name>
-    <ProjectGuid>088b3ad4-8f65-478d-be47-742018ad7baf</ProjectGuid>
+    <Name>WebChat</Name>
+    <ProjectGuid>170019b2-a4a8-49eb-8132-65aeb44402a8</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
+    <PcfBuildMode>production</PcfBuildMode>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="WebChat" version="4.2.4" display-name-key="WebChat" description-key="WebChat description" control-type="standard">
-    
-    <!-- External service usage -->
+  <control namespace="PowerCAT" constructor="WebChat" version="4.2.7" display-name-key="WebChat" description-key="WebChat description" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
-    
-    <!-- Property for bound value -->
-    <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="input" required="true" />
+    <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
+    <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="bound" required="true" />
     
     <!-- Type group definition for strings -->
     <type-group name="strings">
@@ -17,12 +14,9 @@
     </type-group>
     
     <!-- Property for file column logical name -->
-    <property name="fileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
-    
-    <!-- Resource files -->
+    <property name="FileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
     <resources>
       <code path="index.ts" order="1"/>
-      <css path="Components/css/BotTranscriptStyle.css" order="1" />
     </resources>
   </control>
 </manifest>

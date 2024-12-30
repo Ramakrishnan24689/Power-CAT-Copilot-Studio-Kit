@@ -1,1 +1,1 @@
-export * from './WebChat'
+export * from "./WebChat";

@@ -1,11 +1,8 @@
 {
-    "compilerOptions": {
-        "allowSyntheticDefaultImports": true,
-        "esModuleInterop": true,
-        "module": "commonjs",
-        "target": "es5",
-        "strict": true,
-        "jsx": "react",
-        "resolveJsonModule": true,
-    }
+  "extends": "./node_modules/pcf-scripts/tsconfig_base.json",
+  "compilerOptions": {
+    "typeRoots": ["node_modules/@types"],
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react"
+  }
 }
