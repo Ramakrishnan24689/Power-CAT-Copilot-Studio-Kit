@@ -43,8 +43,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     .Select(intent => new IntentCandidates
                     {
                         IntentId = intent?.intentId,
-                        Title = intent?.intentScore?.properties?.Title,
-                        IntentScore = intent?.intentScore?.score
+                        IntentScore = intent?.intentScore?.score,
+                        Title = intent?.intentScore?.properties?.Title
                     }).ToList() ?? new List<IntentCandidates>();
 
                 // Add the ambiguous utterance entry

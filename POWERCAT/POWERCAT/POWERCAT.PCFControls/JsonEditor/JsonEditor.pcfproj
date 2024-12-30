@@ -8,8 +8,8 @@
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.props')" />
 
   <PropertyGroup>
-    <Name>code-editor</Name>
-    <ProjectGuid>5fa7bb1b-b341-4161-bda2-f2e69a8ccf79</ProjectGuid>
+    <Name>JsonEditor</Name>
+    <ProjectGuid>24f7fd14-405c-46f3-84e0-e1f2a899659f</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
     <PcfBuildMode>production</PcfBuildMode>
   </PropertyGroup>

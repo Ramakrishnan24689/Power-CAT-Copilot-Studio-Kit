@@ -1,33 +1,31 @@
 {
-  "name": "json-editor-pcf",
+  "name": "pcf-project",
   "version": "1.0.0",
-  "description": "Json Editor PCF implements Monaco editor in order to show text area field as a code editor.",
+  "description": "Project containing your PowerApps Component Framework (PCF) control.",
   "scripts": {
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
+    "lint": "pcf-scripts lint",
+    "lint:fix": "pcf-scripts lint fix",
     "rebuild": "pcf-scripts rebuild",
     "start": "pcf-scripts start",
+    "start:watch": "pcf-scripts start watch",
     "refreshTypes": "pcf-scripts refreshTypes"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.4.5",
-    "prettier-package-json": "^2.8.0",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "@monaco-editor/react": "^4.6.0"
   },
   "devDependencies": {
-    "@types/node": "^16.4",
-    "@types/powerapps-component-framework": "^1.3.0",
-    "@types/react": "^18.0.9",
-    "@types/react-dom": "^18.0.4",
-    "@typescript-eslint/eslint-plugin": "^4.29.0",
-    "@typescript-eslint/parser": "^4.29.0",
-    "eslint": "^7.32.0",
-    "eslint-plugin-import": "^2.23.4",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^5.1.0",
+    "@microsoft/eslint-plugin-power-apps": "^0.2.51",
+    "@types/node": "^18.19.54",
+    "@types/powerapps-component-framework": "^1.3.15",
+    "@types/react-dom": "^19.0.2",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-promise": "^7.1.0",
     "pcf-scripts": "^1",
     "pcf-start": "^1",
-    "typescript": "^4.3"
+    "typescript": "^5.7.2"
   }
 }

@@ -1,34 +1,20 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <!-- Defines a control with its properties, types, and resources -->
-  <control namespace="PowerCAT" constructor="JsonEditor" version="13.23.0" display-name-key="Json Editor" description-key="Json Editor" control-type="standard">
-    
-    <!-- Property node identifies a specific, configurable piece of data that the control expects from CDS -->
+  <control namespace="PowerCAT" constructor="JsonEditor" version="0.0.23" display-name-key="JsonEditor" description-key="JsonEditor description" control-type="standard" >
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
     <property name="Value" display-name-key="Value" description-key="Field Value" of-type-group="strings" usage="bound" required="true" />
-    
-    <!-- Type group defines a collection of related data types for the property -->
     <type-group name="strings">
-      <type>SingleLine.Text</type> <!-- Single line text type -->
-      <type>SingleLine.TextArea</type> <!-- Text area type for multiline input -->
-      <type>Multiple</type> <!-- Multiple line text type -->
+      <type>SingleLine.Text</type>
+      <type>SingleLine.TextArea</type>
+      <type>Multiple</type>
     </type-group>
-    
-    <!-- Property for setting the height of the editor -->
     <property name="Height" display-name-key="Height" description-key="Editor Height" of-type="Whole.None" usage="input" required="false" />
-    
-    <!-- Property for specifying if the column is a file column (boolean value) -->
-    <property name="FileColumn" display-name-key="File Column?" of-type="Enum" usage="input" required="true" default-value="False">
-      <value name="True" display-name-key="True">True</value>
-      <value name="False" display-name-key="False">False</value>
-    </property>
-    
-    <!-- Property for setting the logical name of the file column -->
-    <property name="fileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
-    
-    <!-- Resources associated with the control -->
+    <property name="FileColumn" display-name-key="File Column?" of-type="TwoOptions" usage="input" required="true" default-value="false" />
+    <property name="FileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
     <resources>
-      <code path="index.ts" order="1"/> <!-- Path to the TypeScript file containing the control's code -->
-      <resx path="strings/CodeEditor.1033.resx" version="1.0.0" /> <!-- Path to the resource file for localized strings -->
+      <code path="index.ts" order="1"/>
     </resources>
   </control>
 </manifest>

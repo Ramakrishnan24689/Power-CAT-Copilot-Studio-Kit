@@ -124,9 +124,10 @@ namespace POWERCAT.Plugins.ConversationKpi
     {
         [JsonProperty("Intent Id")]
         public string IntentId { get; set; }
-        public string Title { get; set; }
         [JsonProperty("Intent Score")]
         public double? IntentScore { get; set; }
+        public string Title { get; set; }
+        
     }
 
     public class ConversationTranscriptModel
