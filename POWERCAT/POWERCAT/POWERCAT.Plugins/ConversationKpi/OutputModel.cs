@@ -9,7 +9,6 @@ namespace POWERCAT.Plugins.ConversationKpi
 {
     public class ProcessDetails
     {
-        public Guid AgentTranscriptId { get; set; }
         public List<SessionDetail> SessionDetails { get; set; } = new List<SessionDetail>();
         public GlobalSessionDetail GlobalSessionDetail { get; set; }
         public List<TrackedVariable> TrackedVariables { get; set; } = new List<TrackedVariable>();
@@ -22,6 +21,8 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string AgentId { get; set; }
         public string ConversationId { get; set; }
         public DateTime ConversationDate { get; set; }
+        public string TranscriptContent { get; set; }
+        public string ConversationTranscriptId { get; set; }
     }
 
     public class GlobalSessionDetail

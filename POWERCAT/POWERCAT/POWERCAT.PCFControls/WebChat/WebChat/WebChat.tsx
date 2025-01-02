@@ -12,7 +12,7 @@ export class WebChat
   private _entityId!: string;
   private _clientUrl!: string;
   private _fileColumnLogicalName!: string;
-  private _transcript: Transcript = {};
+  private _value: Transcript = {};
   private _root!: ReactDOM.Root;
 
   /**
@@ -52,8 +52,18 @@ export class WebChat
   public async updateView(
     context: ComponentFramework.Context<IInputs>
   ): Promise<void> {
-    this._transcript = (await this.getFileContent()) || {};
-    this.renderComponent(); // Only rendering the component, no data saving
+    if (context.parameters.FileColumn.raw) {
+      try {
+        this._value = (await this.getFileContent()) || {};
+      } catch (error) {
+        throw new Error(`Error fetching file content: ${error}`);
+      }
+    } else {
+      const rawValue = context.parameters.Value.raw;
+      this._value =
+        typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue || {};
+    }
+    this.renderComponent();
   }
 
   /**
@@ -122,7 +132,7 @@ export class WebChat
    */
   private renderComponent(): void {
     this._root.render(
-      React.createElement(BotTranscript, { transcript: this._transcript })
+      React.createElement(BotTranscript, { transcript: this._value })
     );
   }
 }

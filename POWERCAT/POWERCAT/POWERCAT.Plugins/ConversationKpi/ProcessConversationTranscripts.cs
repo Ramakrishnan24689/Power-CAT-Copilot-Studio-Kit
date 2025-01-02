@@ -24,32 +24,31 @@ namespace POWERCAT.Plugins.ConversationKpi
         {
             try
             {
-                // Prepare fetch xml based on Conversation Transcript Ids
+                // Get Conversation Transcripts details
                 string conversationTranscripts = context.InputParameters["cat_ConversationTranscriptsList"] as string;
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
-                // Extract Conversation Transcript Ids from input
-                var transcriptIds = inputRecords
-                    .Where(r => !string.IsNullOrEmpty(r.ConversationTranscriptId))
-                    .Select(r => r.ConversationTranscriptId)
+                // Extract Conversation Transcript Names from input
+                var transcriptNames = inputRecords
+                    .Where(r => !string.IsNullOrEmpty(r.Name))
+                    .Select(r => r.Name)
                     .ToList();
 
-                // Fetch existing Agent Transcripts based on Conversation Transcript Ids
-                var existingRecords = FetchExistingAgentTranscripts(organizationService, tracingService, transcriptIds);
+                // Fetch existing Agent Transcripts based on Conversation Transcript Names
+                var existingRecords = FetchExistingAgentTranscripts(organizationService, tracingService, transcriptNames);
 
                 // Prepare ExecuteMultiple request
                 var createRequests = new List<OrganizationRequest>();
                 foreach (var record in inputRecords)
                 {
                     // Check if Agent Transcript record already present
-                    if (!string.IsNullOrEmpty(record.ConversationTranscriptId) &&
-                        !existingRecords.Contains(record.ConversationTranscriptId))
+                    if (!string.IsNullOrEmpty(record.Name) &&
+                        !existingRecords.Contains(record.Name))
                     {
                         var createRequest = new CreateRequest
                         {
                             Target = new Entity("cat_agenttranscripts")
                             {
-                                ["cat_agenttranscriptsid"] = new Guid(record.ConversationTranscriptId),
                                 ["cat_transcriptcontent"] = record.Content,
                                 ["cat_conversationdate"] = record.ConversationStartTime,
                                 ["cat_agentid"] = record.AgentId,
@@ -57,7 +56,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ["cat_conversationid"] = record.ConversationId,
                                 ["cat_trackedvariables"] = record.TrackedVariables,
                                 ["cat_name"] = record.Name,
-                                ["cat_workflowstatus"] = new OptionSetValue(1)
+                                ["cat_workflowstatus"] = new OptionSetValue(1),
+                                ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
                             }
                         };
                         createRequests.Add(createRequest);
@@ -87,7 +87,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                         if (responseItem.Fault != null)
                         {
                             // Construct failure message with GUID and error message
-                            string failedRecordInfo = $"Record with Id: {((CreateResponse)responseItem.Response).id} failed with error: {responseItem.Fault.Message}";
+                            string failedRecordInfo = $"Record creation failed with error: {responseItem.Fault.Message}";
                             failedRecords.AppendLine(failedRecordInfo);
                         }
                     }
@@ -120,23 +120,23 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="organizationService">Organization Service</param>
         /// <param name="tracingService">Tracing Service</param>
-        /// <param name="transcriptIds">Conversation Transcript Ids</param
-        private HashSet<string> FetchExistingAgentTranscripts(IOrganizationService organizationService, ITracingService tracingService, List<string> transcriptIds)
+        /// <param name="transcriptNames">Conversation Transcript Names</param
+        private HashSet<string> FetchExistingAgentTranscripts(IOrganizationService organizationService, ITracingService tracingService, List<string> transcriptNames)
         {
             try
             {
-                var existingTranscriptIds = new HashSet<string>();
+                var existingTranscriptNames = new HashSet<string>();
 
-                if (transcriptIds.Any())
+                if (transcriptNames.Any())
                 {
                     QueryExpression query = new QueryExpression("cat_agenttranscripts")
                     {
-                        ColumnSet = new ColumnSet("cat_agenttranscriptsid"),
+                        ColumnSet = new ColumnSet("cat_name"),
                         Criteria = new FilterExpression
                         {
                             Conditions =
                                 {
-                                    new ConditionExpression("cat_agenttranscriptsid", ConditionOperator.In, transcriptIds.ToArray())
+                                    new ConditionExpression("cat_name", ConditionOperator.In, transcriptNames.ToArray())
                                 }
                         }
                     };
@@ -144,11 +144,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                     EntityCollection results = organizationService.RetrieveMultiple(query);
                     foreach (var entity in results.Entities)
                     {
-                        existingTranscriptIds.Add(entity.GetAttributeValue<Guid>("cat_agenttranscriptsid").ToString());
+                        existingTranscriptNames.Add(entity.GetAttributeValue<String>("cat_name"));
                     }
                 }
 
-                return existingTranscriptIds;
+                return existingTranscriptNames;
             }
             catch (Exception ex)
             {

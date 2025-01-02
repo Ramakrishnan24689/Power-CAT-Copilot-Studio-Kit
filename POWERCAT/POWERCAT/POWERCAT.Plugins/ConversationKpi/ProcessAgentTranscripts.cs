@@ -51,7 +51,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_agentid' />
                                         <attribute name='cat_conversationdate' />
                                         <attribute name='cat_conversationid' />
-                                        <attribute name='cat_trackedvariables' />
+                                        <attribute name='cat_trackedvariables' 
+                                        <attribute name='cat_conversationtranscriptid' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
@@ -79,7 +80,6 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
-                        Guid agentTranscriptId = agentTranscript.Id;
                         string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
                         string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                         string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
@@ -94,11 +94,12 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                         ProcessDetails processDetails = new ProcessDetails
                         {
-                            AgentTranscriptId = agentTranscriptId,
                             AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
                             AgentId = agentTranscript.GetAttributeValue<string>("cat_agentid"),
                             ConversationId = conversationId,
                             ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
+                            TranscriptContent = transcript,
+                            ConversationTranscriptId = ((String)agentTranscript["cat_conversationtranscriptid"]),
                             SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId),
                             ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
                             TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId),
@@ -188,7 +189,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             {
                 foreach (var processDetails in processDetailsList)
                 {
-                    Entity ConversationKpi = new Entity("cat_copilotkpi", "cat_copilotkpiid", processDetails.AgentTranscriptId);
+                    Entity ConversationKpi = new Entity("cat_copilotkpi", "cat_copilotkpiid", processDetails.ConversationTranscriptId);
                     ConversationKpi["cat_name"] = processDetails.ConversationId + "-" + processDetails.ConversationInfoDetails?.Timestamp;
                     ConversationKpi["cat_copilotconfigurationid"] = new EntityReference("cat_copilotconfiguration", new Guid(processDetails.AgentConfigurationId));
                     ConversationKpi["cat_copilotid"] = processDetails.AgentId;
@@ -200,6 +201,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     {
                         ConversationKpi["cat_csat"] = Convert.ToDecimal(processDetails.GlobalSessionDetail?.AvgCsat);
                     }
+                    ConversationKpi["cat_transcriptcontent"] = JsonConvert.SerializeObject(processDetails.TranscriptContent);
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);

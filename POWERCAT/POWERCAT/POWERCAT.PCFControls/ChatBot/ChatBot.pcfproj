@@ -9,9 +9,9 @@
 
   <PropertyGroup>
     <Name>ChatBot</Name>
-    <ProjectGuid>4398b29a-45b5-4208-b9bb-7ed152e649fd</ProjectGuid>
+    <ProjectGuid>a29372b5-555c-42cd-a8d4-75bc969f9cb6</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
-	<PcfBuildMode>production</PcfBuildMode>
+    <PcfBuildMode>production</PcfBuildMode>
   </PropertyGroup>
 
   <PropertyGroup>
