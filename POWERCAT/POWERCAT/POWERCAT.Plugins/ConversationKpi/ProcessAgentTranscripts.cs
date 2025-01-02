@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using static POWERCAT.Plugins.ConversationKpi.ConversationKpiMain;
+using System.IdentityModel.Metadata;
+using System.Collections;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
@@ -19,6 +21,10 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// Tracing Service
         /// </summary>
         private readonly ITracingService _tracingService;
+        /// <summary>
+        /// Callback function for processing KPI response
+        /// </summary>
+        public delegate void CallbackFunction(ExecuteMultipleResponse responseWithResults, Dictionary<Guid, Guid> idDictionary);
 
         /// <summary>
         /// Constructor to initialize Organization & Tracing services
@@ -51,7 +57,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_agentid' />
                                         <attribute name='cat_conversationdate' />
                                         <attribute name='cat_conversationid' />
-                                        <attribute name='cat_trackedvariables' 
+                                        <attribute name='cat_trackedvariables' /> 
                                         <attribute name='cat_conversationtranscriptid' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
@@ -60,12 +66,14 @@ namespace POWERCAT.Plugins.ConversationKpi
                                           </condition>
                                         </filter>
                                       </entity>
-                                    </fetch>"
-                ;
+                                    </fetch>";
                 fetchXml = string.Format(fetchXml, valuesXml);
 
                 // Retrieve the transcripts
                 EntityCollection agentTranscriptList = _organizationService.RetrieveMultiple(new FetchExpression(fetchXml));
+
+                //Dictionary to update agent status
+                Dictionary<Guid, Guid> idDictionary = new Dictionary<Guid, Guid>();
 
                 if (agentTranscriptList.Entities.Count > 0)
                 {
@@ -84,6 +92,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                         string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                         string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
                         TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
+                        Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
+                        Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
 
                         // Add the index to each model
                         var indexedModels = transcriptModel.activities.Select((model, index) =>
@@ -99,7 +109,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             ConversationId = conversationId,
                             ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                             TranscriptContent = transcript,
-                            ConversationTranscriptId = ((String)agentTranscript["cat_conversationtranscriptid"]),
+                            ConversationTranscriptId = conversationTranscriptId.ToString(),
                             SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId),
                             ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
                             TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId),
@@ -110,30 +120,37 @@ namespace POWERCAT.Plugins.ConversationKpi
                         };
                         processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                         processDetailsList.Add(processDetails);
+
+                        // Populate the dictionary from the EntityCollection
+                        idDictionary[conversationTranscriptId] = agentTranscriptId;
+
                     }
 
                     // Upsert Conversation KPIs
                     EntityCollection entitiesToUpsert = GetCollectionOfEntitiesToCreate(processDetailsList);
                     
-                    ExecuteBatchRequests(entitiesToUpsert, UpdateAgentTranScriptStatus);
+                    ExecuteBatchRequests(entitiesToUpsert, idDictionary, UpdateAgentTranScriptStatus);
                 }
             }
             catch (InvalidPluginExecutionException ex)
             {
                 _tracingService.Trace($"Exception: {ex.Message}");
-                throw;
+                throw ex;
             }
             catch (DivideByZeroException ex)
             {
                 _tracingService.Trace($"Error: Division by zero. Details: {ex.Message}");
+                throw ex;
             }
             catch (FormatException ex)
             {
                 _tracingService.Trace($"Error: Invalid format. Details: {ex.Message}");
+                throw ex;
             }
             catch (Exception ex)
             {
                 _tracingService.Trace($"An unexpected error occurred in method GenerateConversationKpis. Details: {ex.Message}");
+                throw ex;
             }
             finally
             {
@@ -145,7 +162,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// Updates Agent Transcript status based on Upsert operation response
         /// </summary>
         /// <param name="responseWithResults">Conversation KPI Upsert operation response.</param>
-        private void UpdateAgentTranScriptStatus(ExecuteMultipleResponse responseWithResults)
+        private void UpdateAgentTranScriptStatus(ExecuteMultipleResponse responseWithResults, Dictionary<Guid, Guid> idDictionary)
         {
             try
             {
@@ -155,24 +172,26 @@ namespace POWERCAT.Plugins.ConversationKpi
                 {
                     Entity entity = new Entity("cat_agenttranscripts")
                     {
-                        Id = ((UpsertResponse)responseItem.Response).Target.Id
+                        Id = idDictionary[((UpsertResponse)responseItem.Response).Target.Id]
                     };
+
                     if (responseItem.Fault == null)
                     {
-                        entity["cat_workflowstatus"] = new OptionSetValue(2);           // Completed                    
+                        entity["cat_workflowstatus"] = new OptionSetValue(2);         // Completed                    
                     }
                     else
                     {
-                        entity["cat_workflowstatus"] = new OptionSetValue(3);          // Failed
+                        entity["cat_workflowstatus"] = new OptionSetValue(3);         // Failed
                         entity["cat_workflowerror"] = responseItem.Fault.Message;     // Error details
                     }
                     agentTransciptList.Entities.Add(entity);
                 }
-                ExecuteBatchRequests(agentTransciptList, null);
+                ExecuteBatchRequests(agentTransciptList, null, null);
             }
             catch (Exception ex)
             {
                 _tracingService.Trace($"An error occurred in method UpdateAgentTranScriptStatus. Details: {ex.Message}");
+                throw ex;
             }
         }
 
@@ -201,7 +220,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     {
                         ConversationKpi["cat_csat"] = Convert.ToDecimal(processDetails.GlobalSessionDetail?.AvgCsat);
                     }
-                    ConversationKpi["cat_transcriptcontent"] = JsonConvert.SerializeObject(processDetails.TranscriptContent);
+                    ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
@@ -217,6 +236,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             catch (Exception ex)
             {
                 _tracingService.Trace($"An error occurred in method GetCollectionOfEntitiesToCreate. Details: {ex.Message}");
+                throw ex;
             }
             return entityCollection;
         }
@@ -226,7 +246,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="entityCollection"> Entity collection for update/upsert </param
         /// <param name="callback"> Callback function </param>
-        public void ExecuteBatchRequests(EntityCollection entityCollection,
+        public void ExecuteBatchRequests(EntityCollection entityCollection, Dictionary<Guid, Guid> idDictionary,
             CallbackFunction callback)
         {
             try
@@ -261,11 +281,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 ExecuteMultipleResponse responseWithResults =
                 (ExecuteMultipleResponse)_organizationService.Execute(requestWithResults);
 
-                callback?.Invoke(responseWithResults);
+                callback?.Invoke(responseWithResults, idDictionary);
             }
             catch (Exception ex)
             {
                 _tracingService.Trace($"An error occurred in method ExecuteBatchRequests. Details: {ex.Message}");
+                throw ex;
             }
         }
     }

@@ -99,15 +99,17 @@ namespace POWERCAT.Plugins.ConversationKpi
             catch (InvalidPluginExecutionException ex)
             {
                 tracingService.Trace($"An error occurred in method GenerateAgentTranscripts. Details:: {ex.Message}");
-                throw;
+                throw ex;
             }
             catch (FormatException ex)
             {
                 tracingService.Trace($"Error: Invalid format. Details: {ex.Message}");
+                throw ex;
             }
             catch (Exception ex)
             {
                 tracingService.Trace($"An unexpected error occurred in method GenerateConversationKpis. Details: {ex.Message}");
+                throw ex;
             }
             finally
             {
@@ -153,7 +155,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             catch (Exception ex)
             {
                 tracingService.Trace($"An error occurred in method FetchExistingAgentTranscripts. Details:: {ex.Message}");
-                throw;
+                throw ex;
             }
         }
     }

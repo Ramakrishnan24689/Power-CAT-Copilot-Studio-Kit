@@ -13,11 +13,6 @@ namespace POWERCAT.Plugins.ConversationKpi
     public class ConversationKpiMain : IPlugin
     {
         /// <summary>
-        /// Callback function for processing KPI response
-        /// </summary>
-        public delegate void CallbackFunction(ExecuteMultipleResponse responseWithResults);
-
-        /// <summary>
         /// Executes the plugin logic.
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
