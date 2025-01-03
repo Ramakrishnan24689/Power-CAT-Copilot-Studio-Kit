@@ -26,6 +26,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             {
                 // Get Conversation Transcripts details
                 string conversationTranscripts = context.InputParameters["cat_ConversationTranscriptsList"] as string;
+                string errorLogId = context.InputParameters["cat_ErrorLogId"] as string;
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
                 // Extract Conversation Transcript Names from input
@@ -92,8 +93,10 @@ namespace POWERCAT.Plugins.ConversationKpi
                         }
                     }
 
-                    // Set output parameter for failures
-                    context.OutputParameters["cat_FailedRecords"] = failedRecords.Length > 0 ? failedRecords.ToString() : "";
+                    // Check for failed records
+                    if (failedRecords.Length > 0) {
+                        AppendErrorDetails(organizationService, tracingService, errorLogId, failedRecords.ToString());
+                    }
                 }
             }
             catch (InvalidPluginExecutionException ex)
@@ -155,6 +158,33 @@ namespace POWERCAT.Plugins.ConversationKpi
             catch (Exception ex)
             {
                 tracingService.Trace($"An error occurred in method FetchExistingAgentTranscripts. Details:: {ex.Message}");
+                throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Append error details based on failed records.
+        /// </summary>
+        /// <param name="organizationService">Organization Service</param>
+        /// <param name="tracingService">Tracing Service</param>
+        /// <param name="errorLogId">Error Log Id</param
+        /// <param name="failedRecords">Failed Records</param
+        private void AppendErrorDetails(IOrganizationService organizationService, ITracingService tracingService, string errorLogId, string failedRecords)
+        {
+            try
+            {
+                //Retrieve existing error details
+                Entity copilotstudiokitlogs = organizationService.Retrieve("cat_copilotstudiokitlogs", new Guid(errorLogId), new ColumnSet("cat_copilotstudiokitlogsid", "cat_errormessage"));
+                string errorMessage = copilotstudiokitlogs.GetAttributeValue<string>("cat_errormessage");
+
+                // Update the error message
+                copilotstudiokitlogs["cat_errormessage"] = $"{errorMessage}{Environment.NewLine}{failedRecords}";
+                copilotstudiokitlogs["cat_executionstatuscode"] = new OptionSetValue(4);
+                organizationService.Update(copilotstudiokitlogs);
+            }
+            catch (Exception ex)
+            {
+                tracingService.Trace($"An error occurred in method AppendErrorDetails. Details:: {ex.Message}");
                 throw ex;
             }
         }
