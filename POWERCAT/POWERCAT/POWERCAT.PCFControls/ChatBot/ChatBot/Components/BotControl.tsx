@@ -11,12 +11,14 @@ interface BotProps {
   userQuery: string;
   tokenEndpoint: string;
   styleOptions: any;
+  enableFluentTheme: boolean;
 }
 
 const BotControl: React.FC<BotProps> = ({
   userQuery,
   tokenEndpoint,
   styleOptions,
+  enableFluentTheme,
 }) => {
   const [directLine, setDirectLine] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -99,12 +101,19 @@ const BotControl: React.FC<BotProps> = ({
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       ) : directLine ? (
-        <FluentThemeProvider>
+        enableFluentTheme ? (
+          <FluentThemeProvider>
+            <ReactWebChat
+              directLine={directLine}
+              styleOptions={JSON.parse(styleOptions)}
+            />
+          </FluentThemeProvider>
+        ) : (
           <ReactWebChat
             directLine={directLine}
             styleOptions={JSON.parse(styleOptions)}
           />
-        </FluentThemeProvider>
+        )
       ) : (
         <Spinner label="Loading..." className="loadingSpinner" />
       )}

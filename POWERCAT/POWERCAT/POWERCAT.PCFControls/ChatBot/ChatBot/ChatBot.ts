@@ -44,6 +44,7 @@ export class ChatBot
         userQuery: context.parameters.UserQuery.raw || "",
         tokenEndpoint: context.parameters.TokenEndpoint.raw || "",
         styleOptions: context.parameters.StyleOptions.raw || {},
+        enableFluentTheme: context.parameters.EnableFluentTheme.raw || false,
       })
     );
   }
