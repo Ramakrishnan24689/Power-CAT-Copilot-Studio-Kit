@@ -59,6 +59,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ["cat_name"] = record.Name,
                                 ["cat_workflowstatus"] = new OptionSetValue(1),
                                 ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
+                                ["ttlinseconds"] = 432000
                             }
                         };
                         createRequests.Add(createRequest);
