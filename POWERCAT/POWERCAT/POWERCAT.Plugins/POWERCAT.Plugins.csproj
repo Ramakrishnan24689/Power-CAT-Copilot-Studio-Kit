@@ -101,6 +101,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApplicationInsightsApi\InvokeApplicationInsightsApi.cs" />
+    <Compile Include="ConversationKpi\ContentConverter.cs" />
     <Compile Include="ConversationKpi\ConversationKpiMain.cs" />
     <Compile Include="ConversationKpi\ProcessAgentTranscripts.cs" />
     <Compile Include="ConversationKpi\ProcessConversationTranscripts.cs" />

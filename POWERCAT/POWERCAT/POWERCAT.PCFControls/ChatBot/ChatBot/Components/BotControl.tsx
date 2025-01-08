@@ -1,17 +1,14 @@
 import React from "react";
 import ReactWebChat, { createDirectLine } from "botframework-webchat";
 import { FluentThemeProvider } from "botframework-webchat-fluent-theme";
-import {
-  Spinner,
-  MessageBar,
-  MessageBarBody,
-} from "@fluentui/react-components";
+import { Spinner } from "@fluentui/react-components";
 
 interface BotProps {
   userQuery: string;
   tokenEndpoint: string;
   styleOptions: any;
   enableFluentTheme: boolean;
+  onError: (error: string | null) => void; // callback for error handling
 }
 
 const BotControl: React.FC<BotProps> = ({
@@ -19,9 +16,9 @@ const BotControl: React.FC<BotProps> = ({
   tokenEndpoint,
   styleOptions,
   enableFluentTheme,
+  onError,
 }) => {
   const [directLine, setDirectLine] = React.useState<any>(null);
-  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     async function createDirectline() {
@@ -59,15 +56,18 @@ const BotControl: React.FC<BotProps> = ({
           domain: `${regionalChannelURL}v3/directline`,
         });
         setDirectLine(directline);
+
+        // Clear any existing error
+        onError(null);
       } catch (err: any) {
         // Set error state if any error occurs
-        setError(err.message);
+        onError(err.message);
       }
     }
 
-    setError(null);
+    onError(null);
     createDirectline();
-  }, [tokenEndpoint]);
+  }, [tokenEndpoint, onError]);
 
   // Post user query to bot
   React.useEffect(() => {
@@ -80,7 +80,7 @@ const BotControl: React.FC<BotProps> = ({
         })
         .subscribe({
           error: (err: any) => {
-            setError(`Failed to send message: ${err.message}`);
+            onError(`Failed to send message: ${err.message}`);
           },
         });
 
@@ -96,11 +96,7 @@ const BotControl: React.FC<BotProps> = ({
 
   return (
     <div className="webChatContainer">
-      {error ? (
-        <MessageBar intent="error">
-          <MessageBarBody>{error}</MessageBarBody>
-        </MessageBar>
-      ) : directLine ? (
+      {directLine ? (
         enableFluentTheme ? (
           <FluentThemeProvider>
             <ReactWebChat

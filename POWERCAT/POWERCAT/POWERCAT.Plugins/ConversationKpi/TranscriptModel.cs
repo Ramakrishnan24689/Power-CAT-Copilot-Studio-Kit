@@ -95,7 +95,18 @@ namespace POWERCAT.Plugins.ConversationKpi
     public class Attachment
     {
         public string contentType { get; set; }
-        public Content content { get; set; }
+
+        [JsonConverter(typeof(ContentConverter))]
+        public object content { get; set; }
+    }
+
+    public class HtmlContent
+    {
+        [JsonProperty("$schema")]
+        public string schema { get; set; }
+        public string type { get; set; }
+        public string version { get; set; }
+        public List<Body> body { get; set; }
     }
 
     public class Body
@@ -109,14 +120,6 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string title { get; set; }
         public string text { get; set; }
         public string value { get; set; }
-    }
-
-    public class Content
-    {
-        public string text { get; set; }
-        public string connectionName { get; set; }
-        public TokenExchangeResource tokenExchangeResource { get; set; }
-        public List<Button> buttons { get; set; }
     }
 
     public class From

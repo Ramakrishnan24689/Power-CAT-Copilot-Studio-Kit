@@ -8,6 +8,8 @@ export class ChatBot
 {
   private _container: HTMLDivElement;
   private _root!: ReactDOM.Root;
+  private _error: string | null = null;
+  private _notifyOutputChanged: () => void;
 
   /**
    * Empty constructor.
@@ -29,6 +31,7 @@ export class ChatBot
     container: HTMLDivElement
   ): void {
     this._container = container;
+    this._notifyOutputChanged = notifyOutputChanged;
     this._root = ReactDOM.createRoot(this._container);
     this.updateView(context);
   }
@@ -45,6 +48,7 @@ export class ChatBot
         tokenEndpoint: context.parameters.TokenEndpoint.raw || "",
         styleOptions: context.parameters.StyleOptions.raw || {},
         enableFluentTheme: context.parameters.EnableFluentTheme.raw || false,
+        onError: this.handleError,
       })
     );
   }
@@ -54,7 +58,9 @@ export class ChatBot
    * @returns an object based on nomenclature defined in manifest, expecting object[s] for property marked as "bound" or "output"
    */
   public getOutputs(): IOutputs {
-    return {};
+    return {
+      Error: this._error || "",
+    };
   }
 
   /**
@@ -66,4 +72,13 @@ export class ChatBot
       this._root.unmount(); // Unmount the component
     }
   }
+
+  /**
+   * Callback for error handling
+   * @param error Error message
+   */
+  private handleError = (error: string | null) => {
+    this._error = error;
+    this._notifyOutputChanged();
+  };
 }
