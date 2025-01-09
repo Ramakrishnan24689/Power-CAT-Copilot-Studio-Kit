@@ -23,6 +23,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public DateTime ConversationDate { get; set; }
         public string TranscriptContent { get; set; }
         public string ConversationTranscriptId { get; set; }
+        public bool CopyFullTranscript { get; set; }
     }
 
     public class GlobalSessionDetail
@@ -141,5 +142,6 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string ConversationTranscriptId { get; set; }        
         public string TrackedVariables { get; set; }
         public string Name { get; set; }
+        public bool CopyFullTranscript { get; set; }
     }
 }

@@ -59,7 +59,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ["cat_name"] = record.Name,
                                 ["cat_workflowstatus"] = new OptionSetValue(1),
                                 ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
-                                ["ttlinseconds"] = 432000
+                                ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
+                                ["ttlinseconds"] = 432000,
                             }
                         };
                         createRequests.Add(createRequest);
@@ -70,7 +71,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 if (createRequests.Any())
                 {
                     ExecuteMultipleRequest executeMultipleRequest = new ExecuteMultipleRequest
-                    {                        
+                    {
                         Settings = new ExecuteMultipleSettings
                         {
                             ContinueOnError = true,
@@ -85,7 +86,8 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                     // Parse failed responses
                     var failedRecords = new StringBuilder();
-                    foreach (var responseItem in responseWithResults.Responses) {
+                    foreach (var responseItem in responseWithResults.Responses)
+                    {
                         if (responseItem.Fault != null)
                         {
                             // Construct failure message with GUID and error message
@@ -95,8 +97,10 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
 
                     // Check for failed records
-                    if (failedRecords.Length > 0) {
-                        AppendErrorDetails(organizationService, tracingService, errorLogId, failedRecords.ToString());
+                    if (failedRecords.Length > 0)
+                    {
+                        string errorMessage = failedRecords.Length > 1000000 ? failedRecords.ToString().Substring(0, 1000000) : failedRecords.ToString();
+                        AppendErrorDetails(organizationService, tracingService, errorLogId, errorMessage);
                     }
                 }
             }
@@ -112,7 +116,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
             catch (Exception ex)
             {
-                tracingService.Trace($"An unexpected error occurred in method GenerateConversationKpis. Details: {ex.Message}");
+                tracingService.Trace($"An unexpected error occurred in method GenerateAgentTranscripts. Details: {ex.Message}");
                 throw ex;
             }
             finally
@@ -170,7 +174,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="tracingService">Tracing Service</param>
         /// <param name="errorLogId">Error Log Id</param
         /// <param name="failedRecords">Failed Records</param
-        private void AppendErrorDetails(IOrganizationService organizationService, ITracingService tracingService, string errorLogId, string failedRecords)
+        private void AppendErrorDetails(IOrganizationService organizationService, ITracingService tracingService, string errorLogId, string failedRecordsError)
         {
             try
             {
@@ -179,7 +183,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                 string errorMessage = copilotstudiokitlogs.GetAttributeValue<string>("cat_errormessage");
 
                 // Update the error message
-                copilotstudiokitlogs["cat_errormessage"] = $"{errorMessage}{Environment.NewLine}{failedRecords}";
+                errorMessage = $"{errorMessage}{Environment.NewLine}{failedRecordsError}";                
+                copilotstudiokitlogs["cat_errormessage"] = errorMessage.Length > 1000000 ? errorMessage.Substring(0, 1000000) : errorMessage;  // Due to column length limitation
                 copilotstudiokitlogs["cat_executionstatuscode"] = new OptionSetValue(4);
                 organizationService.Update(copilotstudiokitlogs);
             }

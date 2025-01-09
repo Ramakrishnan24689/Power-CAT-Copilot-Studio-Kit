@@ -100,15 +100,6 @@ namespace POWERCAT.Plugins.ConversationKpi
         public object content { get; set; }
     }
 
-    public class HtmlContent
-    {
-        [JsonProperty("$schema")]
-        public string schema { get; set; }
-        public string type { get; set; }
-        public string version { get; set; }
-        public List<Body> body { get; set; }
-    }
-
     public class Body
     {
         public string connectionName { get; set; }

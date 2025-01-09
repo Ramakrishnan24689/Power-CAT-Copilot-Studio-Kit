@@ -32,19 +32,27 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <returns>Json string</returns>
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            if (reader.TokenType == JsonToken.String)
+            switch (reader.TokenType)
             {
-                // Return the raw string if it's a simple HTML
-                return reader.Value.ToString();
-            }
-            else if (reader.TokenType == JsonToken.StartObject)
-            {
-                // Parse the object as a specific type
-                JObject obj = JObject.Load(reader);
-                return obj.ToObject<HtmlContent>(serializer); // Replace HtmlContent with your class
-            }
-            else {
-                return null;
+                case JsonToken.String:
+                    return reader.Value.ToString(); // Handle simple strings
+
+                case JsonToken.StartObject:
+                    // Dynamically parse as JObject for unknown structures
+                    JObject obj = JObject.Load(reader);
+                    return obj;
+
+                case JsonToken.StartArray:
+                    // Handle JSON arrays gracefully
+                    JArray array = JArray.Load(reader);
+                    return array;
+
+                case JsonToken.Null:
+                    return null;
+
+                default:
+                    // Skip unsupported token types
+                    return null;
             }
         }
 
@@ -56,14 +64,14 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="serializer">The serializer.</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            if (value is string stringValue)
+            // Serialize back to JSON as is
+            if (value != null)
             {
-                writer.WriteValue(stringValue); // Write simple strings directly
+                serializer.Serialize(writer, value);
             }
             else
             {
-                // Serialize complex objects as JSON
-                serializer.Serialize(writer, value);
+                writer.WriteNull();
             }
         }
     }

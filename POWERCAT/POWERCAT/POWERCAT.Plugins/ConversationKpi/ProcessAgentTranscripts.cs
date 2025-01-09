@@ -57,8 +57,9 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_agentid' />
                                         <attribute name='cat_conversationdate' />
                                         <attribute name='cat_conversationid' />
-                                        <attribute name='cat_trackedvariables' /> 
+                                        <attribute name='cat_trackedvariables' />
                                         <attribute name='cat_conversationtranscriptid' />
+                                        <attribute name='cat_iscopyfulltranscriptenabled' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
@@ -110,6 +111,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                             TranscriptContent = transcript,
                             ConversationTranscriptId = conversationTranscriptId.ToString(),
+                            CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                             SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId),
                             ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
                             TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId),
@@ -216,11 +218,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_conversationdate"] = processDetails.ConversationDate;
                     ConversationKpi["cat_conversationduration"] = processDetails.ConversationInfoDetails?.ConversationDuration;
                     ConversationKpi["cat_globaloutcomecode"] = new OptionSetValue((int)processDetails.GlobalSessionDetail?.GlobalOutcome);
-                    if (processDetails.GlobalSessionDetail?.AvgCsat > 0)
-                    {
+                    if (processDetails.GlobalSessionDetail?.AvgCsat > 0) {
                         ConversationKpi["cat_csat"] = Convert.ToDecimal(processDetails.GlobalSessionDetail?.AvgCsat);
                     }
-                    ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
+                    if (processDetails.CopyFullTranscript) {
+                        ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
+                    }                    
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
