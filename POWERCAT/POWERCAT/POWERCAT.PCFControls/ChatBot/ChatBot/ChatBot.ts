@@ -14,7 +14,9 @@ export class ChatBot
   /**
    * Empty constructor.
    */
-  constructor() {}
+  constructor() {
+    this._notifyOutputChanged = () => {};
+  }
 
   /**
    * Used to initialize the control instance. Controls can kick off remote server calls and other initialization actions here.
@@ -41,13 +43,14 @@ export class ChatBot
    * @param context The entire property bag available to control via Context Object; It contains values as set up by the customizer mapped to names defined in the manifest, as well as utility functions
    */
   public updateView(context: ComponentFramework.Context<IInputs>): void {
-    //const userQuery = context.parameters.UserQuery.raw || "";
     this._root.render(
       React.createElement(BotControl, {
         userQuery: context.parameters.UserQuery.raw || "",
+        defaultActivities: context.parameters.DefaultActivities.raw || null,
         tokenEndpoint: context.parameters.TokenEndpoint.raw || "",
-        styleOptions: context.parameters.StyleOptions.raw || {},
-        enableFluentTheme: context.parameters.EnableFluentTheme.raw || false,
+        styleOptions: context.parameters.StyleOptions.raw || "{}",
+        enableFluentTheme: context.parameters.FluentTheme.raw || false,
+        resetConversation: context.parameters.ResetConversation.raw,
         onError: this.handleError,
       })
     );
@@ -68,9 +71,7 @@ export class ChatBot
    * i.e. cancelling any pending remote calls, removing listeners, etc.
    */
   public destroy(): void {
-    if (this._root) {
-      this._root.unmount(); // Unmount the component
-    }
+    this._root?.unmount();
   }
 
   /**
