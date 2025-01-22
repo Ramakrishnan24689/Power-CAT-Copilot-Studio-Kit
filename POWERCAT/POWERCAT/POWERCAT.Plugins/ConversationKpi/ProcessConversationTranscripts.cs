@@ -60,7 +60,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ["cat_workflowstatus"] = new OptionSetValue(1),
                                 ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
                                 ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
-                                ["ttlinseconds"] = 432000,
+                                ["ttlinseconds"] = 259200,
                             }
                         };
                         createRequests.Add(createRequest);
