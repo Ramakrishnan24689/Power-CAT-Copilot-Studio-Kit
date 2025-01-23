@@ -11,7 +11,10 @@
       <type>Multiple</type>
     </type-group>
     <property name="Height" display-name-key="Height" description-key="Editor Height" of-type="Whole.None" usage="input" required="false" />
-    <property name="FileColumn" display-name-key="File Column?" of-type="TwoOptions" usage="input" required="true" default-value="false" />
+    <property name="FileColumn" display-name-key="File Column" of-type="Enum" usage="input" required="true" default-value="False">
+      <value name="True" display-name-key="True">True</value>
+      <value name="False" display-name-key="False">False</value>
+    </property>
     <property name="FileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
     <resources>
       <code path="index.ts" order="1"/>
