@@ -11,6 +11,7 @@
     <Name>ColorPicker</Name>
     <ProjectGuid>64723fae-0d23-45d7-ab0c-39430878d9d3</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
+    <PcfBuildMode>production</PcfBuildMode>
   </PropertyGroup>
 
   <PropertyGroup>
