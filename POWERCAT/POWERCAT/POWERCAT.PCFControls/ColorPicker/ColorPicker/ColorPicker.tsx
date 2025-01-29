@@ -46,14 +46,14 @@ export class ColorPicker
     // Update the hex color value based on Power Apps property changes
     this._root.render(
       React.createElement(ColorPickerComponent, {
-        initialColor: context.parameters.Value.raw || "#ffffff", // Update the color based on context
+        initialColor: context.parameters.Value.raw || "", // Update the color based on context
         onColorChange: this.handleColorChange, // Keep the callback intact
       })
     );
   }
 
-  private handleColorChange = (colorHex: string) => {
-    this._colorHex = colorHex; // Update the colorHex state when it changes
+  private handleColorChange = (colorHex: string | null) => {
+    this._colorHex = colorHex || "";
     this.notifyOutputChanged();
   };
 
