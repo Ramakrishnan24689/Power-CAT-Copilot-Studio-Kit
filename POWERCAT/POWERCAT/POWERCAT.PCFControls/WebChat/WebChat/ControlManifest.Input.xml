@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="WebChat" version="4.2.8" display-name-key="WebChat" description-key="WebChat description" control-type="standard" >
+  <control namespace="PowerCAT" constructor="WebChat" version="4.3.1" display-name-key="WebChat" description-key="WebChat description" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->

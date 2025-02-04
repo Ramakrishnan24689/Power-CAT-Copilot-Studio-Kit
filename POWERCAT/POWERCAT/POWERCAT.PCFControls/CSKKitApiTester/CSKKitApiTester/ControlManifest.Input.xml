@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="CSKitAPITester" version="0.0.1" display-name-key="CSKitAPITester" description-key="CSKitAPITester description" control-type="standard" >
+  <control namespace="PowerCAT" constructor="CSKKitApiTester" version="0.0.3" display-name-key="CSKKitApiTester" description-key="CSKKitApiTester description" control-type="standard" >
     <property name="RequestURL" display-name-key="Request URL" description-key="Request URL" of-type="SingleLine.Text" usage="input" required="false" />
     <property name="Method" display-name-key="Type" description-key="Type" usage="input" of-type="Enum" required="true">
       <value name="Get" display-name-key="Get" description-key="Get" default="true">Get</value>
@@ -25,7 +25,7 @@
     <property name="IsXML" display-name-key="IsXML" description-key="IsXML" of-type="TwoOptions" usage="output" required="false" />
     <resources>
       <code path="index.ts" order="1"/>
-      <resx path="strings/CSKitAPITester.1033.resx" version="1.0.0" />
+      <resx path="strings/CSKKitApiTester.1033.resx" version="1.0.0" />
     </resources>
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />

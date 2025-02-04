@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="ColorPicker" version="0.0.17" display-name-key="ColorPicker" description-key="ColorPicker control" control-type="standard" >
+  <control namespace="PowerCAT" constructor="ColorPicker" version="0.0.18" display-name-key="ColorPicker" description-key="ColorPicker control" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
     <property name="Value" display-name-key="Value" description-key="Value" of-type="SingleLine.Text" usage="bound" required="true" />

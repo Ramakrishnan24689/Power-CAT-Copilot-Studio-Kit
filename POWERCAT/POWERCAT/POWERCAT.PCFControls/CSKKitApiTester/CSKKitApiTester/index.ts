@@ -5,7 +5,7 @@ import toJsonSchema from "to-json-schema";
 import { ContextEx } from "./Component.types";
 import { APIResponse } from "./APIResponse";
 
-export class CSKitAPITester
+export class CSKKitApiTester
   implements ComponentFramework.StandardControl<IInputs, IOutputs>
 {
   notifyOutputChanged: () => void;
