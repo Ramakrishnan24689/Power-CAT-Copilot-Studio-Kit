@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="PFxCodeEditor" version="0.0.8" display-name-key="PFxCodeEditor_Disp_key" description-key="PFxCodeEditor_Desc_key" control-type="virtual" >
+  <control namespace="PowerCAT" constructor="PFxCodeEditor" version="0.0.9" display-name-key="PFxCodeEditor_Disp_key" description-key="PFxCodeEditor_Desc_key" control-type="virtual" >
     <property name="PowerFx" display-name-key="PFxCodeEditor_PowerFX_Disp_key" description-key="PFxCodeEditor_PowerFX_Desc_key" of-type="Multiple" usage="bound" required="true" />
     <property name="Value" display-name-key="PFxCodeEditor_Value_Disp_key" description-key="PFxCodeEditor_Value_Desc_key" of-type="Multiple" usage="bound" required="true" />
     <property name="LinetoJump" display-name-key="PFxCodeEditor_LinetoJump_Disp_key" description-key="PFxCodeEditor_LinetoJump_Desc_key" of-type="Whole.None" usage="input" required="false" />

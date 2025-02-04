@@ -102,29 +102,6 @@ function setFieldVisibilityForEachSections(executionContext) {
   const configurationTypeValues =
     formContext.getAttribute("cat_configurationtypescodes").getValue() || [];
 
-  // User Authentication Fields Rules
-  const userAuth = formContext
-    .getAttribute("cat_userauthenticationcode")
-    .getValue();
-
-  // Entra ID v2 and Test Automation
-  if (userAuth === 2 && configurationTypeValues.includes(1)) {
-    setFieldVisibility(
-      formContext,
-      ["cat_clientid", "cat_tenantid", "cat_scope"],
-      true,
-      "required"
-    );
-
-    // No Authentication and Test Automation
-  } else if (userAuth === 1 && configurationTypeValues.includes(1)) {
-    clearAndHideFields(formContext, [
-      "cat_clientid",
-      "cat_tenantid",
-      "cat_scope",
-    ]);
-  }
-
   // Enrich With Azure Application Insights Secret Location Rule
   const secretLocation = formContext
     .getAttribute("cat_azureappinsightssecretlocationcode")
