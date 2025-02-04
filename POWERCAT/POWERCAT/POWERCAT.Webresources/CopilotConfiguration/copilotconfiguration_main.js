@@ -25,7 +25,6 @@ function hideAndShowConversationKPISettings(executionContext) {
 
   const sectionsToHideOrShow = [
     "tab_general_section_directlinesettings",
-    //"tab_general_section_userauthentication",
     "tab_general_section_resultsenrichment",
     "tab_general_section_generativeaitesting",
   ];
