@@ -1,101 +1,32 @@
-import {
-  PublicClientApplication,
-  Configuration,
-  AuthenticationResult,
-} from "@azure/msal-browser";
+import { AuthService } from "./AuthService";
+import { CONFIG } from "./Config";
+import type { ActionExecutionRequest, CopilotConfiguration } from "./Types";
 
 /**
  * @class TestRunExecutorService
  * @description Service to handle bot authentication and invoke action for test run execution.
  */
-class TestRunExecutorService {
-  private publicClientApplication: PublicClientApplication;
+export class TestRunExecutorService {
   private formContext: Xrm.FormContext;
+  private authService: AuthService;
 
   /**
    * @constructor
-   * @param clientId - Client ID for Azure application.
-   * @param tenantId - Tenant ID for Azure application.
-   * @param clientUrl - URL of the client application.
-   * @param formContext - Form context.
+   * @param {string} clientId - The client ID of the Azure AD application.
+   * @param {string} tenantId - The tenant ID of the Azure AD application.
+   * @param {string} scope - The scope for the authentication.
+   * @param {string} clientUrl - The URL of the client.
+   * @param {Xrm.FormContext} formContext - The form context of the CRM form.
    */
   constructor(
     clientId: string,
     tenantId: string,
+    scope: string,
     clientUrl: string,
     formContext: Xrm.FormContext
   ) {
-    const msalConfig: Configuration = {
-      auth: {
-        clientId: clientId,
-        authority: `https://login.microsoftonline.com/${tenantId}`,
-        redirectUri: clientUrl,
-      },
-      cache: {
-        cacheLocation: "memoryStorage",
-      },
-    };
-    this.publicClientApplication = new PublicClientApplication(msalConfig);
     this.formContext = formContext;
-  }
-
-  /**
-   * @function getAccessTokenByMSAL
-   * @description Retrieves an access token using MSAL.
-   * @param globalContext - Dynamics 365 global context.
-   * @param scope - Scope for the access token.
-   * @returns Access token.
-   */
-  async getAccessTokenByMSAL(
-    globalContext: any,
-    scope: string
-  ): Promise<string> {
-    try {
-      // Get the current user's email ID
-      const emailID: string = await this.getCurrentUserEmailID(globalContext);
-
-      const ssoRequest: { scopes: string[]; loginHint?: string } = {
-        scopes: [scope],
-        loginHint: emailID,
-      };
-
-      // Initialize the MSAL application
-      await this.publicClientApplication.initialize();
-
-      // Get the access token using SSO silent flow
-      const authResult: AuthenticationResult =
-        await this.publicClientApplication.ssoSilent(ssoRequest);
-
-      if (!authResult || !authResult.accessToken) {
-        throw new Error("Failed to authenticate user.");
-      }
-      return authResult.accessToken;
-    } catch (error) {
-      throw new Error(
-        "Failed to authenticate user. Error Message: " + error.message
-      );
-    }
-  }
-
-  /**
-   * @function getCurrentUserEmailID
-   * @description Retrieves the logged in user's email ID.
-   * @param globalContext - Dynamics 365 global context.
-   * @returns User's email ID.
-   */
-  async getCurrentUserEmailID(globalContext: any): Promise<string> {
-    try {
-      const user = await Xrm.WebApi.retrieveRecord(
-        "systemuser",
-        globalContext.userSettings.userId,
-        "?$select=domainname"
-      );
-      return user.domainname;
-    } catch (error) {
-      throw new Error(
-        "Failed to retrieve user email address. Error Message: " + error.message
-      );
-    }
+    this.authService = new AuthService(clientId, tenantId, scope, clientUrl);
   }
 
   /**
@@ -106,8 +37,8 @@ class TestRunExecutorService {
    * @returns Record Id.
    */
   private async waitForRecordId(
-    maxWaitTime: number = 7000,
-    checkInterval: number = 200
+    maxWaitTime: number = CONFIG.RECORD.MAX_WAIT_TIME,
+    checkInterval: number = CONFIG.RECORD.CHECK_INTERVAL
   ): Promise<string | null> {
     let recordId = this.formContext.data.entity.getId();
     let attempts = 0;
@@ -119,20 +50,32 @@ class TestRunExecutorService {
       attempts++;
     }
 
-    if (!recordId) {
-      return null;
-    }
-    return recordId.replace(/[{},]/g, "");
+    return recordId ? recordId.replace(/[{},]/g, "") : null;
   }
 
   /**
-   * Invokes the Dataverse action.
+   * @function removeNotification
+   * @description remove notification from form.
+   * @uniqueId unique id for notification.
+   */
+  private removeNotification(uniqueId: string): void {
+    setTimeout(() => {
+      this.formContext.ui.clearFormNotification(uniqueId);
+    }, 12000);
+  }
+
+  /**
+   * @function invokeDataverseAction
+   * @description Invokes the Dataverse action.
    * @param copilotConfigurationId The Copilot configuration ID.
-   * @param accessToken The access token.
+   * @param authCode The authorization code.
+   * @param codeVerifier The code verifier.
+   * @param testRunWarningMessage The warning message for the test run.
    */
   private async invokeDataverseAction(
     copilotConfigurationId: string,
-    accessToken: string | null,
+    authCode: string | null,
+    codeVerifier: string | null,
     testRunWarningMessage: string | null
   ): Promise<void> {
     try {
@@ -140,82 +83,80 @@ class TestRunExecutorService {
         .getAttribute("cat_copilottestsetid")
         .getValue()[0]
         .id.replace(/[{},]/g, "");
+
       const copilotTestRun = {
         entityType: this.formContext.data.entity.getEntityName(),
         id: await this.waitForRecordId(),
       };
 
-      const actionExecutionRequest = {
+      const actionExecutionRequest: ActionExecutionRequest = {
         entity: copilotTestRun,
-        AccessToken: accessToken,
+        AuthCode: authCode,
+        CodeVerifier: codeVerifier,
+        CopilotConfigurationId: copilotConfigurationId,
         CopilotTestRunId: copilotTestRun.id,
         CopilotTestSetId: copilotTestSetId,
-        CopilotConfigurationId: copilotConfigurationId,
-        getMetadata: function () {
-          return {
-            boundParameter: "entity",
-            parameterTypes: {
-              entity: {
-                typeName: "mscrm.cat_copilottestrun",
-                structuralProperty: 5,
-              },
-              AccessToken: {
-                typeName: "Edm.String",
-                structuralProperty: 1,
-              },
-              CopilotTestRunId: {
-                typeName: "Edm.String",
-                structuralProperty: 1,
-              },
-              CopilotTestSetId: {
-                typeName: "Edm.String",
-                structuralProperty: 1,
-              },
-              CopilotConfigurationId: {
-                typeName: "Edm.String",
-                structuralProperty: 1,
-              },
+        getMetadata: () => ({
+          boundParameter: "entity",
+          parameterTypes: {
+            entity: {
+              typeName: "mscrm.cat_copilottestrun",
+              structuralProperty: 5,
             },
-            operationType: 0,
-            operationName: "cat_RunCopilotTests",
-          };
-        },
+            AuthCode: {
+              typeName: "Edm.String",
+              structuralProperty: 1,
+            },
+            CodeVerifier: {
+              typeName: "Edm.String",
+              structuralProperty: 1,
+            },
+            CopilotConfigurationId: {
+              typeName: "Edm.String",
+              structuralProperty: 1,
+            },
+            CopilotTestRunId: {
+              typeName: "Edm.String",
+              structuralProperty: 1,
+            },
+            CopilotTestSetId: {
+              typeName: "Edm.String",
+              structuralProperty: 1,
+            },
+          },
+          operationType: 0,
+          operationName: "cat_RunCopilotTests",
+        }),
       };
 
       const result = await Xrm.WebApi.online.execute(actionExecutionRequest);
       if (result.ok) {
+        const { PROGRESS, WARNING } = CONFIG.NOTIFICATIONS;
         this.formContext.ui.setFormNotification(
-          "Test Run execution is in progress.",
-          "INFO",
-          "TESTRUN_ACTION_NOTIFICATION"
+          PROGRESS.message,
+          PROGRESS.type,
+          PROGRESS.id
         );
-        this.removeNotification("TESTRUN_ACTION_NOTIFICATION");
-        if (testRunWarningMessage !== null) {
+        this.removeNotification(PROGRESS.id);
+
+        if (testRunWarningMessage) {
           this.formContext.ui.setFormNotification(
             testRunWarningMessage,
-            "WARNING",
-            "TESTRUN_WARNING_NOTIFICATION"
+            WARNING.type,
+            WARNING.id
           );
-          this.removeNotification("TESTRUN_WARNING_NOTIFICATION");
+          this.removeNotification(WARNING.id);
         }
       } else {
         throw new Error("Failed to execute the action.");
       }
     } catch (error) {
       throw new Error(
-        "Failed to execute the action. Error Message: " + error.message
+        `Failed to execute the action. Error Message: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     }
-  }
-
-  /**
-   * @function removeNotification remove notification from form.
-   * @uniqueId unique id for notification.
-   */
-  private removeNotification(uniqueId: string) {
-    setTimeout(() => {
-      this.formContext.ui.clearFormNotification(uniqueId);
-    }, 12000);
   }
 
   /**
@@ -223,12 +164,12 @@ class TestRunExecutorService {
    * @description Handler for the OnSave event of the form.
    * @param executionContext - Dynamics 365 event context.
    */
-  static async onSave(executionContext: Xrm.Events.EventContext) {
-    const formContext = executionContext.getFormContext();
-    let accessToken = null;
-    let testRunExecutorService: TestRunExecutorService;
-    let testRunWarningMessage: string = null;
+  public static async onSave(
+    executionContext: Xrm.Events.EventContext
+  ): Promise<void> {
+    if (!executionContext) return;
 
+    const formContext = executionContext.getFormContext();
     // Run only on create form
     if (formContext.ui.getFormType() !== 1) {
       return;
@@ -243,43 +184,59 @@ class TestRunExecutorService {
         .getAttribute("cat_copilotconfigurationid")
         .getValue()[0]
         .id.replace(/[{},]/g, "");
-      const copilotConfig = await Xrm.WebApi.retrieveRecord(
+      const copilotConfig = (await Xrm.WebApi.retrieveRecord(
         "cat_copilotconfiguration",
         copilotConfigId,
         "?$select=cat_clientid,cat_tenantid,cat_userauthenticationcode,cat_scope"
-      );
+      )) as CopilotConfiguration;
 
-      testRunExecutorService = new TestRunExecutorService(
+      const service = new TestRunExecutorService(
         copilotConfig.cat_clientid,
         copilotConfig.cat_tenantid,
+        copilotConfig.cat_scope,
         clientUrl,
         formContext
       );
+
+      let authData: { authCode: string | null; codeVerifier: string | null } = {
+        authCode: null,
+        codeVerifier: null,
+      };
+      let testRunWarningMessage = "";
+
       // Run only if end-user authentication is enabled
-      if (copilotConfig.cat_userauthenticationcode === 2) {
-        accessToken = await testRunExecutorService.getAccessTokenByMSAL(
-          globalContext,
-          copilotConfig.cat_scope
-        );
+      if (
+        copilotConfig.cat_userauthenticationcode === CONFIG.USER_AUTH_ENABLED
+      ) {
+        authData = await service.authService.getAuthorizationCode();
+        if (!authData.authCode || !authData.codeVerifier) {
+          throw new Error(
+            "Failed to obtain authorization code or code verifier"
+          );
+        }
         testRunWarningMessage =
           "This agent configuration is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
       }
 
-      await testRunExecutorService.invokeDataverseAction(
+      await service.invokeDataverseAction(
         copilotConfigId,
-        accessToken,
+        authData.authCode,
+        authData.codeVerifier,
         testRunWarningMessage
       );
     } catch (error) {
+      const { ERROR } = CONFIG.NOTIFICATIONS;
       formContext.ui.setFormNotification(
-        "An error occurred while running the test. " + error.message,
-        "ERROR",
-        "TESTRUN_ONSAVE_NOTIFICATION"
+        `An error occurred while running the test. ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        ERROR.type,
+        ERROR.id
       );
-      testRunExecutorService.removeNotification("TESTRUN_ONSAVE_NOTIFICATION");
+      TestRunExecutorService.prototype.removeNotification(ERROR.id);
     }
   }
 }
 
 // Expose the class to the global scope
-(window as any).TestRunExecutorService = TestRunExecutorService;
+(window as any).onSave = TestRunExecutorService.onSave;

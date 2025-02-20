@@ -115,6 +115,7 @@
     <Compile Include="ConversationKpi\TranscriptModel.cs" />
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
     <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
+    <Compile Include="DirectLineApi\TokenResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
