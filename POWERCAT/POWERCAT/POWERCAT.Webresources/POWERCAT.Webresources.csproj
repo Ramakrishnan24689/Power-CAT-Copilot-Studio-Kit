@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="CopilotTestRun\copilottestrun_main.js" />
+    <Content Include="Html\webchat.html" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="BotAuthenticationService\" />
