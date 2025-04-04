@@ -9,10 +9,10 @@
     <script>
       let webChatInstance = null;
       let directLineUrl = null;
-	  const urlParams = new URLSearchParams(window.location.search);
-	  const tokenEndpoint = urlParams.get('INJECT_TOKENENDPOINT');
-	  const styleOptions = JSON.parse(urlParams.get('INJECT_STYLES'));
-	  const backgroundImage = urlParams.get('BACKGROUND_IMAGE');
+	  // Replace with your DirectLine token endpoint
+	  const tokenEndpoint = "{INJECT_TOKENENDPOINT}";
+	  const styleOptions = {'INJECT_STYLES'};
+	  const backgroundImage = "{INJECT_BACKGROUNDIMAGE}";
 	  // Set webchat header CSS properties based on style options
       document.addEventListener('DOMContentLoaded', () => {
         const root = document.documentElement;

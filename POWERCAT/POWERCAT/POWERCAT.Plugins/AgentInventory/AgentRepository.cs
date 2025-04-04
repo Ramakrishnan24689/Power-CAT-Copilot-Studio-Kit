@@ -61,7 +61,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 Entity entity = GetAgentEntity(agentDetails);
 
                 //Delete agent in the agent details table
-                bool deletedResult = DeleteAgent(_tableName, agentDetails.ID);
+                bool deletedResult = DeleteAgent(_tableName, agentDetails.ID, agentDetails.EnvironmentId, agentDetails.Name);
 
                 if (deletedResult == true)
                 {
@@ -83,7 +83,7 @@ namespace POWERCAT.Plugins.AgentInventory
         /// <param name="tableName">Agent details table name for deleting the agent.</param>
         /// <param name="agentDetails">Agent details for deleting agent in the agent details table.</param>
         /// <returns>bool value to indicate the deletion status.</returns>
-        public bool DeleteAgent(string tableName, Guid agentId)
+        public bool DeleteAgent(string tableName, Guid agentId, string environmentID, string agentName)
         {
             bool result = false;
             try
@@ -91,9 +91,18 @@ namespace POWERCAT.Plugins.AgentInventory
                 //Query expression for the delete operation
                 QueryExpression query = new QueryExpression(tableName)
                 {
-                    ColumnSet = new ColumnSet("cat_agentid")
+                    ColumnSet = new ColumnSet("cat_agentdetailsid"),
+                    Criteria = new FilterExpression(LogicalOperator.And)
+                    {
+                        Conditions =
+                        {
+                            new ConditionExpression("cat_agentid", ConditionOperator.Equal, agentId),
+                            new ConditionExpression("cat_name", ConditionOperator.Equal, agentName),
+                            new ConditionExpression("cat_environmentid", ConditionOperator.Equal, environmentID)
+                        }
+                    }
+
                 };
-                query.Criteria.AddCondition("cat_agentid", ConditionOperator.Equal, agentId);
 
                 //Get agents data from the agent details table
                 EntityCollection entities = _organizationService.RetrieveMultiple(query);
