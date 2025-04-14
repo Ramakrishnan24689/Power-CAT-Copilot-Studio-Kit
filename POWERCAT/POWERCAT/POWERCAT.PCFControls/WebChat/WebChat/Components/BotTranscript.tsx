@@ -8,8 +8,7 @@ import AdaptiveCardRenderer from "./AdaptiveCardRenderer";
 /**
  * BotTranscript Component
  *
- * This component is responsible for rendering a transcript of bot and user messages in a chat interface.
- * It supports markdown formatting for message text and renders adaptive card and OAuth card attachments.
+ * This component renders only the messages exchanged between the user and the bot.
  */
 
 // Define the props for the BotTranscript component
@@ -113,57 +112,99 @@ const BotTranscript: React.FC<BotTranscriptProps> = ({ transcript }) => {
     );
   };
 
+  /**
+   * Renders a single activity (message).
+   *
+   * @param activity The activity object to render.
+   * @param index The index of the activity in the transcript.
+   * @returns JSX for rendering the activity or null if no meaningful content.
+   */
+  const renderActivity = (activity: Activity, index: number) => {
+    const messageContent = renderMessageContent(activity);
+
+    // Check if there are attachments and if they have renderable content
+    const hasRenderableAttachments = (activity.attachments ?? []).some((attachment) => {
+      if (attachment.contentType === "application/vnd.microsoft.card.adaptive") {
+        return attachment.content;
+      }
+      if (attachment.contentType === "application/vnd.microsoft.card.oauth") {
+        return (
+          "text" in attachment.content &&
+          "buttons" in attachment.content &&
+          attachment.content.text &&
+          Array.isArray((attachment.content as { buttons: any[] }).buttons) &&
+          (attachment.content as { buttons: any[] }).buttons.length > 0
+        );
+      }
+      return false;
+    });
+
+    if (!messageContent && !hasRenderableAttachments) {
+      return null;
+    }
+
+    return (
+      <div
+        key={index}
+        className={`message ${activity.from?.role === 1 ? "user" : "bot"}`}
+      >
+        {/* Render the avatar based on sender (user/bot) */}
+        <img
+          src={
+            activity.from?.role === 0
+              ? "WebResources/cat_/powercat/img/webchatbotavatar.svg"
+              : "WebResources/cat_/powercat/img/webchatuseravatar.svg"
+          }
+          alt={`${activity.from?.role === 0 ? "Bot" : "User"} avatar`}
+          className="avatar"
+        />
+        <div className="message-content">
+          {/* Render message content */}
+          {messageContent}
+
+          {/* Render adaptive or OAuth card attachments if present */}
+          {hasRenderableAttachments &&
+            (activity.attachments ?? []).map((attachment, idx) => {
+              if (attachment.contentType === "application/vnd.microsoft.card.adaptive") {
+                return (
+                  <div key={idx} className="adaptive-card-wrapper">
+                    <AdaptiveCardRenderer card={attachment.content} />
+                  </div>
+                );
+              }
+
+              if (attachment.contentType === "application/vnd.microsoft.card.oauth") {
+                return renderOAuthCard(attachment.content);
+              }
+              return null;
+            })}
+
+          {/* Display the message timestamp */}
+          <div className="message-timestamp">
+            {formatTimestamp(activity.timestamp)}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Filter and map valid activities
+  const validActivities = transcript.activities
+    ?.filter(
+      (activity) =>
+        activity.type === "message" &&
+        (activity.text || activity.value || (activity.attachments?.length ?? 0) > 0)
+    )
+    .map((activity, index) => renderActivity(activity, index))
+    .filter(Boolean);
+
+  if (!validActivities?.length) {
+    return null;
+  }
+
   return (
     <div className="transcript-container">
-      <div className="transcript">
-        {transcript.activities &&
-          transcript.activities
-            .filter((activity) => activity.type === "message") // Filter to show only message activities
-            .map((activity: Activity, index: number) => (
-              <div
-                key={index}
-                className={`message ${
-                  activity.from.role === 1 ? "user" : "bot"
-                }`}
-              >
-                {/* Render the avatar based on sender (user/bot) */}
-                <img
-                  src={
-                    activity.from.role === 0
-                      ? "WebResources/cat_/powercat/img/webchatbotavatar.svg"
-                      : "WebResources/cat_/powercat/img/webchatuseravatar.svg"
-                  }
-                  alt={`${activity.from.role === 0 ? "Bot" : "User"} avatar`}
-                  className="avatar"
-                />
-                <div className="message-content">
-                  {/* Render message content (Markdown or key-value pairs) */}
-                  {renderMessageContent(activity)}
-
-                  {/* Render adaptive or OAuth card attachments if present */}
-                  {activity.attachments &&
-                    activity.attachments.length > 0 &&
-                    activity.attachments.map((attachment, idx) => (
-                      <div key={idx} className="adaptive-card-wrapper">
-                        {attachment.contentType ===
-                          "application/vnd.microsoft.card.adaptive" && (
-                          <AdaptiveCardRenderer card={attachment.content} />
-                        )}
-
-                        {attachment.contentType ===
-                          "application/vnd.microsoft.card.oauth" &&
-                          renderOAuthCard(attachment.content)}
-                      </div>
-                    ))}
-
-                  {/* Display the message timestamp */}
-                  <div className="message-timestamp">
-                    {formatTimestamp(activity.timestamp)}
-                  </div>
-                </div>
-              </div>
-            ))}
-      </div>
+      <div className="transcript">{validActivities}</div>
     </div>
   );
 };
