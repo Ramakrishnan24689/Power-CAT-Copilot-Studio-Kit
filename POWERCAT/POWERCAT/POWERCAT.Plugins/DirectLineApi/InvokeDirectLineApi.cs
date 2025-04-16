@@ -3,6 +3,7 @@
 
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
+using Newtonsoft.Json;
 using POWERCAT.Plugins.ConversationKpi;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Authentication;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace POWERCAT.Plugins.DirectLineApi
@@ -326,7 +326,7 @@ namespace POWERCAT.Plugins.DirectLineApi
                     $"Token exchange failed. Status: {response.StatusCode}, Response: {responseContent}");
             }
 
-            return System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseContent)
+            return JsonConvert.DeserializeObject<TokenResponse>(responseContent)
                 ?? throw new InvalidPluginExecutionException("Deserialized token response is null.");
         }
 
@@ -362,8 +362,8 @@ namespace POWERCAT.Plugins.DirectLineApi
                     name = "CopilotStudioKit"
                 }
             };
-
-            string body = System.Text.Json.JsonSerializer.Serialize(requestBody);
+            
+            string body = JsonConvert.SerializeObject(requestBody);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             var encodedBody = new StringContent(body, Encoding.UTF8, "application/json");
