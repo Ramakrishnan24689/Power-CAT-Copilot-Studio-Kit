@@ -134,7 +134,6 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="bin\Debug\POWERCAT.Plugins.dll.config" />
-    <None Include="CSKKey.pfx" />
     <None Include="Key.pfx" />
     <None Include="packages.config" />
   </ItemGroup>
