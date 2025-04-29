@@ -16,8 +16,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Generative Answers List</returns>
-        public List<GenerativeAnswers> ProcessForGenerativeAnswers(List<Activity> model, string conversationId)
+        public List<GenerativeAnswers> ProcessForGenerativeAnswers(List<Activity> model, string conversationId, string agentId)
         {
             // Filter activities with pvagptfeedback
             var transcriptActivities = model
@@ -41,7 +42,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add the current activity's details to the result list
                 generativeAnswers.Add(new GenerativeAnswers
                 {
-                    SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
                     UserQuery = currentElement.channelData.pvagptfeedback?.message,
                     GeneratedAnswer = currentElement.channelData.pvagptfeedback?.summarizationOpenAIResponse?.result?.summary,
                     Status = currentElement.channelData.pvagptfeedback?.gptAnswerState,

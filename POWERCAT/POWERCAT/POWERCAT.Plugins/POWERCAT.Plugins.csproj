@@ -126,6 +126,7 @@
     <Compile Include="ConversationKpi\ProcessTraversedComponents.cs" />
     <Compile Include="ConversationKpi\ProcessUnrecognizedUtterances.cs" />
     <Compile Include="ConversationKpi\TranscriptModel.cs" />
+    <Compile Include="ConversationKpi\ValueConverter.cs" />
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
     <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
     <Compile Include="DirectLineApi\TokenResponse.cs" />

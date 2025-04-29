@@ -17,14 +17,15 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Session Details List.</returns>
-        public List<SessionDetail> ProcessTranscript(List<Activity> model, string conversationId)
+        public List<SessionDetail> ProcessTranscript(List<Activity> model, string conversationId, string agentId)
         {
             return model
                 .Where(activity => activity.valueType == "SessionInfo" && activity.value != null)
                 .Select(activity => new SessionDetail
                 {
-                    SessionID = $"{conversationId}-{activity.timestamp}-{activity.id}",
+                    SessionID = $"{agentId}-{conversationId}-{activity.timestamp}-{activity.id}",
                     Engagement = activity.value.type,
                     Outcome = activity.value.outcome,
                     CSAT = activity.value.csatScore,

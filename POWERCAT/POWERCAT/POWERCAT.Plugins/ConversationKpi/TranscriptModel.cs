@@ -19,6 +19,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string type { get; set; }
         public int timestamp { get; set; }
         public From from { get; set; }
+        [JsonConverter(typeof(ValueConverter))]
         public Value value { get; set; }
         public string id { get; set; }
         public string channelId { get; set; }

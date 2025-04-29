@@ -16,8 +16,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Ambiguous Utterances List</returns>
-        public List<AmbiguousUtterances> ProcessForAmbiguousUtterances(List<Activity> model, string conversationId)
+        public List<AmbiguousUtterances> ProcessForAmbiguousUtterances(List<Activity> model, string conversationId, string agentId)
         {
             var ambiguousUtterances = new List<AmbiguousUtterances>();
 
@@ -50,7 +51,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add the ambiguous utterance entry
                 ambiguousUtterances.Add(new AmbiguousUtterances
                 {
-                    SessionID = $"{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     IntentCandidatesId = currentElement?.id,
                     AmbiguousUtterance = currentElement?.value?.triggerUtterance,
                     IntentCandidates = intentCandidates

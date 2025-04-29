@@ -16,8 +16,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Unrecognized Utterances List</returns>
-        public List<UnrecognizedUtterances> ProcessForUnrecognizedUtterances(List<Activity> model, string conversationId)
+        public List<UnrecognizedUtterances> ProcessForUnrecognizedUtterances(List<Activity> model, string conversationId, string agentId)
         {
             // Filter activities
             var transcriptActivities = model
@@ -76,7 +77,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add to the result
                 unrecognizedUtterances.Add(new UnrecognizedUtterances
                 {
-                    SessionID = $"{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     UnrecognizedUtterance = currentElement?.value?.userQuery,
                     Status = isgptAnswerStatePresent ? gptAnswerState.value.gptAnswerState : "Fallback",
                     UsedGenerativeAnswer = isgptAnswerStatePresent,

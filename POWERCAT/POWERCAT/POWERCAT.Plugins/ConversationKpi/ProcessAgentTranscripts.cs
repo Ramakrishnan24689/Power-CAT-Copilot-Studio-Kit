@@ -92,6 +92,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                         string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
                         string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                         string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
+                        string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
                         TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
                         Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
                         Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
@@ -106,19 +107,19 @@ namespace POWERCAT.Plugins.ConversationKpi
                         ProcessDetails processDetails = new ProcessDetails
                         {
                             AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
-                            AgentId = agentTranscript.GetAttributeValue<string>("cat_agentid"),
+                            AgentId = agentId,
                             ConversationId = conversationId,
                             ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                             TranscriptContent = transcript,
                             ConversationTranscriptId = conversationTranscriptId.ToString(),
                             CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
-                            SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId),
+                            SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
                             ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
-                            TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId),
-                            UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId),
-                            AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId),
-                            TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId),
-                            GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId),
+                            TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
+                            UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
+                            AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
+                            TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
+                            GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                         };
                         processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                         processDetailsList.Add(processDetails);

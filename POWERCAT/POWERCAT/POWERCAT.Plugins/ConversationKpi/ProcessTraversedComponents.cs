@@ -16,8 +16,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Traversed Components List</returns>
-        public List<TraversedComponents> ProcessForTraversedComponents(List<Activity> model, string conversationId)
+        public List<TraversedComponents> ProcessForTraversedComponents(List<Activity> model, string conversationId, string agentId)
         {
             // Filter and preprocess relevant activities
             var transcriptActivities = model
@@ -45,7 +46,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 traversedComponents.Add(new TraversedComponents
                 {
-                    SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
                     ComponentType = "Topic",
                     Trigger = GetTrigger(currentElement.valueType, currentElement.name),
                     ComponentID = GetComponentID(currentElement.valueType, currentElement.value, currentElement.name)

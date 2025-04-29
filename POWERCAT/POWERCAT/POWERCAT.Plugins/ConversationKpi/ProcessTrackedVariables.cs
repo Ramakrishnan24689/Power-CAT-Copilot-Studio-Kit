@@ -17,8 +17,9 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// </summary>
         /// <param name="model">Transcript Activity Model</param>
         /// <param name="conversationId">Conversation Id</param>
+        /// <param name="agentId">Agent Id</param>
         /// <returns>Tracked Variables List</returns>
-        public List<TrackedVariable> ProcessForTrackedVariables(List<Activity> model, string variableNames, string conversationId)
+        public List<TrackedVariable> ProcessForTrackedVariables(List<Activity> model, string variableNames, string conversationId, string agentId)
         {
             // Check for variableNames
             if (string.IsNullOrEmpty(variableNames)){
@@ -50,7 +51,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add to tracked variables
                 trackedVariables.Add(new TrackedVariable
                 {
-                    SessionID = $"{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
                     VariableName = currentElement.value.id,
                     VariableValue = currentElement.value.newValue ?? string.Empty
                 });
