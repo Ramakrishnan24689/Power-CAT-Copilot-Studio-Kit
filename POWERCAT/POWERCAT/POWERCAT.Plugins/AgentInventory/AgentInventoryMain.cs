@@ -56,6 +56,22 @@ namespace POWERCAT.Plugins.AgentInventory
                     }
 
                 }
+                //Check if the custom api call is cat_ExtractWorkFlowData
+                else if (context.MessageName == "cat_ExtractWorkFlowData")
+                {
+                    //list of WorkFlows as a json string from custom api
+                    string jsonData = (string)context.InputParameters["cat_ExtractWorkFlowInput"];
+
+                    AgentDataProcessor agentDataProcess = new AgentDataProcessor();
+
+                    var result = agentDataProcess.ExtractWorkFlowData(jsonData);
+
+                    if (!string.IsNullOrEmpty(result))
+                    {
+                        //Set output - list of connections extracted from workflows as json string
+                        context.OutputParameters["cat_ExtractWorkFlowOutput"] = result;
+                    }
+                }
             }
             catch (Exception ex)
             {

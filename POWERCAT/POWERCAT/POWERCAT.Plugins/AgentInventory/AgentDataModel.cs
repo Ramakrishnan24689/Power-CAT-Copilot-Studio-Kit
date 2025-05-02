@@ -56,6 +56,16 @@ namespace POWERCAT.Plugins.AgentInventory
             public string HttpRequests { get; set; }
             public string KnowledgeSources { get; set; }
             public string DefaultApplicationId { get; set; }
+            public bool AutonomousAgent { get; set; }
+            public bool UsesClassicGenerativeAnswersSources { get; set; }
+            public bool UsesMCP { get; set; }
+            public bool UsesCustomizedResponse { get; set; }
+            public bool UsesConnectorMakerAuthContext { get; set; }
+            public bool UsesCloudFlowAuthContext { get; set; }
+            public bool UsesCustomKnowledgeSource { get; set; }
+            public string ClassicDataSources { get; set; }
+            public string Connections { get; set; }
+            public string AgentTriggers { get; set; }
         }
 
         /// <summary>

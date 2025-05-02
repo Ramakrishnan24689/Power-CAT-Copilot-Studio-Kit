@@ -10,6 +10,7 @@ using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk;
 using Newtonsoft.Json.Linq;
 using static POWERCAT.Plugins.AgentInventory.AgentDataModel;
+using static POWERCAT.Plugins.AgentInventory.AgentDataProcessor;
 
 namespace POWERCAT.Plugins.AgentInventory
 {
@@ -145,7 +146,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 var instructions = agentComponentDetails.Where(obj => obj.ComponentType == 15 && obj.ComponentTypeName == "Custom GPT");
                 if (instructions.Any())
                 {
-                    agentDetails.Instructions = agentDataProcess.ExtractComponentsData(instructions.ToList(), "instructions");
+                    agentDetails.Instructions = agentDataProcess.ExtractComponentsData(instructions.ToList(), ComponentKeyEnum.Instructions);
                 }
 
                 //Get DefaultApplicationId from synchronizationStatus json in agent details
@@ -156,7 +157,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 var promptsList = agentComponentDetails.Where(obj => obj.Data != null && obj.Data.Contains("InvokeAIBuilderModelAction"));
                 if (promptsList.Any())
                 {
-                    var prompts = agentDataProcess.ExtractComponentsData(promptsList.ToList(), "InvokeAIBuilderModelAction");
+                    var prompts = agentDataProcess.ExtractComponentsData(promptsList.ToList(), ComponentKeyEnum.InvokeAIBuilderModelAction);
                     agentDetails.Prompts = !string.IsNullOrEmpty(prompts) ? prompts : string.Empty;
                 }
 
@@ -164,7 +165,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 var httpRequestsList = agentComponentDetails.Where(obj => obj.Data != null && obj.Data.Contains("HttpRequestAction"));
                 if (httpRequestsList.Any())
                 {
-                    var httpRequestaction = agentDataProcess.ExtractComponentsData(httpRequestsList.ToList(), "HttpRequestAction");
+                    var httpRequestaction = agentDataProcess.ExtractComponentsData(httpRequestsList.ToList(), ComponentKeyEnum.HttpRequestAction);
                     agentDetails.HttpRequests = !string.IsNullOrEmpty(httpRequestaction) ? httpRequestaction : string.Empty;
                 }
 
@@ -174,7 +175,7 @@ namespace POWERCAT.Plugins.AgentInventory
                                                                 || (obj.ComponentType == 14 && obj.ComponentTypeName == "Bot File Attachment"));
                 if (knowledgeSourceList.Any())
                 {
-                    var kowledgeSources = agentDataProcess.ExtractComponentsData(knowledgeSourceList.ToList(), "KnowledgeSources");
+                    var kowledgeSources = agentDataProcess.ExtractComponentsData(knowledgeSourceList.ToList(), ComponentKeyEnum.KnowledgeSources);
                     agentDetails.KnowledgeSources = !string.IsNullOrEmpty(kowledgeSources) ? kowledgeSources : string.Empty;
                 }
 
@@ -197,6 +198,63 @@ namespace POWERCAT.Plugins.AgentInventory
                                                         obj => obj.Data != null && obj.ComponentType == 9 &&
                                                                obj.Data.Contains("TaskDialog")).Count() > 0;
 
+                //Get classicDataSources from the data(yaml) in agent components
+                var classicDataSourcesList = agentComponentDetails.Where(
+                                                        obj => obj.Data != null && obj.ComponentType == 9 &&
+                                                               obj.Data.Contains("- kind: SearchAndSummarizeContent") &&
+                                                               (obj.Data.Replace(" ", "").Contains("publicDataSource:\r\nsites:") ||
+                                                               obj.Data.Replace(" ", "").Contains("customDataSource:\r\nsearchResults:") ||
+                                                               obj.Data.Replace(" ", "").Contains("sharePointSearchDataSource:\r\nsites:") ||
+                                                               obj.Data.Replace(" ", "").Contains("azureOpenAIOnYourDataSource:\r\ndataSources:")));
+                if (classicDataSourcesList.Any())
+                {
+                    var classicDataSources = agentDataProcess.ExtractComponentsData(classicDataSourcesList.ToList(), ComponentKeyEnum.ClassicDataSources);
+                    agentDetails.ClassicDataSources = !string.IsNullOrEmpty(classicDataSources) ? classicDataSources : string.Empty;
+                }
+
+                //Get Agent Triggers from the data(yaml) in agent components
+                var agentTriggersList = agentComponentDetails.Where(obj => obj.ComponentType == 17 && obj.ComponentTypeName == "External Trigger");
+                if (agentTriggersList.Any())
+                {
+                    var agentTriggers = agentDataProcess.ExtractComponentsData(agentTriggersList.ToList(), ComponentKeyEnum.AgentTriggers);
+                    agentDetails.AgentTriggers = !string.IsNullOrEmpty(agentTriggers) ? agentTriggers : string.Empty;
+                }
+
+                //Get connections from the data(yaml) in agent components
+                var connectionsLists = agentComponentDetails.Where(obj => obj.Data != null && (obj.Data.Contains("connectionReference:") || obj.Data.Contains("flowId:")));
+                if (connectionsLists.Any())
+                {
+                    var connections = agentDataProcess.ExtractComponentsData(connectionsLists.ToList(), ComponentKeyEnum.Connections);
+                    agentDetails.Connections = !string.IsNullOrEmpty(connections) ? connections : string.Empty;
+                }
+
+                //If connections in agent has connection mode as maker then true
+                if (!string.IsNullOrEmpty(agentDetails.Connections))
+                {
+                    agentDetails.UsesConnectorMakerAuthContext = JArray.Parse(agentDetails.Connections).Where(obj => obj["Type"]?.ToString() == "Agent" && obj["ConnectionMode"]?.ToString() == "Maker").Any();
+                }
+
+                //If agent uses classic data sources then true
+                agentDetails.UsesClassicGenerativeAnswersSources = !string.IsNullOrEmpty(agentDetails.ClassicDataSources) ? true : false;
+
+                //If Agent Trigger is available then true
+                agentDetails.AutonomousAgent = !string.IsNullOrEmpty(agentDetails.AgentTriggers) ? true : false;
+
+                //If agent uses MCP then true
+                agentDetails.UsesMCP = agentComponentDetails.Where(
+                                                        obj => obj.Data != null && obj.ComponentType == 9 &&
+                                                               obj.Data.Contains("kind: InvokeExternalAgentTaskAction")).Any();
+
+                //If agent uses customized knowledge source then true
+                agentDetails.UsesCustomKnowledgeSource = agentComponentDetails.Where(
+                                                        obj => obj.Data != null && obj.ComponentType == 9 &&
+                                                               obj.Data.StartsWith("kind: AdaptiveDialog\r\nbeginDialog:\r\n  kind: OnKnowledgeRequested")).Any();
+
+                //If agent uses customized response then true
+                agentDetails.UsesCustomizedResponse = agentComponentDetails.Where(
+                                                        obj => obj.Data != null && obj.ComponentType == 9 &&
+                                                               obj.Data.Contains("- kind: AnswerQuestionWithAI")).Any();
+
                 //Get GenerativeActionsEnabled, useModelKnowledge, isSemanticSearchEnabled from configuration json in agent details
                 if (!string.IsNullOrEmpty(agentDetails.Configuration))
                 {
@@ -214,9 +272,10 @@ namespace POWERCAT.Plugins.AgentInventory
 
                 }
 
-                //If agent has actions or prompts or knowledge sources or orchestration type is generative or ai knowledge is true the set to true
+                //If agent has actions or prompts or knowledge sources or mcp or customize response or classic generative answer sources or ai knowledge or orchestration type is generative then set to true
                 agentDetails.UsesGenAI = agentDetails.UsesActions || agentDetails.UsesAIKnowledge ||
-                                             agentDetails.UsesKnowledgeSources || agentDetails.UsesPrompts ||
+                                             agentDetails.UsesKnowledgeSources || agentDetails.UsesPrompts || agentDetails.UsesClassicGenerativeAnswersSources ||
+                                             agentDetails.UsesMCP || agentDetails.UsesCustomizedResponse ||
                                              string.Equals(agentDetails.OrchestrationType, "Generative", StringComparison.OrdinalIgnoreCase);
             }
             catch (Exception ex)
@@ -241,7 +300,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 //Details of the agent
                 entity["cat_agentid"] = agentDetails.ID.ToString();
                 entity["cat_name"] = agentDetails.Name;
-                entity["cat_type"] = agentDetails.Type;
+                entity["cat_type"] = "Custom";
 
                 //Environment details of the agent
                 entity["cat_environmentname"] = agentDetails.EnvironmentName;
@@ -276,11 +335,22 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_useshttprequests"] = agentDetails.UsesHttpRequests;
                 entity["cat_usesskills"] = agentDetails.UsesSkills;
                 entity["cat_usesknowledgesources"] = agentDetails.UsesKnowledgeSources;
-                
+
                 //Agent Components
                 entity["cat_prompts"] = agentDetails.Prompts;
                 entity["cat_httprequestactions"] = agentDetails.HttpRequests;
                 entity["cat_knowledgesources"] = agentDetails.KnowledgeSources;
+
+                entity["cat_autonomousagent"] = agentDetails.AutonomousAgent;
+                entity["cat_usesclassicgenerativeanswerssources"] = agentDetails.UsesClassicGenerativeAnswersSources;
+                entity["cat_usesmcp"] = agentDetails.UsesMCP;
+                entity["cat_usescustomizedresponse"] = agentDetails.UsesCustomizedResponse;
+                entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext;
+                entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
+                entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
+                entity["cat_classicdatasources"] = agentDetails.ClassicDataSources;
+                entity["cat_connections"] = agentDetails.Connections;
+                entity["cat_agenttriggers"] = agentDetails.AgentTriggers;
 
                 return entity;
             }
