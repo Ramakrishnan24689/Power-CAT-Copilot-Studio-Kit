@@ -66,6 +66,9 @@ namespace POWERCAT.Plugins.AgentInventory
             public string ClassicDataSources { get; set; }
             public string Connections { get; set; }
             public string AgentTriggers { get; set; }
+            public bool UsesFileInput { get; set; }
+            public bool UsesDeepReasoningModels { get; set; }
+
         }
 
         /// <summary>

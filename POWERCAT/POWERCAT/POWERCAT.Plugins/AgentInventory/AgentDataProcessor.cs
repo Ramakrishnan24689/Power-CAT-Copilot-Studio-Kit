@@ -427,7 +427,10 @@ namespace POWERCAT.Plugins.AgentInventory
                 if (!keyValuePairs.ContainsKey(key))
                 {
                     //For extracting list of values from value
-                    foreach (Match match in Regex.Matches(keyValueListMatch.Groups["list"].Value, @"-\s*(?<item>[^\r\n]+)"))
+                    string listItemsRegex = GetRegexPattern(ComponentKeyEnum.ExtractListItemsInValue);
+                    MatchCollection listItemsMatchResults = Regex.Matches(keyValueListMatch.Groups["list"].Value, listItemsRegex);
+
+                    foreach (Match match in listItemsMatchResults)
                     {
                         string rawString = match.Groups["item"].Value.Trim();
                         string formattedString = rawString.Contains('"') ? rawString.Replace('"', '\'') : rawString;
@@ -492,7 +495,8 @@ namespace POWERCAT.Plugins.AgentInventory
                 var dataSources = new List<Dictionary<string, object>>();
 
                 // Split the data source block into individual index blocks
-                var indexBlocks = Regex.Split(dataSourceContent.Trim(), @"^\s*-\s*indexName:", RegexOptions.Multiline);
+                string indexNameKeyRegex = GetRegexPattern(ComponentKeyEnum.IndexNameKey);
+                var indexBlocks = Regex.Split(dataSourceContent.Trim(), indexNameKeyRegex, RegexOptions.Multiline);
 
                 //Loop all index block
                 foreach (var indexBlock in indexBlocks)
@@ -502,7 +506,9 @@ namespace POWERCAT.Plugins.AgentInventory
                         var indexMetadata = new Dictionary<string, object>();
 
                         // Extract index name from the index block
-                        var indexNameMatch = Regex.Match(indexBlock, @"^\s*(?<name>[^\r\n]+)");
+                        string indexNameValueRegex = GetRegexPattern(ComponentKeyEnum.IndexNameValue);
+                        var indexNameMatch = Regex.Match(indexBlock, indexNameValueRegex);
+
                         if (indexNameMatch.Success)
                         {
                             indexMetadata["indexName"] = indexNameMatch.Groups["name"].Value.Trim();
@@ -594,8 +600,20 @@ namespace POWERCAT.Plugins.AgentInventory
                     regex = @"^\s*(?<key>\w+):\s*\r?\n(?<list>(?:\s*-\s*[^\r\n]+\r?\n?)+)";
                     break;
 
+                case ComponentKeyEnum.ExtractListItemsInValue:
+                    regex = @"-\s*(?<item>[^\r\n]+)";
+                    break;
+
                 case ComponentKeyEnum.ExtractValueForKey:
                     regex = @"{0}:\s*(.+)";
+                    break;
+
+                case ComponentKeyEnum.IndexNameKey:
+                    regex = @"^\s*-\s*indexName:";
+                    break;
+
+                case ComponentKeyEnum.IndexNameValue:
+                    regex = @"^\s*(?<name>[^\r\n]+)";
                     break;
 
                 case ComponentKeyEnum.AgentTriggers:
@@ -663,7 +681,10 @@ namespace POWERCAT.Plugins.AgentInventory
             ExtractYamlBlock,
             ExtractAllKeyValue,
             ExtractAllKeyValueList,
+            ExtractListItemsInValue,
             ExtractValueForKey,
+            IndexNameKey,
+            IndexNameValue,
             ClassicDataSources,
             AgentTriggers,
             Connections

@@ -270,6 +270,12 @@ namespace POWERCAT.Plugins.AgentInventory
                     var enhanceSearchResult = agentDataProcess.ParseJsonData(configJson, "isSemanticSearchEnabled").ToLower();
                     agentDetails.UsesEnhancedSearchResult = !string.IsNullOrEmpty(enhanceSearchResult) && enhanceSearchResult != "false" ? true : false;
 
+                    var fileInput = agentDataProcess.ParseJsonData(configJson, "isFileAnalysisEnabled").ToLower();
+                    agentDetails.UsesFileInput = !string.IsNullOrEmpty(fileInput) && fileInput != "false" ? true : false;
+
+                    var deepReasoningModels = agentDataProcess.ParseJsonData(configJson, "optInUseLatestModels").ToLower();
+                    agentDetails.UsesDeepReasoningModels = !string.IsNullOrEmpty(deepReasoningModels) && deepReasoningModels != "false" ? true : false;
+
                 }
 
                 //If agent has actions or prompts or knowledge sources or mcp or customize response or classic generative answer sources or ai knowledge or orchestration type is generative then set to true
@@ -326,21 +332,19 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_instructions"] = agentDetails.Instructions;
                 entity["cat_managedstate"] = agentDetails.IsManaged == true ? "Managed" : "Unmanaged";
 
-                //Agent features
+                //Agent Configurations
                 entity["cat_usesgenai"] = agentDetails.UsesGenAI;
                 entity["cat_usesaiknowledge"] = agentDetails.UsesAIKnowledge;
                 entity["cat_usesenhancedsearchresults"] = agentDetails.UsesEnhancedSearchResult;
+                entity["cat_usesfileinput"] = agentDetails.UsesFileInput;
+                entity["cat_usesdeepreasoningmodels"] = agentDetails.UsesDeepReasoningModels;
+
+                //Agent features
                 entity["cat_usesactions"] = agentDetails.UsesActions;
                 entity["cat_usesprompts"] = agentDetails.UsesPrompts;
                 entity["cat_useshttprequests"] = agentDetails.UsesHttpRequests;
                 entity["cat_usesskills"] = agentDetails.UsesSkills;
                 entity["cat_usesknowledgesources"] = agentDetails.UsesKnowledgeSources;
-
-                //Agent Components
-                entity["cat_prompts"] = agentDetails.Prompts;
-                entity["cat_httprequestactions"] = agentDetails.HttpRequests;
-                entity["cat_knowledgesources"] = agentDetails.KnowledgeSources;
-
                 entity["cat_autonomousagent"] = agentDetails.AutonomousAgent;
                 entity["cat_usesclassicgenerativeanswerssources"] = agentDetails.UsesClassicGenerativeAnswersSources;
                 entity["cat_usesmcp"] = agentDetails.UsesMCP;
@@ -348,6 +352,11 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext;
                 entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
                 entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
+
+                //Agent Components
+                entity["cat_prompts"] = agentDetails.Prompts;
+                entity["cat_httprequestactions"] = agentDetails.HttpRequests;
+                entity["cat_knowledgesources"] = agentDetails.KnowledgeSources;
                 entity["cat_classicdatasources"] = agentDetails.ClassicDataSources;
                 entity["cat_connections"] = agentDetails.Connections;
                 entity["cat_agenttriggers"] = agentDetails.AgentTriggers;
