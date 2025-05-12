@@ -72,8 +72,11 @@ namespace POWERCAT.Plugins.AgentInventory
                         //Match instructions in yaml data with regex pattern
                         Match instructionMatch = Regex.Match(instructionYaml, regexPattern, RegexOptions.Singleline);
 
-                        //Set the extracted instruction value to output
-                        extractedResult = instructionMatch.Groups[1].Value;
+                        if (instructionMatch.Success && instructionMatch.Groups[1].Success)
+                        {
+                            //Set the extracted instruction value to output
+                            extractedResult = instructionMatch.Groups[1].Value;
+                        }
                     }
                     break;
 
@@ -107,17 +110,20 @@ namespace POWERCAT.Plugins.AgentInventory
 
                                 foreach (Match knowledgeSourceMatch in knowledgeSourceMatchResults)
                                 {
-                                    //Set knowledge source value(Name from current item, knowledge type and value from the data yaml)
-                                    var componentMetadata = new Dictionary<string, string>
+                                    if (knowledgeSourceMatch.Success && knowledgeSourceMatch.Groups[1].Success && knowledgeSourceMatch.Groups[2].Success && knowledgeSourceMatch.Groups[3].Success)
                                     {
-                                        { ComponentMetaDataEnum.DisplayName.ToString(), component.Name },
-                                        { ComponentMetaDataEnum.KnowledgeType.ToString(), knowledgeSourceMatch.Groups[1].Value },
-                                        { ComponentMetaDataEnum.Value.ToString(), string.Concat(knowledgeSourceMatch.Groups[2].Value, " - ", knowledgeSourceMatch.Groups[3].Value)},
-                                    };
+                                        //Set knowledge source value(Name from current item, knowledge type and value from the data yaml)
+                                        var componentMetadata = new Dictionary<string, string>
+                                        {
+                                            { ComponentMetaDataEnum.DisplayName.ToString(), component.Name },
+                                            { ComponentMetaDataEnum.KnowledgeType.ToString(), knowledgeSourceMatch.Groups[1].Value },
+                                            { ComponentMetaDataEnum.Value.ToString(), string.Concat(knowledgeSourceMatch.Groups[2].Value, " - ", knowledgeSourceMatch.Groups[3].Value)},
+                                        };
 
-                                    if (componentMetadata.Count > 0)
-                                    {
-                                        componentMetadataList.Add(componentMetadata);
+                                        if (componentMetadata.Count > 0)
+                                        {
+                                            componentMetadataList.Add(componentMetadata);
+                                        }
                                     }
                                 }
                             }
@@ -139,17 +145,20 @@ namespace POWERCAT.Plugins.AgentInventory
                             //Loop for all the HttpRequestAction matches
                             foreach (Match httpRequestActionMatch in httpRequestActionMatchResults)
                             {
-                                //Set httprequests value(Name from current item, displayname and value from the data yaml)
-                                var componentMetadata = new Dictionary<string, string>
+                                if (httpRequestActionMatch.Success && httpRequestActionMatch.Groups[2].Success && httpRequestActionMatch.Groups[3].Success)
                                 {
-                                    { ComponentMetaDataEnum.TopicName.ToString(), component.Name },
-                                    { ComponentMetaDataEnum.DisplayName.ToString(), httpRequestActionMatch.Groups[2].Value },
-                                    { ComponentMetaDataEnum.Value.ToString(), httpRequestActionMatch.Groups[3].Value }
-                                };
+                                    //Set httprequests value(Name from current item, displayname and value from the data yaml)
+                                    var componentMetadata = new Dictionary<string, string>
+                                    {
+                                        { ComponentMetaDataEnum.TopicName.ToString(), component.Name },
+                                        { ComponentMetaDataEnum.DisplayName.ToString(), httpRequestActionMatch.Groups[2].Value },
+                                        { ComponentMetaDataEnum.Value.ToString(), httpRequestActionMatch.Groups[3].Value }
+                                    };
 
-                                if (componentMetadata.Count > 0)
-                                {
-                                    componentMetadataList.Add(componentMetadata);
+                                    if (componentMetadata.Count > 0)
+                                    {
+                                        componentMetadataList.Add(componentMetadata);
+                                    }
                                 }
                             }
                         }
@@ -170,17 +179,20 @@ namespace POWERCAT.Plugins.AgentInventory
                             //Loop for all the InvokeAIBuilderModelAction matches
                             foreach (Match aiBuilderActionMatch in aiBuilderActionMatchResults)
                             {
-                                //Set prompts value(Name from current item, value from the data yaml)
-                                var componentMetadata = new Dictionary<string, string>
+                                if (aiBuilderActionMatch.Success && aiBuilderActionMatch.Groups[3].Success)
                                 {
-                                    { ComponentMetaDataEnum.TopicName.ToString(), component.Name},
-                                    { ComponentMetaDataEnum.PromptName.ToString(), string.Empty},   //value populated in agent inventory power automate grandchild flow
-                                    { ComponentMetaDataEnum.Value.ToString(), aiBuilderActionMatch.Groups[3].Value}
-                                };
+                                    //Set prompts value(Name from current item, value from the data yaml)
+                                    var componentMetadata = new Dictionary<string, string>
+                                    {
+                                        { ComponentMetaDataEnum.TopicName.ToString(), component.Name},
+                                        { ComponentMetaDataEnum.PromptName.ToString(), string.Empty},   //value populated in agent inventory power automate grandchild flow
+                                        { ComponentMetaDataEnum.Value.ToString(), aiBuilderActionMatch.Groups[3].Value}
+                                    };
 
-                                if (componentMetadata.Count > 0)
-                                {
-                                    componentMetadataList.Add(componentMetadata);
+                                    if (componentMetadata.Count > 0)
+                                    {
+                                        componentMetadataList.Add(componentMetadata);
+                                    }
                                 }
                             }
                         }
@@ -208,65 +220,74 @@ namespace POWERCAT.Plugins.AgentInventory
                             foreach (Match searchAndSummarizeMatch in searchAndSummarizeMatchResults)
                             {
                                 // Extract the SearchAndSummarizeContent block
-                                string searchAndSummarizeContent = searchAndSummarizeMatch.Value;
+                                string searchAndSummarizeContent = searchAndSummarizeMatch.Success ? searchAndSummarizeMatch.Value : string.Empty;
 
-                                // List of known classic data sources to extract from SearchAndSummarizeContent block
-                                string[] classicDataSourceKeys = {
+                                if (!string.IsNullOrEmpty(searchAndSummarizeContent))
+                                {
+                                    // List of known classic data sources to extract from SearchAndSummarizeContent block
+                                    string[] classicDataSourceKeys = {
                                     "publicDataSource",
                                     "sharePointSearchDataSource",
                                     "customDataSource",
                                     "azureOpenAIOnYourDataSource"
-                                };
+                                    };
 
-                                //Initialize classicDataSources variable to hold the extracted values of classic data sources
-                                var classicDataSources = new Dictionary<string, object>();
+                                    //Initialize classicDataSources variable to hold the extracted values of classic data sources
+                                    var classicDataSources = new Dictionary<string, object>();
 
-                                // Loop through each key(classic data sources) and match regex for the key in SearchAndSummarizeContent block
-                                foreach (var classicDataSourceKey in classicDataSourceKeys)
-                                {
-                                    //Extract Classic Data Sources like publicdatasource, sharepointdatasource, customdtasource, azureopenaidatasource
-                                    var classicDataSourceNode = ExtractYamlBlock(searchAndSummarizeContent, classicDataSourceKey);
-                                    string classicDataSourceContent = classicDataSourceNode != null ? classicDataSourceNode.Groups["block"].Value : null;
-
-                                    if (!string.IsNullOrEmpty(classicDataSourceContent))
+                                    // Loop through each key(classic data sources) and match regex for the key in SearchAndSummarizeContent block
+                                    foreach (var classicDataSourceKey in classicDataSourceKeys)
                                     {
-                                        if (classicDataSourceKey == "azureOpenAIOnYourDataSource")
-                                        {
-                                            //Parse and extract key values in azureOpenAIOnYourDataSource block 
-                                            var azureOpenAIDataSource = ParseAzureOpenAIDataSource(classicDataSourceContent);
-                                            classicDataSources[classicDataSourceKey] = azureOpenAIDataSource;
-                                        }
-                                        else
-                                        {
-                                            var extractDataSource = new Dictionary<string, object>();
+                                        //Extract Classic Data Sources like publicdatasource, sharepointdatasource, customdtasource, azureopenaidatasource
+                                        var classicDataSourceNode = ExtractYamlBlock(searchAndSummarizeContent, classicDataSourceKey);
+                                        string classicDataSourceContent = classicDataSourceNode.Success && classicDataSourceNode.Groups["block"].Success ? classicDataSourceNode.Groups["block"].Value.TrimEnd('\r', '\n') : string.Empty;
 
-                                            //Parse and extract key values in data source like publicDataSource or sharePointSearchDataSource or customDataSource block 
-                                            ExtractKeyValuePairs(classicDataSourceContent, extractDataSource);
-
-                                            if (classicDataSourceKey == "publicDataSource" || classicDataSourceKey == "sharePointSearchDataSource")
+                                        if (!string.IsNullOrEmpty(classicDataSourceContent))
+                                        {
+                                            if (classicDataSourceKey == "azureOpenAIOnYourDataSource")
                                             {
-                                                classicDataSources[classicDataSourceKey] = extractDataSource["sites"];
+                                                //Parse and extract key values in azureOpenAIOnYourDataSource block 
+                                                var azureOpenAIDataSource = ParseAzureOpenAIDataSource(classicDataSourceContent);
+                                                classicDataSources[classicDataSourceKey] = azureOpenAIDataSource;
                                             }
-                                            else if (classicDataSourceKey == "customDataSource")
+                                            else
                                             {
-                                                classicDataSources[classicDataSourceKey] = extractDataSource["searchResults"];
+                                                var extractDataSource = new Dictionary<string, object>();
+
+                                                //Parse and extract key values in data source like publicDataSource or sharePointSearchDataSource or customDataSource block 
+                                                ExtractKeyValuePairs(classicDataSourceContent, extractDataSource);
+
+                                                if (classicDataSourceKey == "publicDataSource" || classicDataSourceKey == "sharePointSearchDataSource")
+                                                {
+                                                    if (extractDataSource.ContainsKey("sites"))
+                                                    {
+                                                        classicDataSources[classicDataSourceKey] = extractDataSource["sites"];
+                                                    }
+                                                }
+                                                else if (classicDataSourceKey == "customDataSource")
+                                                {
+                                                    if (extractDataSource.ContainsKey("searchResults"))
+                                                    {
+                                                        classicDataSources[classicDataSourceKey] = extractDataSource["searchResults"];
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                if (classicDataSources.Count > 0)
-                                {
-                                    // Set values of classic data sources
-                                    var componentMetadata = new Dictionary<string, object>
+                                    if (classicDataSources.Count > 0)
                                     {
-                                        { ComponentMetaDataEnum.TopicName.ToString(), component.Name },
-                                        { ComponentMetaDataEnum.Value.ToString(), classicDataSources }
-                                    };
+                                        // Set values of classic data sources
+                                        var componentMetadata = new Dictionary<string, object>
+                                        {
+                                            { ComponentMetaDataEnum.TopicName.ToString(), component.Name },
+                                            { ComponentMetaDataEnum.Value.ToString(), classicDataSources }
+                                        };
 
-                                    if (componentMetadata.Count > 0)
-                                    {
-                                        parsedComponents.Add(componentMetadata);
+                                        if (componentMetadata.Count > 0)
+                                        {
+                                            parsedComponents.Add(componentMetadata);
+                                        }
                                     }
                                 }
                             }
@@ -291,7 +312,7 @@ namespace POWERCAT.Plugins.AgentInventory
                             //Match triggerConnectionType in yaml data with regex pattern
                             Match agentTriggerMatch = Regex.Match(data, regexPattern, RegexOptions.Singleline);
 
-                            if (agentTriggerMatch.Success)
+                            if (agentTriggerMatch.Success && agentTriggerMatch.Groups[1].Success)
                             {
                                 agentTriggers.Add(agentTriggerMatch.Groups[1].Value);
                             }
@@ -321,41 +342,47 @@ namespace POWERCAT.Plugins.AgentInventory
                             //Loop for all connections matches
                             foreach (Match connectionMatch in connectionMatchResults)
                             {
-                                var componentMetadata = new Dictionary<string, string>();
-
-                                //if connections with connection name and connection mode exists in agent
-                                if (connectionMatch.Groups[1].Success && connectionMatch.Groups[2].Success)
+                                if (connectionMatch.Success)
                                 {
-                                    //Set value(Name from current item, connection name, connection mode value from the data yaml)
-                                    componentMetadata = new Dictionary<string, string>
+                                    var componentMetadata = new Dictionary<string, string>();
+
+                                    //if connections with connection name and connection mode exists in agent
+                                    if (connectionMatch.Groups[1].Success && connectionMatch.Groups[2].Success)
+                                    {
+                                        //Set value(Name from current item, connection name, connection mode value from the data yaml)
+                                        componentMetadata = new Dictionary<string, string>
                                     {
                                         {ComponentMetaDataEnum.Name.ToString(), string.Concat("TopicName - ",component.Name)},
                                         {ComponentMetaDataEnum.Type.ToString(), "Agent"},
                                         {ComponentMetaDataEnum.Connection.ToString(), connectionMatch.Groups[1].Value}, //Connection name
                                         {ComponentMetaDataEnum.ConnectionMode.ToString(), connectionMatch.Groups[2].Value} //invoker/maker
                                     };
-                                }
+                                    }
 
-                                //if flow exists in agent, add flow id
-                                if (connectionMatch.Groups[3].Success)
-                                {
-                                    //Set value(value from the data yaml(matched regex))
-                                    componentMetadata = new Dictionary<string, string>
+                                    //if flow exists in agent, add flow id
+                                    if (connectionMatch.Groups[3].Success)
+                                    {
+                                        //Set value(value from the data yaml(matched regex))
+                                        componentMetadata = new Dictionary<string, string>
                                     {
                                         {ComponentMetaDataEnum.Name.ToString(), string.Empty}, //populated in agent inventory child flow
                                         {ComponentMetaDataEnum.Type.ToString(), "Flow"},  //populated in agent inventory child flow
                                         {ComponentMetaDataEnum.Connection.ToString(), connectionMatch.Groups[3].Value}, //Flowid
                                         {ComponentMetaDataEnum.ConnectionMode.ToString(), string.Empty}   //populated in agent inventory child flow
                                     };
-                                }
-                                if (componentMetadata.Count > 0)
-                                {
-                                    componentMetadataList.Add(componentMetadata);
+                                    }
+                                    if (componentMetadata.Count > 0)
+                                    {
+                                        componentMetadataList.Add(componentMetadata);
+                                    }
                                 }
                             }
                         }
                     }
-                    componentMetadataList = componentMetadataList.Distinct().ToList();
+                    if (componentMetadataList.Count > 0)
+                    {
+                        componentMetadataList = componentMetadataList.Distinct().ToList();
+                    }
                     break;
 
                 default:
@@ -379,30 +406,18 @@ namespace POWERCAT.Plugins.AgentInventory
         /// </summary>
         private static Match ExtractYamlBlock(string yaml, string key)
         {
-            //Get regex for indentation
-            string regexIndentPattern = GetRegexPattern(ComponentKeyEnum.Indent);
+            //Get regex for extracting th yaml block for given key
+            string regexPattern = GetRegexPattern(ComponentKeyEnum.ExtractYamlBlock);
 
-            //String format regexIndentPattern with key
-            regexIndentPattern = string.Format(regexIndentPattern, key);
+            // Escape the key properly first
+            string escapedKey = Regex.Escape(key);
 
-            //Get indentation of the given key in yaml by matching yaml with regex
-            var indentMatch = Regex.Match(yaml, regexIndentPattern, RegexOptions.Multiline);
+            //String format regexPattern with key
+            regexPattern = string.Format(regexPattern, escapedKey);
 
-            if (indentMatch.Success)
-            {
-                string baseIndent = Regex.Escape(indentMatch.Groups["indent"].Value);
+            Match yamlBlockMatch = Regex.Match(yaml, regexPattern, RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
 
-                //Get regex for extracting th yaml block for given key
-                string regexPattern = GetRegexPattern(ComponentKeyEnum.ExtractYamlBlock);
-
-                //String format regexIndentPattern with key
-                regexPattern = string.Format(regexPattern, baseIndent, key);
-
-                Match yamlBlockMatch = Regex.Match(yaml, regexPattern, RegexOptions.Multiline);
-
-                return yamlBlockMatch;
-            }
-            return null;
+            return yamlBlockMatch;
         }
 
         /// <summary>
@@ -420,23 +435,31 @@ namespace POWERCAT.Plugins.AgentInventory
             //Loop all key and values list matches
             foreach (Match keyValueListMatch in keyValueListMatchResults)
             {
-                string key = keyValueListMatch.Groups["key"].Value.Trim();
-                var values = new List<string>();
+                string key = keyValueListMatch.Success && keyValueListMatch.Groups["key"].Success ? keyValueListMatch.Groups["key"].Value.Trim() : string.Empty;
 
                 //Skip if key is already available in the keyValuePairs dictionary
-                if (!keyValuePairs.ContainsKey(key))
+                if (!string.IsNullOrEmpty(key) && !keyValuePairs.ContainsKey(key))
                 {
+                    var values = new List<string>();
+
                     //For extracting list of values from value
                     string listItemsRegex = GetRegexPattern(ComponentKeyEnum.ExtractListItemsInValue);
-                    MatchCollection listItemsMatchResults = Regex.Matches(keyValueListMatch.Groups["list"].Value, listItemsRegex);
 
-                    foreach (Match match in listItemsMatchResults)
+                    //Value of the key
+                    string valueOfKey = keyValueListMatch.Success && keyValueListMatch.Groups["list"].Success ? keyValueListMatch.Groups["list"].Value : string.Empty;
+
+                    if (!string.IsNullOrEmpty(valueOfKey))
                     {
-                        string rawString = match.Groups["item"].Value.Trim();
-                        string formattedString = rawString.Contains('"') ? rawString.Replace('"', '\'') : rawString;
-                        values.Add(formattedString);
+                        MatchCollection listItemsMatchResults = Regex.Matches(valueOfKey, listItemsRegex);
+
+                        foreach (Match match in listItemsMatchResults)
+                        {
+                            string rawString = match.Success && match.Groups["item"].Success ? match.Groups["item"].Value.Trim() : string.Empty;
+                            string formattedString = rawString.Contains('"') ? rawString.Replace('"', '\'') : rawString;
+                            values.Add(formattedString);
+                        }
+                        keyValuePairs[key] = values;
                     }
-                    keyValuePairs[key] = values;
                 }
             }
 
@@ -450,12 +473,12 @@ namespace POWERCAT.Plugins.AgentInventory
             //Loop all key values matches
             foreach (Match keyValueMatch in keyValueMatchResults)
             {
-                string key = keyValueMatch.Groups["key"].Value.Trim();
+                string key = keyValueMatch.Success && keyValueMatch.Groups["key"].Success ? keyValueMatch.Groups["key"].Value.Trim() : string.Empty;
 
                 //Skip if key is already available in the keyValuePairs dictionary
-                if (!keyValuePairs.ContainsKey(key))
+                if (!string.IsNullOrEmpty(key) && !keyValuePairs.ContainsKey(key))
                 {
-                    string rawString = keyValueMatch.Groups["value"].Value.Trim();
+                    string rawString = keyValueMatch.Success && keyValueMatch.Groups["value"].Success ? keyValueMatch.Groups["value"].Value.Trim() : string.Empty;
                     string formattedString = rawString.Contains('"') ? rawString.Replace('"', '\'') : rawString;
                     keyValuePairs[key] = formattedString;
                 }
@@ -475,7 +498,7 @@ namespace POWERCAT.Plugins.AgentInventory
 
             //Match the regex with yaml to extract the value for the given key
             var match = Regex.Match(yaml, regex);
-            string valueMatch = match.Success ? match.Groups[1].Value.Trim() : null;
+            string valueMatch = match.Success && match.Groups[1].Success ? match.Groups[1].Value.Trim() : string.Empty;
             return valueMatch;
         }
 
@@ -488,7 +511,7 @@ namespace POWERCAT.Plugins.AgentInventory
 
             // Extract the "dataSources" block in azureOpenAIDataSourceBlock
             var dataSourceNode = ExtractYamlBlock(azureOpenAIDataSourceBlock, "dataSources");
-            string dataSourceContent = dataSourceNode != null ? dataSourceNode.Groups["block"].Value : null;
+            string dataSourceContent = dataSourceNode.Success && dataSourceNode.Groups["block"].Success ? dataSourceNode.Groups["block"].Value.TrimEnd('\r', '\n') : string.Empty;
 
             if (!string.IsNullOrEmpty(dataSourceContent))
             {
@@ -509,7 +532,7 @@ namespace POWERCAT.Plugins.AgentInventory
                         string indexNameValueRegex = GetRegexPattern(ComponentKeyEnum.IndexNameValue);
                         var indexNameMatch = Regex.Match(indexBlock, indexNameValueRegex);
 
-                        if (indexNameMatch.Success)
+                        if (indexNameMatch.Success && indexNameMatch.Groups["name"].Success)
                         {
                             indexMetadata["indexName"] = indexNameMatch.Groups["name"].Value.Trim();
                         }
@@ -532,7 +555,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 if (scalarKey == "stopSequence")
                 {
                     var stopSequenceNode = ExtractYamlBlock(azureOpenAIDataSourceBlock, "stopSequence");
-                    if (stopSequenceNode != null)
+                    if (stopSequenceNode.Success && !string.IsNullOrEmpty(stopSequenceNode.Value))
                     {
                         ExtractKeyValuePairs(stopSequenceNode.Value, parsedData);
                     }
@@ -584,12 +607,8 @@ namespace POWERCAT.Plugins.AgentInventory
                     regex = @"{0}:\s*((?:.|\r\n)*?)(?=\r\n\r\n|\z)";
                     break;
 
-                case ComponentKeyEnum.Indent:
-                    regex = @"(?<indent>^[ \t]*)-?[ \t]*{0}:\s*(?:\r?\n|\r?)";
-                    break;
-
                 case ComponentKeyEnum.ExtractYamlBlock:
-                    regex = @"^{0}-?[ \t]*{1}:\s*\r?\n(?<block>(?:(?!^{0}\S)[ \t]*\S.*\r?\n|^\s*\r?\n)*)"; ;
+                    regex = @"^(?<indent>[ \t]*){0}:\s*\r?\n(?<block>((?:(?!^[ \t]*\S).*?$|^(?!\k<indent>\S)[ \t]+\S.*?$)\r?\n?)*)";
                     break;
 
                 case ComponentKeyEnum.ExtractAllKeyValue:
