@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="WebChat" version="4.3.2" display-name-key="WebChat" description-key="WebChat description" control-type="standard" >
+  <control namespace="PowerCAT" constructor="WebChat" version="4.3.30" display-name-key="WebChat" description-key="WebChat description" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
@@ -14,6 +14,9 @@
     
     <property name="FileColumn" display-name-key="File Column?" of-type="TwoOptions" usage="input" required="true" default-value="false" />
     <property name="FileColumnLogicalName" display-name-key="File Column Logical Name" description-key="Logical name of file column" of-type="SingleLine.Text" usage="input" />
+    <property name="BotAvatarUrl" display-name-key="Bot Avatar Url" description-key="Bot Avatar Url" of-type="SingleLine.Text" usage="input" />
+    <property name="UserAvatarUrl" display-name-key="User Avatar Url" description-key="User Avatar Url" of-type="SingleLine.Text" usage="input" />
+    <property name="SearchMessage" display-name-key="Message To Search" description-key="Message to search" of-type="SingleLine.Text" usage="input" />
     <resources>
       <code path="index.ts" order="1"/>
     </resources>

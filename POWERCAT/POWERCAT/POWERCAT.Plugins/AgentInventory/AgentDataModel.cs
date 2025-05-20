@@ -33,6 +33,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string EnvironmentName { get; set; }
             public string EnvironmentId { get; set; }
             public string EnvironmentType { get; set; }
+            public string EnvironmentUrl { get; set; }
             public string AgentCreatedDate { get; set; }
             public string AgentCreatedBy { get; set; }
             public string AgentModifiedDate { get; set; }
@@ -42,6 +43,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string OrchestrationType { get; set; }
             public string EndUserAuthenticationType { get; set; }
             public bool IsManaged { get; set; }
+            public bool IsTranscriptAvailable { get; set; }
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
             public bool UsesEnhancedSearchResult { get; set; }

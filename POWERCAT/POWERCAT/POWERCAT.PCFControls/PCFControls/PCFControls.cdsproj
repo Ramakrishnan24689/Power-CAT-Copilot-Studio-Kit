@@ -55,6 +55,7 @@
     <ProjectReference Include="..\PFxCodeEditor\PFxCodeEditor.pcfproj" />
     <ProjectReference Include="..\ColorPicker\ColorPicker.pcfproj" />
     <ProjectReference Include="..\ChatBot\ChatBot.pcfproj" />
+    <ProjectReference Include="..\OutputCard\OutputCard.pcfproj" />
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />

@@ -312,6 +312,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_environmentname"] = agentDetails.EnvironmentName;
                 entity["cat_environmentid"] = agentDetails.EnvironmentId.ToString();
                 entity["cat_environmenttype"] = agentDetails.EnvironmentType;
+                entity["cat_environmenturl"] = agentDetails.EnvironmentUrl;
 
                 //Agent created and modified details
                 entity["cat_agentcreatedby"] = agentDetails.AgentCreatedBy;
@@ -331,6 +332,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_description"] = agentDetails.Description;
                 entity["cat_instructions"] = agentDetails.Instructions;
                 entity["cat_managedstate"] = agentDetails.IsManaged == true ? "Managed" : "Unmanaged";
+                entity["cat_istranscriptavailable"] = agentDetails.IsTranscriptAvailable;
 
                 //Agent Configurations
                 entity["cat_usesgenai"] = agentDetails.UsesGenAI;

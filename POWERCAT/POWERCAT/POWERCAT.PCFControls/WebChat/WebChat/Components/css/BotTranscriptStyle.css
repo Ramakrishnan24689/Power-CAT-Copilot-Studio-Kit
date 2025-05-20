@@ -1,81 +1,126 @@
 /* Styles for the chat transcript container */
 .transcript {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 20px;
-    overflow-y: auto;
-    height: 100%;
-    background-color: #f7f7f7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  background-color: #ffffff;
 }
 
 /* Styles for individual messages */
 .message {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px;
-    border-radius: 8px;
-    max-width: 80%;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    white-space: normal;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px;
+  border-radius: 8px;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 /* User messages aligned to the right */
 .message.user {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-    background-color: #e1f5fe;
+  align-self: flex-end;
+  flex-direction: row-reverse;
 }
 
 /* Bot messages aligned to the left */
 .message.bot {
-    align-self: flex-start;
-    background-color: #f1f1f1;
+  align-self: flex-start;
 }
 
 /* Content styling for the message box */
 .message-content {
-    background-color: #ffffff;
-    border: 1px solid #dcdcdc;
-    border-radius: 8px;
-    padding: 20px;
-    width: auto;
-    max-width: 100%;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    white-space: normal;
-    box-sizing: border-box;
+  background-color: #f1f1f1;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  padding: 8px;
+  padding-left: 18px;
+  width: auto;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+  box-sizing: border-box;
+  text-align: left;
+  font-family: "Segoe UI", "Open Sans", sans-serif;
+  font-size: 11px;
 }
 
 /* Styles for the actual message text */
 .message-text {
-    margin: 0;
-    line-height: 1.4;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 14px;
-    color: #333;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    white-space: normal;
+  margin: 0;
+  line-height: 1.4;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
 }
 
 /* Styles for avatars in the messages */
 .avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 /* Styling for the message timestamp */
 .message-timestamp {
-    font-size: 0.8em;
-    color: #888;
-    margin-top: 5px;
-    align-self: flex-end;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 0.6em;
+  color: #888;
+  margin-top: 5px;
+  align-self: flex-end;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.highlight-message {
+  animation: highlight-pulse 2s ease-in-out;
+  background-color: rgba(255, 248, 197, 0.9);
+  border-left: 4px solid #f2c811;
+  box-shadow: 0 0 12px rgba(242, 200, 17, 0.4);
+  position: relative;
+  z-index: 1;
+  transition: all 0.5s ease;
+  transform-origin: center;
+}
+
+/* Add a glow/outline effect to the entire bubble */
+.message .highlight-message {
+  outline: 2px solid rgba(242, 200, 17, 0.3);
+  outline-offset: 2px;
+}
+
+@keyframes highlight-pulse {
+  0% {
+    background-color: rgba(255, 248, 197, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    background-color: rgba(255, 248, 197, 1);
+    transform: scale(1.015);
+  }
+  100% {
+    background-color: rgba(255, 248, 197, 0.9);
+    transform: scale(1);
+  }
+}
+
+@keyframes highlight-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(242, 200, 17, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(242, 200, 17, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(242, 200, 17, 0.3);
+  }
 }

@@ -8,10 +8,6 @@ export class WebChat
   implements ComponentFramework.StandardControl<IInputs, IOutputs>
 {
   private _container!: HTMLDivElement;
-  private _entityName!: string;
-  private _entityId!: string;
-  private _clientUrl!: string;
-  private _fileColumnLogicalName!: string;
   private _value: Transcript = {};
   private _root!: ReactDOM.Root;
 
@@ -30,16 +26,10 @@ export class WebChat
     container: HTMLDivElement
   ): Promise<void> {
     this._container = container;
-    this._entityName = (context as any).page.entityTypeName;
-    this._entityId = (context as any).page.entityId;
-    this._clientUrl = (context as any).page.getClientUrl();
-    this._fileColumnLogicalName =
-      context.parameters.FileColumnLogicalName.raw || "";
 
     // Set container styles for scrolling
-    this._container.style.height = "70.5vh";
+    this._container.style.height = "100%";
     this._container.style.overflowY = "auto";
-    this._container.style.backgroundColor = "#f7f7f7";
 
     this._root = ReactDOM.createRoot(this._container);
     await this.updateView(context);
@@ -52,18 +42,32 @@ export class WebChat
   public async updateView(
     context: ComponentFramework.Context<IInputs>
   ): Promise<void> {
-    if (context.parameters.FileColumn.raw) {
-      try {
-        this._value = (await this.getFileContent()) || {};
-      } catch (error) {
-        throw new Error(`Error fetching file content: ${error}`);
+    try {
+      const botAvatarUrl = context.parameters.BotAvatarUrl.raw || "";
+      const userAvatarUrl = context.parameters.UserAvatarUrl.raw || "";
+      const searchMessage = context.parameters.SearchMessage.raw || "";
+
+      //Check if the file column is used for transcript
+      if (context.parameters.FileColumn.raw) {
+        this._value = (await this.getFileContent(context)) || {};
+      } else {
+        const rawValue = context.parameters.Value.raw;
+        this._value =
+          typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue || {};
       }
-    } else {
-      const rawValue = context.parameters.Value.raw;
-      this._value =
-        typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue || {};
+
+      // render the BotTranscript component
+      this._root.render(
+        React.createElement(BotTranscript, {
+          transcript: this._value,
+          botAvatarUrl: botAvatarUrl,
+          userAvatarUrl: userAvatarUrl,
+          searchMessage: searchMessage,
+        })
+      );
+    } catch (error) {
+      throw new Error(`Error rendering the component..: ${error}`);
     }
-    this.renderComponent();
   }
 
   /**
@@ -90,13 +94,20 @@ export class WebChat
 
   /**
    * Fetches the file content from the specified URL.
-   *
-   * @returns The transcript content.
+   * @param context The context object containing the parameters.
+   * @returns The file content as a Transcript object.
    */
-  private async getFileContent(): Promise<Transcript> {
+  private async getFileContent(
+    context: ComponentFramework.Context<IInputs>
+  ): Promise<Transcript> {
+    const fileColumnLogicalName =
+      context.parameters.FileColumnLogicalName.raw || "";
+    const entityName = (context as any).page.entityTypeName;
+    const entityId = (context as any).page.entityId;
+    const clientUrl = (context as any).page.getClientUrl();
+    const url = `${clientUrl}/api/data/v9.2/${entityName}s(${entityId})/${fileColumnLogicalName}/$value`;
     let startBytes = 0;
     const increment = 4194304; // 4MB increment
-    const url = `${this._clientUrl}/api/data/v9.2/${this._entityName}s(${this._entityId})/${this._fileColumnLogicalName}/$value`;
     let finalContent = "";
     let fileSize = 0;
 
@@ -125,14 +136,5 @@ export class WebChat
     }
 
     return JSON.parse(finalContent) as Transcript;
-  }
-
-  /**
-   * Renders the BotTranscript component using React.
-   */
-  private renderComponent(): void {
-    this._root.render(
-      React.createElement(BotTranscript, { transcript: this._value })
-    );
   }
 }

@@ -49,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="BotAuthenticationService\" />
+    <Folder Include="ConversationKpi\" />
     <Folder Include="ResourceFiles\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
