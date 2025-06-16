@@ -14,6 +14,7 @@ using System.Security.Authentication;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace POWERCAT.Plugins.DirectLineApi
 {
     /// <summary>
@@ -66,7 +67,7 @@ namespace POWERCAT.Plugins.DirectLineApi
                 string conversationId = string.Empty;
                 string tokenResponse = string.Empty;
                 #endregion
-               
+
                 //Invoke apis based on message name
                 switch (messageName)
                 {
@@ -242,6 +243,37 @@ namespace POWERCAT.Plugins.DirectLineApi
         }
 
         /// <summary>
+        /// Retrieves the client secret based on the user authentication secret location code.
+        /// </summary>
+        /// <param name="agentConfigRecord">The agent configuration record.</param>
+        /// <param name="service">The organization service instance.</param>
+        /// <returns>The client secret.</returns>
+        private string GetClientSecret(Entity agentConfigRecord, IOrganizationService service)
+        {
+            // Get the user authentication secret location code as an OptionSetValue
+            OptionSetValue userAuthSecretLocationCode = agentConfigRecord.GetAttributeValue<OptionSetValue>("cat_userauthsecretlocationcode");
+            string clientSecret = string.Empty;
+            // Check if the OptionSetValue is not null and its Value equals 1
+            if (userAuthSecretLocationCode != null && userAuthSecretLocationCode.Value == 1)
+            {
+                clientSecret = agentConfigRecord.GetAttributeValue<string>("cat_clientsecret");
+            }
+            else
+            {
+                string environmentSecretVariable = agentConfigRecord.GetAttributeValue<string>("cat_userauthenvironmentvariable");
+                OrganizationRequest actionRequest = new OrganizationRequest("RetrieveEnvironmentVariableSecretValue");
+                actionRequest["EnvironmentVariableName"] = environmentSecretVariable;
+                OrganizationResponse response = service.Execute(actionRequest);
+                if (response.Results.Contains("EnvironmentVariableSecretValue"))
+                {
+                    clientSecret = (string)response.Results["EnvironmentVariableSecretValue"];
+                }
+            }
+
+            return clientSecret;
+        }
+
+        /// <summary>
         /// Authenticates the end user using authorization code.
         /// </summary>
         /// <param name="token">The bearer direct line token for authentication.</param>
@@ -261,7 +293,7 @@ namespace POWERCAT.Plugins.DirectLineApi
             IOrganizationService service)
         {
             // Get agent configuration
-            ColumnSet columns = new ColumnSet("cat_clientid", "cat_clientsecret", "cat_tenantid");
+            ColumnSet columns = new ColumnSet("cat_clientid", "cat_clientsecret", "cat_tenantid", "cat_userauthsecretlocationcode", "cat_userauthenvironmentvariable");
             Entity agentConfigRecord = service.Retrieve("cat_copilotconfiguration", new Guid(agentConfigId), columns);
 
             if (agentConfigRecord == null)
@@ -270,7 +302,7 @@ namespace POWERCAT.Plugins.DirectLineApi
             }
 
             string clientId = agentConfigRecord.GetAttributeValue<string>("cat_clientid");
-            string clientSecret = agentConfigRecord.GetAttributeValue<string>("cat_clientsecret");
+            string clientSecret = GetClientSecret(agentConfigRecord, service); // Call the method to get the client secret
             string tenantId = agentConfigRecord.GetAttributeValue<string>("cat_tenantid");
 
             // Exchange auth code for token
@@ -362,7 +394,7 @@ namespace POWERCAT.Plugins.DirectLineApi
                     name = "CopilotStudioKit"
                 }
             };
-            
+
             string body = JsonConvert.SerializeObject(requestBody);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
