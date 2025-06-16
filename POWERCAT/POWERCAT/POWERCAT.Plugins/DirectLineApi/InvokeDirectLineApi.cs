@@ -390,7 +390,7 @@ namespace POWERCAT.Plugins.DirectLineApi
             // Get the user authentication secret location code as an OptionSetValue
             OptionSetValue userAuthSecretLocationCode = agentConfigRecord.GetAttributeValue<OptionSetValue>("cat_userauthsecretlocationcode");
             string clientSecret = string.Empty;
-            // Check if the OptionSetValue is not null and its Value equals 1
+            // Check if the OptionSetValue is not null and its Value equals 2
             if (userAuthSecretLocationCode != null && userAuthSecretLocationCode.Value == 2)
             {
                 string environmentSecretVariable = agentConfigRecord.GetAttributeValue<string>("cat_userauthenvironmentvariable");
