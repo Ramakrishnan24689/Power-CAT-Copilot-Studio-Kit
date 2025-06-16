@@ -243,37 +243,6 @@ namespace POWERCAT.Plugins.DirectLineApi
         }
 
         /// <summary>
-        /// Retrieves the client secret based on the user authentication secret location code.
-        /// </summary>
-        /// <param name="agentConfigRecord">The agent configuration record.</param>
-        /// <param name="service">The organization service instance.</param>
-        /// <returns>The client secret.</returns>
-        private string GetClientSecret(Entity agentConfigRecord, IOrganizationService service)
-        {
-            // Get the user authentication secret location code as an OptionSetValue
-            OptionSetValue userAuthSecretLocationCode = agentConfigRecord.GetAttributeValue<OptionSetValue>("cat_userauthsecretlocationcode");
-            string clientSecret = string.Empty;
-            // Check if the OptionSetValue is not null and its Value equals 1
-            if (userAuthSecretLocationCode != null && userAuthSecretLocationCode.Value == 1)
-            {
-                clientSecret = agentConfigRecord.GetAttributeValue<string>("cat_clientsecret");
-            }
-            else
-            {
-                string environmentSecretVariable = agentConfigRecord.GetAttributeValue<string>("cat_userauthenvironmentvariable");
-                OrganizationRequest actionRequest = new OrganizationRequest("RetrieveEnvironmentVariableSecretValue");
-                actionRequest["EnvironmentVariableName"] = environmentSecretVariable;
-                OrganizationResponse response = service.Execute(actionRequest);
-                if (response.Results.Contains("EnvironmentVariableSecretValue"))
-                {
-                    clientSecret = (string)response.Results["EnvironmentVariableSecretValue"];
-                }
-            }
-
-            return clientSecret;
-        }
-
-        /// <summary>
         /// Authenticates the end user using authorization code.
         /// </summary>
         /// <param name="token">The bearer direct line token for authentication.</param>
@@ -407,6 +376,38 @@ namespace POWERCAT.Plugins.DirectLineApi
             return response.IsSuccessStatusCode
                 ? responseContent
                 : $"Error: {response.StatusCode} - {response.ReasonPhrase}\nResponse:\n{responseContent}";
+        }
+
+
+        /// <summary>
+        /// Retrieves the client secret based on the user authentication secret location code.
+        /// </summary>
+        /// <param name="agentConfigRecord">The agent configuration record.</param>
+        /// <param name="service">The organization service instance.</param>
+        /// <returns>The client secret.</returns>
+        private string GetClientSecret(Entity agentConfigRecord, IOrganizationService service)
+        {
+            // Get the user authentication secret location code as an OptionSetValue
+            OptionSetValue userAuthSecretLocationCode = agentConfigRecord.GetAttributeValue<OptionSetValue>("cat_userauthsecretlocationcode");
+            string clientSecret = string.Empty;
+            // Check if the OptionSetValue is not null and its Value equals 2
+            if (userAuthSecretLocationCode != null && userAuthSecretLocationCode.Value == 2)
+            {
+                string environmentSecretVariable = agentConfigRecord.GetAttributeValue<string>("cat_userauthenvironmentvariable");
+                OrganizationRequest actionRequest = new OrganizationRequest("RetrieveEnvironmentVariableSecretValue");
+                actionRequest["EnvironmentVariableName"] = environmentSecretVariable;
+                OrganizationResponse response = service.Execute(actionRequest);
+                if (response.Results.Contains("EnvironmentVariableSecretValue"))
+                {
+                    clientSecret = (string)response.Results["EnvironmentVariableSecretValue"];
+                }
+            }
+            else
+            {
+                clientSecret = agentConfigRecord.GetAttributeValue<string>("cat_clientsecret");
+            }
+
+            return clientSecret;
         }
     }
 }
