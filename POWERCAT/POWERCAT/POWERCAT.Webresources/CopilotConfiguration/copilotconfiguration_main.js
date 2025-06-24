@@ -544,7 +544,6 @@ function sharepointValidation(formContext, selectedEntityTypeName) {
   Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (
     error
   ) {
-    console.error("Error navigating to Sharepoint Validation:", error);
     formContext.ui.setFormNotification(
       "Error generating Sharepoint Validation: " + error.message,
       "ERROR",
