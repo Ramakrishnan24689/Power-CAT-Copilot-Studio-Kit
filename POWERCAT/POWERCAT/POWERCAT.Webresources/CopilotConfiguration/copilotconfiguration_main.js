@@ -519,3 +519,38 @@ function removeNotification(formContext, uniqueId) {
         formContext.ui.clearFormNotification(uniqueId);
     }, 7000);
 }
+
+/**
+ * @function sharepointValidation
+ * @description SharePoint Validation for selected duration
+ * @param {object} formContext - The form context.
+ * @param {string} selectedEntityTypeName - The entity name.
+ */
+function sharepointValidation(formContext, selectedEntityTypeName) {
+  "use strict";
+  const pageInput = {
+    pageType: "custom",
+    name: "cat_validatesharepointconnection_d362d",
+    entityName: selectedEntityTypeName,
+    recordId: formContext.data.entity.getId(),
+  };
+  const navigationOptions = {
+    target: 2,
+    position: 1,
+    height: 280,
+    width: 530,
+    title: "Sharepoint Validation",
+  };
+  Xrm.Navigation.navigateTo(pageInput, navigationOptions).catch(function (
+    error
+  ) {
+    formContext.ui.setFormNotification(
+      "Error generating Sharepoint Validation: " + error.message,
+      "ERROR",
+      "SHAREPOINT_VALIDATION_ERROR"
+    );
+    setTimeout(function () {
+      formContext.ui.clearFormNotification("SHAREPOINT_VALIDATION_ERROR");
+    }, 8000);
+  });
+}
