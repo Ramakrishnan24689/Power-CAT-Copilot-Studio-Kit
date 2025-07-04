@@ -278,7 +278,10 @@ namespace POWERCAT.Plugins.AgentInventory
 
                 }
 
-                //If agent has actions or prompts or knowledge sources or mcp or customize response or classic generative answer sources or ai knowledge or orchestration type is generative then set to true
+                // Determines whether the agent utilizes generative AI capabilities by evaluating multiple other properties.
+                // If any of the following properties are true: 
+                // UsesActions, UsesAIKnowledge, UsesKnowledgeSources, UsesPrompts, UsesClassicGenerativeAnswersSources, UsesMCP, and UsesCustomizedResponse. 
+                // Also checks if the orchestration type is explicitly set to "Generative".
                 agentDetails.UsesGenAI = agentDetails.UsesActions || agentDetails.UsesAIKnowledge ||
                                              agentDetails.UsesKnowledgeSources || agentDetails.UsesPrompts || agentDetails.UsesClassicGenerativeAnswersSources ||
                                              agentDetails.UsesMCP || agentDetails.UsesCustomizedResponse ||
