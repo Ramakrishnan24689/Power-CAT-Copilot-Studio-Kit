@@ -149,7 +149,7 @@ function setFieldVisibilityForEachSections(executionContext) {
         .getAttribute("cat_userauthsecretlocationcode")
         .getValue();
     if (uasecretLocation === 1 && configurationTypeValues.includes(1)) {
-        // Show and require cat_clientsecret
+        // Show and require client secret
         setFieldVisibility(
             formContext,
             ["cat_clientsecret"],
@@ -158,7 +158,7 @@ function setFieldVisibilityForEachSections(executionContext) {
         );
         clearAndHideFields(formContext, ["cat_userauthenvironmentvariable"]);
     } else if (uasecretLocation === 2 && configurationTypeValues.includes(1)) {
-        // Show and require cat_userauthenvironmentvariable
+        // Show and require user authentication environment variable
         setFieldVisibility(
             formContext,
             ["cat_userauthenvironmentvariable"],
@@ -522,7 +522,7 @@ function removeNotification(formContext, uniqueId) {
 
 /**
  * @function sharepointValidation
- * @description SharePoint Validation for selected duration
+ * @description This function opens a custom page to validate SharePoint connection and display file and page counts.
  * @param {object} formContext - The form context.
  * @param {string} selectedEntityTypeName - The entity name.
  */
