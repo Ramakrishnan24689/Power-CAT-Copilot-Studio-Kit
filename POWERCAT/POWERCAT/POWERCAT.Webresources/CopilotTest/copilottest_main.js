@@ -145,7 +145,7 @@ function getMaxOrderValueWebApi(parentRecordId) {
 }
 
 /** @globalvariable used for holding the original Choices of Comparison operator*/
-var fullComparisonOptions = []; // Cache the full list on form load
+let fullComparisonOptions = []; // Cache the full list on form load
 
 /**
  * @function  setChoicesForComparisonOperatorOnFormLoad function to retrieve the original choices of comparison operator and set the choices.
@@ -181,13 +181,18 @@ function setChoicesForComparisonOperator(executionContext) {
 
     if (!testTypeValue || !comparisonControl || !comparisonAttr) return;
 
+    const TestType = {
+        RESPONSE_OR_OTHERS: 1,
+        ATTACHMENTS: 3
+    };
+
      // Sort full options by value in ascending order like choices 1 2 3 4 5 6 7 8 9
     const sortedOptions = [...fullComparisonOptions].sort((a, b) => a.value - b.value);
 
     // Define allowed options for each test type
     const comparisonOperatorOptions = {
-        1: fullComparisonOptions.slice(0, -1), // all choices except last(AI Validation)
-        3: [...sortedOptions.slice(0, 4), sortedOptions[sortedOptions.length - 1]] 
+        [TestType.RESPONSE_OR_OTHERS]: fullComparisonOptions.slice(0, -1), // all choices except last(AI Validation)
+        [TestType.ATTACHMENTS]: [...sortedOptions.slice(0, 4), sortedOptions[sortedOptions.length - 1]] 
         // first 4 options 1 2 3 4 - equals, not equals, contains, not contains and last one(AI Validation)
     };
     
@@ -216,8 +221,8 @@ function setChoicesForComparisonOperator(executionContext) {
 }
 
 /** @globalvariable previousComparisonOperator used for holding the previous selection of choice and isInitialLoad flag for form load */
-var previousComparisonOperator = null;
-var isInitialLoad = true;
+let previousComparisonOperator = null;
+let isInitialLoad = true;
 
 /**
  * @function updateValidationInstructionField function to update the label and clear the input field when the comparison operator selection changes.
@@ -237,9 +242,18 @@ function updateValidationInstructionField(executionContext) {
     const testTypeValue = testTypeAttr.getValue();
     const currentValue = comparisonAttr.getValue();
 
+    const ComparisonOperator = {
+        CONTAINS: 3,
+        NOT_CONTAINS: 4
+    };
+
+    const TestType = {
+        ATTACHMENTS: 3
+    };
+
     // Dynamically get values for "Contains" and "Does Not Contain"
     const containsOrNotContains = fullComparisonOptions
-        .filter(option => option.value === 3 || option.value === 4)
+        .filter(option => option.value === ComparisonOperator.CONTAINS || option.value === ComparisonOperator.NOT_CONTAINS)
         .map(option => option.value);
 
     // 1. Update label based on current value
@@ -250,7 +264,7 @@ function updateValidationInstructionField(executionContext) {
     }
 
     // 2. Clear field if switching between AI Validation and Contains/Not Contains
-    if (!isInitialLoad && testTypeValue === 3 && previousComparisonOperator !== null) {
+    if (!isInitialLoad && testTypeValue === TestType.ATTACHMENTS && previousComparisonOperator !== null) {
         // Assume last option is "AI Validation"
         const aiValidationValue = fullComparisonOptions[fullComparisonOptions.length - 1].value;
 
