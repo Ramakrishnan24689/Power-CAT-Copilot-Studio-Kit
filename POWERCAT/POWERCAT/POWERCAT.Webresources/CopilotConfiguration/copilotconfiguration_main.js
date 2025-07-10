@@ -308,9 +308,12 @@ function setFieldVisibilityForEachSections(executionContext) {
         section.controls.get("cat_dataverseurl2").setVisible(true);
         formContext.getAttribute("cat_dataverseurl").setRequiredLevel("required");
         section.controls.get("cat_iscopyfulltranscriptenabled1").setVisible(true);
+        section.controls.get("cat_copilotid2").setVisible(true);
+        formContext.getAttribute("cat_copilotid").setRequiredLevel("required");
     } else {
         section.controls.get("cat_dataverseurl2").setVisible(false);
         section.controls.get("cat_iscopyfulltranscriptenabled1").setVisible(false);
+        section.controls.get("cat_copilotid2").setVisible(false);
     }
 }
 
