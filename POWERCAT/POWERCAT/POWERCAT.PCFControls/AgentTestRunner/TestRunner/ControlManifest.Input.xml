@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="PowerCAT" constructor="TestRunner" version="2.0.16" display-name-key="TestRunner" description-key="TestRunner_Desc" control-type="standard">
+    
+    <external-service-usage enabled="true">
+      <domain>login.microsoftonline.com</domain>        <!-- Azure AD Authentication -->
+      <domain>api.powerplatform.com</domain>           <!-- Power Platform APIs -->
+      <domain>*.crm.dynamics.com</domain>              <!-- Dataverse instances -->
+      <domain>*.dynamics.com</domain>                  <!-- General Dynamics 365 domains -->
+    </external-service-usage>
+    
+    <!-- Properties for the Test Runner control -->
+    <property name="TestRunId" display-name-key="TestRunId_Display" description-key="TestRunId_Desc" of-type="SingleLine.Text" usage="bound" required="false" />
+    
+    <resources>
+      <code path="index.ts" order="1"/>
+      <resx path="strings/TestRunner.1033.resx" version="1.0.0" />
+    </resources>
+    
+    <feature-usage>
+      <uses-feature name="WebAPI" required="true" />
+      <uses-feature name="Utility" required="true" />
+    </feature-usage>
+  </control>
+</manifest>
