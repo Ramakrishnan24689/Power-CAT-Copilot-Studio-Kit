@@ -1,6 +1,21 @@
 /**
- * Test Execution Engine for Multiturn Tests
- * Handles the execution of child tests within multiturn conversations.
+ * TestExecutionEngine.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides execution engine capabilities for child tests within multiturn conversation
+ * scenarios. Handles individual test execution, result aggregation, parent test updates,
+ * and comprehensive summary generation for multiturn test scenarios.
+ *
+ * Exports:
+ *   - TestExecutionEngine: Main execution engine for multiturn child test processing.
+ *   - ChildTestResult: Interface defining child test execution result structure.
+ *
+ * Usage:
+ *   const engine = new TestExecutionEngine(orchestrator, dataverseService);
+ *   const results = await engine.executeChildTests(children, conversationId, testRunId, config);
+ *   const allPassed = engine.allTestsPassed(results);
  */
 
 import { MultiturnTestOrchestrator } from "./MultiturnTestOrchestrator";
@@ -12,19 +27,29 @@ import type {
 } from "../shared/models/DataModels";
 
 /**
- * Constants for TestExecutionEngine
+ * Constants for TestExecutionEngine operations
  */
 const TEST_EXECUTION_ENGINE_CONSTANTS = {
-  SERVICE_NAME: "TestExecutionEngine",
   ERROR_MESSAGES: {
     SERVICES_REQUIRED: "Required services not provided",
   },
 } as const;
 
 /**
- * Result from executing child test
+ * Result code constants for test execution
  */
-interface ChildTestResult {
+const RESULT_CODES = {
+  SUCCESS: 1,
+  FAILED: 2,
+  UNKNOWN: 3,
+  ERROR: 4,
+  PENDING: 5,
+} as const;
+
+/**
+ * Result structure from executing individual child test
+ */
+export interface ChildTestResult {
   testCase: AgentTestCase;
   response: AgentResponse;
   success: boolean;
@@ -32,12 +57,12 @@ interface ChildTestResult {
 }
 
 /**
- * Engine for executing child tests in a multiturn conversation
+ * Execution engine for processing child tests within multiturn conversation scenarios.
+ * Provides orchestration, error handling, and comprehensive result analysis.
  */
 export class TestExecutionEngine {
   private readonly conversationManager: MultiturnTestOrchestrator;
   private readonly dataverseService: IDataverseOperations;
-  private readonly serviceName = TEST_EXECUTION_ENGINE_CONSTANTS.SERVICE_NAME;
 
   constructor(
     conversationManager: MultiturnTestOrchestrator,
@@ -53,9 +78,29 @@ export class TestExecutionEngine {
     this.dataverseService = dataverseService;
   }
 
+  /**
+   * Validates if a result code indicates test failure.
+   * @param resultCode - The result code to validate (2=FAILED, 3=UNKNOWN, 4=ERROR)
+   * @returns True if the result code indicates failure
+   */
   private isFailureResultCode(resultCode: number): boolean {
-    return resultCode === 2 || resultCode === 3 || resultCode === 4; // FAILED, UNKNOWN, ERROR
+    return (
+      resultCode === RESULT_CODES.FAILED ||
+      resultCode === RESULT_CODES.UNKNOWN ||
+      resultCode === RESULT_CODES.ERROR
+    );
   }
+
+  /**
+   * Executes all child tests in sequence within a multiturn conversation.
+   * Handles error scenarios and stops execution for critical test failures.
+   * @param childTests - Array of child test cases to execute
+   * @param conversationId - The conversation identifier for message context
+   * @param testRunId - Associated test run identifier
+   * @param configuration - Agent configuration for test execution
+   * @param parentTestResultId - Optional parent test result for relationship tracking
+   * @returns Promise resolving to array of child test execution results
+   */
 
   async executeChildTests(
     childTests: AgentTestCase[],
@@ -97,7 +142,7 @@ export class TestExecutionEngine {
             error
           ),
           success: false,
-          actualResultCode: 4, // 4 = ERROR
+          actualResultCode: RESULT_CODES.ERROR,
         };
 
         results.push(errorResult);
@@ -120,6 +165,17 @@ export class TestExecutionEngine {
     return results;
   }
 
+  /**
+   * Executes an individual child test within the conversation context.
+   * Handles start conversation activity for first child test and creates test results.
+   * @param childTest - Child test case to execute
+   * @param conversationId - The conversation identifier for message context
+   * @param testRunId - Associated test run identifier
+   * @param configuration - Agent configuration for test execution
+   * @param parentTestResultId - Optional parent test result for relationship tracking
+   * @param isFirstChildTest - Whether this is the first child test in the sequence
+   * @returns Promise resolving to child test execution result
+   */
   async executeIndividualChildTest(
     childTest: AgentTestCase,
     conversationId: string,
@@ -162,6 +218,16 @@ export class TestExecutionEngine {
     };
   }
 
+  /**
+   * Creates a child test result in Dataverse and retrieves the actual result code.
+   * Handles test result creation and code retrieval with proper error handling.
+   * @param childTest - Child test case definition
+   * @param testRunId - Associated test run identifier
+   * @param response - Agent response from the test execution
+   * @param configuration - Agent configuration used for testing
+   * @param parentTestResultId - Optional parent test result for relationship tracking
+   * @returns Promise resolving to test result ID and actual result code
+   */
   private async createChildTestResult(
     childTest: AgentTestCase,
     testRunId: string,
@@ -182,15 +248,25 @@ export class TestExecutionEngine {
         const actualResultCode = await this.dataverseService.getTestResultCode(
           testResultId
         );
-        return { testResultId, actualResultCode: actualResultCode || 4 }; // 4 = ERROR
+        return {
+          testResultId,
+          actualResultCode: actualResultCode || RESULT_CODES.ERROR,
+        };
       }
 
-      return { testResultId: null, actualResultCode: 4 }; // 4 = ERROR
+      return { testResultId: null, actualResultCode: RESULT_CODES.ERROR };
     } catch (error) {
-      return { testResultId: null, actualResultCode: 4 }; // 4 = ERROR
+      return { testResultId: null, actualResultCode: RESULT_CODES.ERROR };
     }
   }
 
+  /**
+   * Updates parent test result with aggregated data from child test results.
+   * Handles the rollup of child test outcomes to the parent test result.
+   * @param parentTestResultId - Parent test result identifier
+   * @param childResults - Array of child test execution results
+   * @returns Promise that resolves when update is complete
+   */
   private async updateParentTestResultFromChildren(
     parentTestResultId: string,
     childResults: ChildTestResult[]
@@ -210,46 +286,14 @@ export class TestExecutionEngine {
     }
   }
 
-  calculateSuccessRate(childResults: ChildTestResult[]): number {
-    if (childResults.length === 0) return 0;
-    const successfulTests = childResults.filter(
-      (result) => result.success
-    ).length;
-    return Math.round((successfulTests / childResults.length) * 100);
-  }
-
-  evaluateOverallSuccess(childResults: ChildTestResult[]): boolean {
-    return this.calculateSuccessRate(childResults) === 100;
-  }
-
-  generateExecutionSummary(childResults: ChildTestResult[]): {
-    totalTests: number;
-    successfulTests: number;
-    failedTests: number;
-    successRate: number;
-    overallSuccess: boolean;
-    avgResponseTime: number;
-  } {
-    const totalTests = childResults.length;
-    const successfulTests = childResults.filter(
-      (result) => result.success
-    ).length;
-    const successRate = this.calculateSuccessRate(childResults);
-    const overallSuccess = this.evaluateOverallSuccess(childResults);
-
-    const totalResponseTime = childResults.reduce(
-      (sum, result) => sum + (result.response.responseTime || 0),
-      0
+  /**
+   * Determines if all child tests passed successfully.
+   * @param childResults - Array of child test execution results
+   * @returns True if all tests succeeded, false otherwise
+   */
+  allTestsPassed(childResults: ChildTestResult[]): boolean {
+    return (
+      childResults.length > 0 && childResults.every((result) => result.success)
     );
-    const avgResponseTime = totalTests > 0 ? totalResponseTime / totalTests : 0;
-
-    return {
-      totalTests,
-      successfulTests,
-      failedTests: totalTests - successfulTests,
-      successRate,
-      overallSuccess,
-      avgResponseTime,
-    };
   }
 }

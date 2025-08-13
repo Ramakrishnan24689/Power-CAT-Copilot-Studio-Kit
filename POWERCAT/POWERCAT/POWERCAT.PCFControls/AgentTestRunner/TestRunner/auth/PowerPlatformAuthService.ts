@@ -1,3 +1,23 @@
+/**
+ * PowerPlatformAuthService.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides secure Power Platform authentication using Microsoft Authentication Library (MSAL).
+ * Handles token acquisition, caching, and management for Power Platform API operations
+ * with support for both silent and interactive authentication flows.
+ *
+ * Exports:
+ *   - AgentConfig: Configuration interface for authentication parameters.
+ *   - PowerPlatformAuthService: Main class for secure token acquisition and management.
+ *
+ * Usage:
+ *   const authService = new PowerPlatformAuthService();
+ *   authService.initialize(agentConfig);
+ *   const token = await authService.acquireToken();
+ */
+
 import {
   PublicClientApplication,
   Configuration,
@@ -18,20 +38,22 @@ export interface AgentConfig {
 
 /**
  * Power Platform Authentication service using MSAL (Microsoft Authentication Library)
- * Provides secure token acquisition for Power Platform operations
+ * Provides secure token acquisition for Power Platform operations with automatic token caching
+ * and support for both silent and interactive authentication flows.
  * @class PowerPlatformAuthService
  */
 export class PowerPlatformAuthService {
   private msalInstance: PublicClientApplication | null = null;
   private config: AgentConfig | null = null;
-  private scopes = ["https://api.powerplatform.com/.default"];
+  private readonly scopes = ["https://api.powerplatform.com/.default"];
   private cachedToken: string | null = null;
   private tokenExpiryTime: Date | null = null;
 
   /**
    * Initialize MSAL instance with agent configuration
-   * @param agentConfig - Configuration containing clientId, tenantId, etc.
-   * @throws {Error} When required configuration is missing
+   * Sets up authentication parameters and creates MSAL client for token acquisition
+   * @param agentConfig - Configuration containing clientId, tenantId, environmentId, and botIdentifier
+   * @throws {Error} When required configuration parameters are missing
    */
   initialize(agentConfig: AgentConfig): void {
     // Validate required configuration
@@ -41,7 +63,7 @@ export class PowerPlatformAuthService {
 
     this.config = agentConfig;
 
-    // Configure MSAL with secure settings
+    // Configure MSAL with secure settings for browser environment
     const msalConfig: Configuration = {
       auth: {
         clientId: agentConfig.clientId,
@@ -59,10 +81,10 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Main method to acquire authentication token
-   * Uses cached token if valid, otherwise performs authentication flow
-   * @returns {Promise<string>} Access token for API calls
-   * @throws {Error} When authentication fails
+   * Acquire authentication token for Power Platform API calls
+   * Returns cached token if valid, otherwise performs full authentication flow
+   * @returns {Promise<string>} Access token for API operations
+   * @throws {Error} When authentication initialization or token acquisition fails
    */
   async acquireToken(): Promise<string> {
     // Return cached token if still valid
@@ -80,15 +102,15 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Check if authentication service is properly initialized
-   * @returns {boolean} True if MSAL instance and config are available
+   * Check if authentication service has been properly initialized
+   * @returns {boolean} True if MSAL instance and configuration are available
    */
   isInitialized(): boolean {
     return this.msalInstance !== null && this.config !== null;
   }
 
   /**
-   * Check if cached token is still valid
+   * Check if cached token is still valid and not expired
    * @returns {boolean} True if cached token exists and hasn't expired
    * @private
    */
@@ -101,8 +123,8 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Validate that MSAL has been properly initialized
-   * @throws {Error} When MSAL instance or config is missing
+   * Validate that MSAL has been properly initialized before token operations
+   * @throws {Error} When MSAL instance or configuration is missing
    * @private
    */
   private validateInitialization(): void {
@@ -114,7 +136,7 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Initialize the MSAL instance asynchronously
+   * Initialize the MSAL instance asynchronously for browser compatibility
    * @private
    */
   private async initializeMsalInstance(): Promise<void> {
@@ -123,7 +145,7 @@ export class PowerPlatformAuthService {
 
   /**
    * Ensure user has valid account, perform interactive login if needed
-   * @returns {Promise<AccountInfo[]>} Array of user accounts
+   * @returns {Promise<AccountInfo[]>} Array of authenticated user accounts
    * @private
    */
   private async ensureUserIsLoggedIn(): Promise<AccountInfo[]> {
@@ -138,9 +160,9 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Attempt silent token acquisition, fallback to interactive if needed
-   * @param accounts - User accounts from MSAL
-   * @returns {Promise<string>} Access token
+   * Attempt silent token acquisition first, fallback to interactive if needed
+   * @param accounts - Authenticated user accounts from MSAL
+   * @returns {Promise<string>} Access token for API operations
    * @private
    */
   private async acquireTokenSilentOrInteractive(
@@ -162,7 +184,8 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Perform interactive login when no accounts exist
+   * Perform interactive login popup when no cached accounts exist
+   * @throws {Error} When interactive login fails
    * @private
    */
   private async performInteractiveLogin(): Promise<void> {
@@ -176,8 +199,9 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Perform interactive token acquisition
-   * @returns {Promise<AuthenticationResult>} Authentication result with token
+   * Perform interactive token acquisition popup when silent acquisition fails
+   * @returns {Promise<AuthenticationResult>} Authentication result with access token
+   * @throws {Error} When interactive token acquisition fails
    * @private
    */
   private async performInteractiveLoginForToken(): Promise<AuthenticationResult> {
@@ -196,9 +220,9 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Cache the authentication token and return it
-   * @param result - Authentication result from MSAL
-   * @returns {string} Access token
+   * Cache the authentication token and return it for immediate use
+   * @param result - Authentication result from MSAL containing token and expiry
+   * @returns {string} Access token for API operations
    * @private
    */
   private cacheAndReturnToken(result: AuthenticationResult): string {
@@ -210,9 +234,9 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Extract error message from unknown error object
+   * Extract error message from unknown error object for consistent error reporting
    * @param error - Error object of unknown type
-   * @returns {string} Error message string
+   * @returns {string} Human-readable error message
    * @private
    */
   private getErrorMessage(error: unknown): string {

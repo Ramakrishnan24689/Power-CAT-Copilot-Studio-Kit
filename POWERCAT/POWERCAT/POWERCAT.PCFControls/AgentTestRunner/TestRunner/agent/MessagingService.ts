@@ -1,3 +1,22 @@
+/**
+ * MessagingService.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Handles agent communication, message processing, and response validation
+ * for Agent testing scenarios. Manages conversation lifecycle,
+ * processes agent responses, and validates results against test expectations.
+ *
+ * Exports:
+ *   - MessagingService: Main service for agent communication and response processing.
+ *
+ * Usage:
+ *   const service = new MessagingService(conversationManager);
+ *   const response = await service.sendMessage(message, testCase);
+ *   const continuedResponse = await service.continueConversation(message, conversationId, testCase);
+ */
+
 import type { Activity } from "@microsoft/agents-activity";
 import { ConversationManager } from "./ConversationManager";
 import { MessageProcessor } from "./MessageProcessor";
@@ -8,6 +27,11 @@ import type {
   AdaptiveCard,
 } from "../shared/models/DataModels";
 
+/**
+ * MessagingService manages agent communication and response processing.
+ * Provides methods for sending messages, continuing conversations, and validating responses
+ * against expected test case outcomes.
+ */
 export class MessagingService {
   private conversationManager: ConversationManager;
   private messageProcessor: MessageProcessor;
@@ -18,20 +42,20 @@ export class MessagingService {
   }
 
   /**
-   * Helper method to filter activities with text content
-   * @param activities - Array of activities to filter
-   * @returns Array of text content from activities
+   * Extracts text content from activities array.
+   * @param activities - Activities to filter for text content
+   * @returns Array of trimmed text strings
    */
   private extractTextFromActivities(activities: Activity[]): string[] {
     return activities
-      .filter((activity) => activity.text && activity.text.trim().length > 0)
+      .filter((activity) => activity.text?.trim())
       .map((activity) => activity.text!.trim());
   }
 
   /**
-   * Helper method to create simplified response format for JSON storage
-   * @param activities - Array of activities to simplify
-   * @returns Array of simplified response objects
+   * Creates simplified response format for JSON storage.
+   * @param activities - Activities to convert to simplified format
+   * @returns Array of simplified response objects with text, attachments, and suggested actions
    */
   private createSimplifiedResponses(
     activities: Activity[]
@@ -45,25 +69,14 @@ export class MessagingService {
         text: activity.text?.trim() || "",
       };
 
-      // Include attachments if they exist (for adaptive cards)
-      if (
-        activity.attachments &&
-        Array.isArray(activity.attachments) &&
-        activity.attachments.length > 0
-      ) {
+      if (activity.attachments?.length) {
         result.attachments = activity.attachments;
       }
 
-      // Include suggested actions if they exist (for position-based logic in extractSuggestedActionsJson)
-      // Note: These are needed for position-based suggested actions extraction
-      // The global suggestedActions field is still used for overall processing
       if (activity.suggestedActions) {
-        if (Array.isArray(activity.suggestedActions)) {
-          result.suggestedActions = activity.suggestedActions;
-        } else {
-          // If it's not an array, wrap it in an array or handle accordingly
-          result.suggestedActions = [activity.suggestedActions];
-        }
+        result.suggestedActions = Array.isArray(activity.suggestedActions)
+          ? activity.suggestedActions
+          : [activity.suggestedActions];
       }
 
       return result;
@@ -71,9 +84,9 @@ export class MessagingService {
   }
 
   /**
-   * Helper method to process agent response and extract all components
+   * Processes agent response activities and extracts all components.
    * @param activities - Activities from agent response
-   * @returns Processed response components
+   * @returns Object containing processed response, adaptive cards, attachments, and suggested actions
    */
   private processAgentResponse(activities: Activity[]) {
     const processedResponse = this.messageProcessor.processResponse(activities);
@@ -92,13 +105,13 @@ export class MessagingService {
   }
 
   /**
-   * Helper method to validate response against test case expectations
+   * Validates response against test case expectations.
    * @param testCase - Test case with expected values
-   * @param processedResponse - The processed response text
+   * @param processedResponse - Processed response text
    * @param adaptiveCards - Extracted adaptive cards
    * @param allResponsesArray - Array of all response texts
-   * @param isContinueConversation - Whether this is for continue conversation (simpler position logic)
-   * @returns Object with validation results
+   * @param isContinueConversation - Whether this is for continue conversation
+   * @returns Validation results with match status and specific response
    */
   private validateResponse(
     testCase: AgentTestCase,
@@ -111,11 +124,8 @@ export class MessagingService {
     let specificResponse: string = processedResponse || "";
 
     if (testCase.expectedResponse && processedResponse) {
-      // Always use the same position logic regardless of isContinueConversation
-      // Send message: handle position logic
-      let positionIndex = 0; // Default: First response (index 0) when position not specified
+      let positionIndex = 0;
 
-      // Use expectedPositionOfTheResponseActivity if specified, regardless of isStartConversationEventSent
       if (testCase.expectedPositionOfTheResponseActivity !== undefined) {
         positionIndex = testCase.expectedPositionOfTheResponseActivity;
       }
@@ -128,13 +138,15 @@ export class MessagingService {
       }
     }
 
-    // Perform validation using ResponseValidationEngine
     if (testCase.expectedAttachmentsJson) {
-      isMatch = ResponseValidationEngine.compareAttachments(
+      isMatch = ResponseValidationEngine.validateAdaptiveCards(
+        1, // Operation type 1 = Comparison Operator
+        testCase.comparisonOperatorCode ?? 1, // Default to Equals
         testCase.expectedAttachmentsJson,
+        testCase.validationInstructions || "", // For Contains/Does not contain operations
         adaptiveCards || [],
-        testCase.comparisonOperatorCode
-      );
+        true // Return boolean only for MessagingService compatibility
+      ) as boolean;
     } else if (testCase.expectedResponse) {
       isMatch = ResponseValidationEngine.validateResponse(
         specificResponse,
@@ -147,13 +159,12 @@ export class MessagingService {
   }
 
   /**
-   * Sends a message to the agent and processes the response
-   * Creates a new conversation and handles the complete message exchange
-   * @param message - The message text to send to the agent
-   * @param testCase - Optional test case for response comparison and validation
+   * Sends a message to the agent and processes the response.
+   * Creates a new conversation and handles the complete message exchange.
+   * @param message - Message text to send to the agent
+   * @param testCase - Optional test case for response validation
    * @returns Promise resolving to AgentResponse with processed results
    */
-
   async sendMessage(
     message: string,
     testCase?: AgentTestCase
@@ -163,50 +174,33 @@ export class MessagingService {
     let allActivities: Activity[] = [];
 
     try {
-      // Always create conversation with start event true
       const result = await this.conversationManager.createConversation();
       conversationId = result.conversationId;
 
-      // Store the start conversation activity based on isStartConversationEventSent setting
-      // This implements the filtering logic for start conversation activity:
-      // - If isStartConversationEventSent = true: include start conversation in allActivities
-      // - If isStartConversationEventSent = false: exclude start conversation from allActivities
-      // - If testCase is undefined: default to including start conversation (backward compatibility)
-      // This affects all downstream processing including cat_actualcompleteresponse, cat_response, cat_result, and cat_resultreason
+      // Include start conversation activity based on test case setting
       if (
         result.startActivity &&
         (testCase?.isStartConversationEventSent ?? true)
       ) {
         allActivities.push(result.startActivity);
-      } else if (
-        result.startActivity &&
-        testCase?.isStartConversationEventSent === false
-      ) {
-        // Skip start conversation activity when not expected
       }
 
-      // Ensure we have a conversation ID
       if (!conversationId) {
         throw new Error(
           "Failed to create conversation - no conversation ID returned"
         );
       }
 
-      // Send message
       const client = this.conversationManager.getClient();
       if (!client) {
         throw new Error("Client not available");
       }
 
-      // Send the user's message and get the response
       let activities;
       try {
         activities = await client.askQuestionAsync(message, conversationId);
-        if (activities && activities.length > 0) {
-          // Activities received successfully
-        }
       } catch (apiError) {
-        // Check if it's a token-related error and try to refresh
+        // Handle token-related errors with refresh
         if (
           apiError instanceof Error &&
           (apiError.message.includes("401") ||
@@ -228,38 +222,15 @@ export class MessagingService {
         }
       }
 
-      // Add these activities to our collection of all activities
-      if (activities && activities.length > 0) {
+      if (activities?.length) {
         allActivities = [...allActivities, ...activities];
       }
 
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-      // Process all activities to accumulate all responses
+      const responseTime = Date.now() - startTime;
       const allResponsesArray = this.extractTextFromActivities(allActivities);
       const simplifiedResponses = this.createSimplifiedResponses(allActivities);
       const allResponsesJson = JSON.stringify(simplifiedResponses);
 
-      // Debug logging to see what's being populated
-      console.log(
-        "DEBUG: MessagingService sendMessage - allActivities:",
-        allActivities
-      );
-      console.log(
-        "DEBUG: MessagingService sendMessage - allResponsesArray:",
-        allResponsesArray
-      );
-      console.log(
-        "DEBUG: MessagingService sendMessage - simplifiedResponses:",
-        simplifiedResponses
-      );
-      console.log(
-        "DEBUG: MessagingService sendMessage - allResponsesJson:",
-        allResponsesJson
-      );
-
-      // Process the response components
       const {
         processedResponse,
         adaptiveCards,
@@ -267,31 +238,23 @@ export class MessagingService {
         suggestedActions,
       } = this.processAgentResponse(activities);
 
-      if (adaptiveCards && adaptiveCards.length > 0) {
-        // Adaptive cards found in response
-      }
-
-      // Validate response if test case is provided
       let isMatch: boolean | undefined;
       let specificResponse: string = processedResponse || "";
 
-      if (
-        testCase &&
-        (testCase.expectedResponse || testCase.expectedAttachmentsJson)
-      ) {
+      if (testCase?.expectedResponse || testCase?.expectedAttachmentsJson) {
         const validation = this.validateResponse(
           testCase,
           processedResponse,
           adaptiveCards,
           allResponsesArray,
-          false // sendMessage uses complex position logic
+          false
         );
         isMatch = validation.isMatch;
         specificResponse = validation.specificResponse;
       }
 
       return {
-        message: processedResponse || "", // Ensure we always have a string
+        message: processedResponse || "",
         timestamp: new Date(),
         success: true,
         responseTime,
@@ -299,15 +262,14 @@ export class MessagingService {
         attachments,
         suggestedActions,
         isMatch,
-        conversationId, // This should always be set now
-        allResponses: allResponsesJson, // Add full responses (with suggested actions & attachments)
-        specificResponse, // Include the specific response used for comparison
+        conversationId,
+        allResponses: allResponsesJson,
+        specificResponse,
         responseIndex: testCase?.expectedPositionOfTheResponseActivity,
-        startConversationActivity: result.startActivity || undefined, // Store start activity for multiturn scenarios
+        startConversationActivity: result.startActivity || undefined,
       };
     } catch (error) {
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
+      const responseTime = Date.now() - startTime;
 
       return {
         message: "",
@@ -316,16 +278,18 @@ export class MessagingService {
         responseTime,
         error:
           error instanceof Error ? error.message : "Unknown error occurred",
-        conversationId: conversationId || undefined, // Convert null to undefined
+        conversationId: conversationId || undefined,
       };
     }
   }
 
   /**
-   * Continues an existing conversation by sending a message to an existing conversation ID
-   * @param message The message to send
-   * @param conversationId The existing conversation ID
-   * @param testCase Optional test case for comparison
+   * Continues an existing conversation by sending a message.
+   * @param message - Message to send
+   * @param conversationId - Existing conversation ID
+   * @param testCase - Optional test case for validation
+   * @param isFirstChildTest - Whether this is first child test in multiturn scenario
+   * @param startConversationActivity - Start conversation activity for context
    * @returns Promise<AgentResponse>
    */
   async continueConversation(
@@ -339,7 +303,7 @@ export class MessagingService {
     let allActivities: Activity[] = [];
 
     try {
-      // Include start conversation activity for first child test if conditions are met
+      // Include start conversation activity for first child test if needed
       if (
         isFirstChildTest &&
         testCase?.isStartConversationEventSent === true &&
@@ -348,24 +312,18 @@ export class MessagingService {
         allActivities.push(startConversationActivity);
       }
 
-      // Get the client from conversation manager
       const client = this.conversationManager.getClient();
       if (!client) {
         throw new Error("Client not available for continuing conversation");
       }
 
-      // Send message to existing conversation
       const activities = await client.askQuestionAsync(message, conversationId);
 
-      // Add current activities to allActivities
-      if (activities && activities.length > 0) {
+      if (activities?.length) {
         allActivities = [...allActivities, ...activities];
       }
 
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-      // Process the response using helper methods - use allActivities (which may include start conversation)
+      const responseTime = Date.now() - startTime;
       const allResponsesArray = this.extractTextFromActivities(allActivities);
       const simplifiedResponses = this.createSimplifiedResponses(allActivities);
       const allResponsesJson = JSON.stringify(simplifiedResponses);
@@ -377,20 +335,16 @@ export class MessagingService {
         suggestedActions,
       } = this.processAgentResponse(allActivities);
 
-      // Validate response if test case is provided
       let isMatch: boolean | undefined;
       let specificResponse: string = processedResponse || "";
 
-      if (
-        testCase &&
-        (testCase.expectedResponse || testCase.expectedAttachmentsJson)
-      ) {
+      if (testCase?.expectedResponse || testCase?.expectedAttachmentsJson) {
         const validation = this.validateResponse(
           testCase,
           processedResponse,
           adaptiveCards,
           allResponsesArray,
-          true // continueConversation uses simple first response logic
+          true
         );
         isMatch = validation.isMatch;
         specificResponse = validation.specificResponse;
@@ -411,8 +365,7 @@ export class MessagingService {
         responseIndex: testCase?.expectedPositionOfTheResponseActivity,
       };
     } catch (error) {
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
+      const responseTime = Date.now() - startTime;
 
       return {
         message: "",

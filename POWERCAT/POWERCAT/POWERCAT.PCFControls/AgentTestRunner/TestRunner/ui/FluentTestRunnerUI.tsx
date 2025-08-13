@@ -1,5 +1,20 @@
 /**
- * FluentUI-based React components for test execution interface
+ * FluentTestRunnerUI.tsx
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides FluentUI-based React components for test execution interface.
+ * Handles test runner UI components, progress monitoring, logging, and user interactions.
+ * Integrates with test execution services to provide comprehensive testing experience.
+ *
+ * Exports:
+ *   - FluentTestRunnerManager: Primary UI management class for test execution interface.
+ *   - TestRunnerUI: React component for test runner user interface.
+ *
+ * Usage:
+ *   const uiManager = new FluentTestRunnerManager(containerElement);
+ *   uiManager.setStatus("Ready for test execution");
  */
 
 import React, { useMemo, useCallback } from "react";
@@ -10,35 +25,24 @@ import {
   Button,
   ProgressBar,
   Title3,
-  Body1,
-  Caption1,
   Spinner,
   makeStyles,
-  shorthands,
   tokens,
   FluentProvider,
   webLightTheme,
   Badge,
   Divider,
-  InfoLabel,
   MessageBar,
   MessageBarBody,
   Text,
   Tooltip,
   CounterBadge,
-  Avatar,
-  Field,
-  Label,
 } from "@fluentui/react-components";
 import {
   CheckmarkCircle24Regular,
   ErrorCircle24Regular,
   Warning24Regular,
   Info24Regular,
-  Clock24Regular,
-  Beaker24Regular,
-  Settings24Regular,
-  Important24Regular,
 } from "@fluentui/react-icons";
 import { createRoot, Root } from "react-dom/client";
 import type { TestExecutionSummary } from "../shared/models/DataModels";
@@ -177,12 +181,6 @@ const useStyles = makeStyles({
     minWidth: "80px",
     flexShrink: 0,
   },
-  logContent: {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-  },
   logMessage: {
     lineHeight: tokens.lineHeightBase300,
     color: tokens.colorNeutralForeground1,
@@ -201,13 +199,6 @@ const useStyles = makeStyles({
     height: "12px",
     borderRadius: "6px",
   },
-  progressText: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    fontWeight: tokens.fontWeightSemibold,
-    color: tokens.colorBrandForeground1,
-  },
   statusSection: {
     display: "flex",
     alignItems: "center",
@@ -222,9 +213,6 @@ const useStyles = makeStyles({
     border: "none",
     boxShadow: tokens.shadow4,
   },
-  statusBadge: {
-    marginLeft: tokens.spacingHorizontalS,
-  },
   infoSection: {
     display: "flex",
     alignItems: "center",
@@ -238,49 +226,20 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground2,
   },
-  progressStats: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: tokens.spacingVerticalS,
-    background: tokens.colorBrandBackground2,
-    borderRadius: tokens.borderRadiusSmall,
-    marginBottom: tokens.spacingVerticalS,
-  },
-  logHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: tokens.spacingVerticalS,
-  },
-  avatarSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-  },
   buttonSection: {
     display: "flex",
     alignItems: "center",
     gap: tokens.spacingHorizontalM,
   },
-
   chartContainer: {
     display: "flex",
     flexDirection: "column",
     gap: "12px",
   },
-
-  chartMetadata: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    justifyContent: "center",
-    ...shorthands.padding("8px"),
-  },
 });
+
 /**
- * Custom PlaySolid icon using Microsoft Fabric Icons font
- * F5B0 is the Unicode for PlaySolid in Fabric MDL2 Icons
+ * PlaySolid icon component using Microsoft Fabric Icons font.
  */
 const PlaySolidIcon: React.FC = () => {
   const styles = useStyles();
@@ -311,6 +270,10 @@ interface TestRunnerUIProps {
 /**
  * Main TestRunner UI Component
  * Provides a comprehensive interface for test execution and monitoring
+ */
+/**
+ * Main TestRunner UI component with comprehensive test execution interface.
+ * @param props - Component props including execution state and callbacks.
  */
 const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
   isRunning,
@@ -403,25 +366,10 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
    * Memoized recent logs for performance
    */
   const recentLogs = useMemo(() => {
-    console.log("🔄 recentLogs useMemo triggered with logs array:", {
-      logsArrayLength: logs.length,
-      logsArray: logs,
-      RECENT_LOGS_LIMIT:
-        FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.RECENT_LOGS_LIMIT,
-    });
-
     const recent = logs.slice(
       -FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.RECENT_LOGS_LIMIT
     );
 
-    console.log("📋 TestRunnerUI recentLogs calculation:", {
-      totalLogs: logs.length,
-      recentLogsCount: recent.length,
-      recentLogsSample: recent.slice(-3).map((log) => ({
-        level: log.level,
-        message: log.message.substring(0, 50) + "...",
-      })),
-    });
     return recent;
   }, [logs]);
 
@@ -462,7 +410,6 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
         </div>
       </Card>
 
-      {/* Progress Section - Cleaned up */}
       {(progress ||
         isRunning ||
         status !== FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.READY_STATUS) && (
@@ -539,7 +486,6 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
       )}
 
       <div className={styles.summaryCards}>
-        {/* Test Results Summary - Cleaned up */}
         {summary && (
           <Card className={styles.summaryCard}>
             <CardHeader
@@ -558,18 +504,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
         )}
 
         {/* Execution Log - Single line format */}
-        {(() => {
-          console.log("🔍 UI Log Section Render Check:", {
-            logsLength: logs.length,
-            recentLogsLength: recentLogs.length,
-            shouldShowLogs: logs.length > 0,
-            logsSample: logs.slice(-2).map((log) => ({
-              level: log.level,
-              message: log.message.substring(0, 30) + "...",
-            })),
-          });
-          return logs.length > 0;
-        })() && (
+        {logs.length > 0 && (
           <Card className={`${styles.logCard} ${styles.summaryCard}`}>
             <CardHeader
               header={
@@ -618,8 +553,11 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
 export default TestRunnerUI;
 
 /**
- * React wrapper for the FluentUI Test Runner
- * Manages React root and provides interface for the PCF component
+ * FluentTestRunnerManager
+ *
+ * React wrapper for the FluentUI Test Runner interface.
+ * Manages React root, provides interface for PCF component integration,
+ * and handles comprehensive logging and state management for test execution.
  */
 export class FluentTestRunnerManager {
   private root: Root | null = null;
@@ -634,6 +572,10 @@ export class FluentTestRunnerManager {
   };
   private onRunTestsCallback?: () => void;
 
+  /**
+   * Creates a new FluentTestRunnerManager instance.
+   * @param container - HTML element to render the React components into.
+   */
   constructor(container: HTMLElement) {
     this.container = container;
     this.state = {
@@ -649,18 +591,12 @@ export class FluentTestRunnerManager {
     this.logInitialized();
   }
 
+  /**
+   * Renders the React components into the container with current state.
+   * Creates FluentUI-wrapped TestRunnerUI component with current state data and callback handlers.
+   * @private
+   */
   private render(): void {
-    console.log("🎨 FluentTestRunnerManager.render() called with state:", {
-      isRunning: this.state.isRunning,
-      hasExistingResults: this.state.hasExistingResults,
-      status: this.state.status,
-      logsCount: this.state.logs.length,
-      lastFewLogs: this.state.logs.slice(-3).map((log) => ({
-        level: log.level,
-        message: log.message.substring(0, 50) + "...",
-      })),
-    });
-
     if (this.root) {
       this.root.render(
         <FluentProvider theme={webLightTheme}>
@@ -673,51 +609,77 @@ export class FluentTestRunnerManager {
     }
   }
 
+  /**
+   * Updates the test execution running state and triggers UI re-render.
+   * Controls the visual state of running tests including button states and loading indicators.
+   * @param running - Whether tests are currently executing.
+   */
   public setRunning(running: boolean): void {
     this.state.isRunning = running;
     this.render();
   }
 
+  /**
+   * Updates the existing test results state and triggers UI re-render.
+   * Controls visibility of result badges and button availability based on existing data.
+   * @param hasResults - Whether existing test results are available for display.
+   */
   public setHasExistingResults(hasResults: boolean): void {
     this.state.hasExistingResults = hasResults;
     this.render();
   }
 
+  /**
+   * Updates the status display text and triggers UI re-render.
+   * Status message appears in the main progress card with appropriate styling based on content.
+   * @param status - Current status message to display to users.
+   */
   public setStatus(status: string): void {
     this.state.status = status;
     this.render();
   }
 
+  /**
+   * Updates test execution progress display with completion tracking.
+   * Shows progress bar with percentage calculation and count display.
+   * @param completed - Number of completed tests for progress calculation.
+   * @param total - Total number of tests to be executed.
+   */
   public setProgress(completed: number, total: number): void {
     this.state.progress = { completed, total };
     this.render();
   }
 
+  /**
+   * Clears progress and result displays by removing progress state.
+   * Used to reset the UI when tests complete or when clearing previous execution data.
+   */
   public clearResults(): void {
     this.state.progress = undefined;
     this.render();
   }
 
+  /**
+   * Updates test execution summary display with comprehensive result data.
+   * Displays summary chart with test outcome breakdown and statistics.
+   * @param summary - Test execution summary data including counts, rates, and timing information.
+   */
   public setSummary(summary: TestExecutionSummary): void {
     this.state.summary = summary;
     this.render();
   }
 
+  /**
+   * Adds a timestamped log entry to the execution log display with automatic memory management.
+   * Creates immutable log arrays for React change detection and limits total logs to prevent memory issues.
+   * @param level - Log level for styling and categorization (info, success, error, warning).
+   * @param message - Log message content to display to users.
+   */
   public addLog(
     level: (typeof FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS)[keyof typeof FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS],
     message: string
   ): void {
-    console.log("📝 FluentTestRunnerManager.addLog() called with:", {
-      level,
-      message,
-    });
-    console.log(
-      "📊 Current logs state before adding:",
-      this.state.logs.length,
-      "logs"
-    );
-
-    // CRITICAL FIX: Create new array instead of mutating existing one
+    // Create new array instead of mutating existing one
     const newLogEntry = {
       level,
       message,
@@ -727,12 +689,6 @@ export class FluentTestRunnerManager {
     // Create a new logs array to ensure React detects the change
     const updatedLogs = [...this.state.logs, newLogEntry];
 
-    console.log(
-      "📊 Current logs state after adding:",
-      updatedLogs.length,
-      "logs"
-    );
-
     // Keep only last 100 logs to prevent memory issues
     if (
       updatedLogs.length >
@@ -741,100 +697,100 @@ export class FluentTestRunnerManager {
       this.state.logs = updatedLogs.slice(
         -FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_LOGS_LIMIT
       );
-      console.log("✂️ Trimmed logs to:", this.state.logs.length);
     } else {
       this.state.logs = updatedLogs;
     }
 
-    console.log("🔄 Calling render() after addLog");
     this.render();
   }
 
-  // Helper methods for common log messages
+  // Helper methods for common log messages with specific styling
+
+  /**
+   * Logs an informational message with info-level styling.
+   * @param message - Information message to display in the execution log.
+   */
   public logInfo(message: string): void {
     this.addLog(FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS.INFO, message);
   }
 
+  /**
+   * Logs a success message with success-level styling and green visual indicators.
+   * @param message - Success message to display in the execution log.
+   */
   public logSuccess(message: string): void {
     this.addLog(FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS.SUCCESS, message);
   }
 
+  /**
+   * Logs an error message with error-level styling and red visual indicators.
+   * @param message - Error message to display in the execution log.
+   */
   public logError(message: string): void {
     this.addLog(FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS.ERROR, message);
   }
 
+  /**
+   * Logs a warning message with warning-level styling and yellow visual indicators.
+   * @param message - Warning message to display in the execution log.
+   */
   public logWarning(message: string): void {
     this.addLog(FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS.WARNING, message);
   }
 
-  // Common status messages
+  // Common status messages for test execution lifecycle
+
+  /**
+   * Logs the initial setup completion message when the Test Runner is ready for operation.
+   * Called once during component initialization to indicate successful setup.
+   */
   public logInitialized(): void {
     this.logSuccess("🚀 Agent Test Runner initialized and ready");
   }
 
+  /**
+   * Logs the test execution start message with test run identification.
+   * Provides users with confirmation that test execution has begun for a specific test run.
+   * @param testRunName - Name or identifier of the test run being executed.
+   */
   public logTestExecutionStarted(testRunName: string): void {
     this.logInfo(`🔄 Test execution started for Test Run: ${testRunName}`);
   }
 
+  /**
+   * Logs the configuration loading status during test execution initialization.
+   * Indicates that agent configuration and test cases are being loaded from Dataverse.
+   */
   public logConfigurationLoaded(): void {
     this.logInfo("🔧 Loading agent configuration and test cases..");
   }
 
+  /**
+   * Logs the authentication process start during test execution setup.
+   * Indicates that credential validation and agent connection process has begun.
+   */
   public logAuthenticationStarted(): void {
     this.logInfo("🔐 Starting authentication and agent connection process..");
   }
 
-  public logTestExecutionCompleted(): void {
-    this.logSuccess("Test execution completed successfully!");
-  }
-
-  public logTestExecutionPhaseCompleted(
-    completed: number,
-    total: number
-  ): void {
-    this.logInfo(
-      `🏁 Test execution phase completed: ${completed}/${total} tests processed`
-    );
-  }
-
-  public logFinalResultsSummary(
-    passed: number,
-    failed: number,
-    errors: number,
-    unknown?: number,
-    pending?: number
-  ): void {
-    // Debug logging to see what values are being passed
-    console.log(
-      `DEBUG: Final Results Summary - passed: ${passed}, failed: ${failed}, errors: ${errors}, unknown: ${
-        unknown || 0
-      }, pending: ${pending || 0}`
-    );
-
-    // Calculate total from all categories
-    const totalCounted =
-      passed + failed + errors + (unknown || 0) + (pending || 0);
-    console.log(`DEBUG: Total counted from all categories: ${totalCounted}`);
-
-    // Build comprehensive summary message
-    const summaryParts = [`${passed} passed`, `${failed} failed`];
-    if (errors > 0) summaryParts.push(`${errors} errors`);
-    if (unknown && unknown > 0) summaryParts.push(`${unknown} unknown`);
-    if (pending && pending > 0) summaryParts.push(`${pending} pending`);
-
-    const summaryMessage = `📊 Final Results Summary: ${summaryParts.join(
-      ", "
-    )} (Total: ${totalCounted})`;
-
-    this.logInfo(summaryMessage);
-  }
-
+  /**
+   * Logs formatted execution time with appropriate time units based on duration.
+   * Automatically formats seconds into readable format (seconds, minutes, hours).
+   * @param seconds - Total execution time in seconds to format and display.
+   */
   public logExecutionTime(seconds: number): void {
     const timeEmoji = String.fromCodePoint(0x23f1, 0xfe0f); // ⏱️ stopwatch emoji
     const formattedTime = this.formatExecutionTime(seconds);
     this.logInfo(`${timeEmoji} Total execution time: ${formattedTime}`);
   }
 
+  /**
+   * Formats execution time duration into human-readable string with appropriate units.
+   * Converts seconds to appropriate time format based on duration length.
+   * @param seconds - Duration in seconds to format.
+   * @returns Formatted time string (e.g., "45.2 seconds", "2m 30s", "1h 5m 20s").
+   * @private
+   */
   private formatExecutionTime(seconds: number): string {
     if (seconds < 60) {
       return `${seconds.toFixed(1)} seconds`;
@@ -851,31 +807,37 @@ export class FluentTestRunnerManager {
   }
 
   /**
-   * Logs complete test execution completion sequence
-   * Call this when test execution finishes to log all completion messages
+   * Logs comprehensive test execution completion sequence with detailed result breakdown.
+   * Provides final summary statistics and optional execution timing information.
+   * Calculates and displays complete test outcome distribution for user review.
+   * @param summary - Test execution summary containing all test outcome counts and metadata.
+   * @param executionTimeSeconds - Optional total execution time in seconds for performance display.
    */
   public logTestRunCompletion(
     summary: TestExecutionSummary,
     executionTimeSeconds?: number
   ): void {
-    // Debug logging to see the actual summary object
-    console.log("DEBUG: logTestRunCompletion summary object:", {
-      totalTests: summary.totalTests,
-      successTests: summary.successTests,
-      failedTests: summary.failedTests,
-      errorTests: summary.errorTests,
-      unknownTests: summary.unknownTests,
-      pendingTests: summary.pendingTests,
-    });
-
     // Final results summary
-    this.logFinalResultsSummary(
-      summary.successTests || 0,
-      summary.failedTests || 0,
-      summary.errorTests || 0,
-      summary.unknownTests || 0,
-      summary.pendingTests || 0
-    );
+    const passed = summary.successTests || 0;
+    const failed = summary.failedTests || 0;
+    const errors = summary.errorTests || 0;
+    const unknown = summary.unknownTests || 0;
+    const pending = summary.pendingTests || 0;
+
+    // Calculate total from all categories
+    const totalCounted = passed + failed + errors + unknown + pending;
+
+    // Build comprehensive summary message
+    const summaryParts = [`${passed} passed`, `${failed} failed`];
+    if (errors > 0) summaryParts.push(`${errors} errors`);
+    if (unknown > 0) summaryParts.push(`${unknown} unknown`);
+    if (pending > 0) summaryParts.push(`${pending} pending`);
+
+    const summaryMessage = `📊 Final Results Summary: ${summaryParts.join(
+      ", "
+    )} (Total: ${totalCounted})`;
+
+    this.logInfo(summaryMessage);
 
     // Execution time - if provided
     if (executionTimeSeconds !== undefined) {
@@ -884,43 +846,28 @@ export class FluentTestRunnerManager {
   }
 
   /**
-   * Logs performance metrics and averages
+   * Logs agent connection failure error with user guidance for resolution.
+   * Provides specific error message for agent connectivity issues and configuration verification steps.
    */
-  public logPerformanceSummary(
-    summary: TestExecutionSummary,
-    executionTimeSeconds: number
-  ): void {
-    const totalTests = summary.totalTests || 0;
-    if (totalTests > 0) {
-      const avgTimePerTest = (executionTimeSeconds / totalTests).toFixed(2);
-      this.logInfo(
-        `📈 Performance: Average ${avgTimePerTest}s per test, ${totalTests} total tests executed`
-      );
-    }
-  }
-
-  public logNoResults(): void {
-    this.logInfo(
-      "📋 No previous test results found - ready for test execution"
-    );
-  }
-
-  public logAuthenticationError(): void {
-    this.logError(
-      "❌ Authentication failed. Please check your credentials and try again."
-    );
-  }
-
   public logAgentConnectionError(): void {
     this.logError(
       "❌ Failed to connect to agent. Please verify your agent configuration."
     );
   }
 
+  /**
+   * Sets the callback function for test execution button clicks.
+   * Establishes the link between UI button interactions and test execution logic.
+   * @param callback - Function to execute when Run Tests button is clicked by user.
+   */
   public setOnRunTestsCallback(callback: () => void): void {
     this.onRunTestsCallback = callback;
   }
 
+  /**
+   * Cleans up React root and removes all event listeners for proper component disposal.
+   * Ensures proper cleanup when the component is destroyed to prevent memory leaks.
+   */
   public destroy(): void {
     if (this.root) {
       this.root.unmount();

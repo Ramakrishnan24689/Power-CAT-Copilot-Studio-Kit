@@ -1,6 +1,20 @@
 /**
- * Agent Test Result Operations for Dataverse
- * Handles all CRUD operations related to agent test results
+ * AgentTestResultOperations.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides comprehensive Dataverse operations for managing agent test result records and validation.
+ * Handles test result creation, updates, status management, and complex business logic for
+ * response validation, multiturn test rollups, and execution history analysis.
+ *
+ * Exports:
+ *   - AgentTestResultOperations: Main class for test result operations and validation logic.
+ *
+ * Usage:
+ *   const testResultOps = new AgentTestResultOperations(context);
+ *   const resultId = await testResultOps.createTestResult(testCase, testRunId, response, config);
+ *   const history = await testResultOps.getTestExecutionHistory(testRunId);
  */
 
 import { DataverseOperationBase } from "./DataverseOperationBase";
@@ -9,6 +23,7 @@ import type {
   AgentTestCase,
   AgentResponse,
   AgentConfiguration,
+  AdaptiveCard,
 } from "../shared/models/DataModels";
 
 /**
@@ -22,7 +37,7 @@ interface ParsedAgentResponse {
 }
 
 /**
- * Test type mapping constants
+ * Test type mapping constants for Dataverse field values
  */
 const TEST_TYPES = {
   RESPONSE_MATCH: 1,
@@ -34,7 +49,7 @@ const TEST_TYPES = {
 } as const;
 
 /**
- * Result code constants
+ * Result code constants for test outcome classification
  */
 const RESULT_CODES = {
   SUCCESS: 1,
@@ -46,7 +61,8 @@ const RESULT_CODES = {
 
 /**
  * Service for managing agent test result operations in Dataverse
- * Handles creation, updates, and business logic for test results
+ * Handles creation, updates, and business logic for test results with comprehensive validation
+ * @class AgentTestResultOperations
  */
 export class AgentTestResultOperations extends DataverseOperationBase {
   constructor(context: ComponentFramework.Context<unknown>) {
@@ -54,13 +70,13 @@ export class AgentTestResultOperations extends DataverseOperationBase {
   }
 
   /**
-   * Create a test result record in Dataverse
-   * @param testCase - The test case being executed
-   * @param testRunId - GUID of the current test run
-   * @param agentResponse - Response received from the agent
-   * @param configuration - Agent configuration settings
-   * @param parentTestResultId - Optional parent test result ID for multiturn tests
-   * @returns Promise resolving to test result ID or null
+   * Create a test result record in Dataverse with comprehensive validation and response analysis
+   * @param testCase - The test case being executed with validation criteria
+   * @param testRunId - GUID of the current test run for association
+   * @param agentResponse - Response received from the agent with all response data
+   * @param configuration - Agent configuration settings for validation logic
+   * @param parentTestResultId - Optional parent test result ID for multiturn test scenarios
+   * @returns Promise resolving to created test result ID or null if creation failed
    */
   async createTestResult(
     testCase: AgentTestCase,
@@ -70,52 +86,25 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     parentTestResultId?: string
   ): Promise<string | null> {
     return this.executeOperationSafely(async () => {
-      // Debug logging to see the actual agentResponse object structure
-      console.log(`DEBUG: createTestResult for test case: ${testCase.name}`);
-      console.log("DEBUG: agentResponse object:", {
-        message: agentResponse.message,
-        specificResponse: agentResponse.specificResponse,
-        allResponses: agentResponse.allResponses,
-        adaptiveCards: agentResponse.adaptiveCards,
-        allResponsesType: typeof agentResponse.allResponses,
-        allResponsesLength: agentResponse.allResponses
-          ? agentResponse.allResponses.length
-          : "N/A",
-      });
-
-      // Extract response data for validation
-      const agentResponseText =
-        agentResponse.specificResponse || agentResponse.message || "";
-      const testType = testCase.testTypeCode;
-      const adaptiveCardJson = this.extractAdaptiveCardJson(agentResponse);
-      const expectedAttachmentsJson = testCase.expectedAttachmentsJson || "";
-
-      // Generate position-based response value FIRST (before validation)
-      const responseValue = this.generateResponseValue(
-        agentResponseText,
-        adaptiveCardJson,
-        testCase,
-        agentResponse
-      );
+      // Generate position-based response value for validation
+      const responseValue = this.generateResponseValue(testCase, agentResponse);
 
       // Calculate result code based on business logic using position-based response
       const resultCode = this.calculateResultCode(
         testCase,
         configuration,
-        responseValue, // Use position-based response instead of agentResponseText
-        adaptiveCardJson,
-        expectedAttachmentsJson,
-        agentResponse.isMatch, // Pass the isMatch result from MessagingService
-        agentResponse // Pass the full agentResponse for adaptive cards access
+        responseValue,
+        agentResponse.isMatch,
+        agentResponse
       );
 
       // Generate result reason using position-based response
       const resultReason = this.generateResultReason(
         testCase,
         configuration,
-        responseValue, // Use position-based response instead of agentResponseText
+        responseValue,
         resultCode,
-        agentResponse // Pass agentResponse for adaptive card handling
+        agentResponse
       );
 
       // Generate unique name for the test result
@@ -139,32 +128,55 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         parentTestResultId
       );
 
-      try {
-        const response = await this.context.webAPI.createRecord(
-          "cat_copilottestresult",
-          testResultData
-        );
-
-        return response.id;
-      } catch (error) {
-        // Check if it's a table not found error
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes("Resource not found")) {
-          // Handle resource not found error
-        }
-
-        throw error;
-      }
+      return this.createTestResultRecord(testResultData);
     }, "Create test result");
   }
 
   /**
+   * Create a test result record in Dataverse with standardized error handling
+   * @param testResultData - Complete test result data object for record creation
+   * @returns Promise resolving to created record ID or null if creation failed
+   * @private
+   */
+  private async createTestResultRecord(
+    testResultData: Record<string, string | number | boolean | null | undefined>
+  ): Promise<string | null> {
+    try {
+      const response = await this.context.webAPI.createRecord(
+        "cat_copilottestresult",
+        testResultData
+      );
+      return response.id;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes("Resource not found")) {
+        throw new Error(
+          "Test result table 'Agent Test Result' not found. Please check your Dataverse environment setup."
+        );
+      }
+
+      if (
+        errorMessage.includes("Forbidden") ||
+        errorMessage.includes("Unauthorized")
+      ) {
+        throw new Error(
+          "Insufficient permissions to create test results. Please check your security roles and table permissions."
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Create a placeholder test result for multiturn parent tests
-   * @param parentTestCase - The parent test case
-   * @param testRunId - GUID of the current test run
-   * @param conversationId - Conversation ID for the multiturn test
-   * @returns Promise resolving to test result ID or null
+   * Creates initial test result record that will be updated with child test rollup data
+   * @param parentTestCase - The parent test case definition for multiturn scenario
+   * @param testRunId - GUID of the current test run for association
+   * @param conversationId - Conversation ID for the multiturn test session
+   * @returns Promise resolving to created test result ID or null if creation failed
    */
   async createPlaceholderTestResult(
     parentTestCase: AgentTestCase,
@@ -178,52 +190,35 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         cat_resultreason: "",
         cat_response: "",
         cat_testtypecode: parentTestCase.testTypeCode,
-
-        // Explicitly override inherited fields to ensure placeholder behavior
-        cat_testutterance: "", // Empty to override inherited value from test case binding
-        cat_expectedresponse: "", // Empty for placeholder - always use expectedResponse directly
-        cat_expectedtopicname: "", // Empty for placeholder
-        cat_comparisonoperator: null, // No comparison for placeholder
-        cat_operationtypecode: parentTestCase.operationTypeCode ?? null, // Copy operation type from parent test case
-        cat_adaptivecardpayload: "", // Empty for placeholder
-        cat_generativeansweroutcomecode: null, // No outcome for placeholder
-        cat_passthreshold: parentTestCase.cat_passthreshold ?? null, // Copy pass threshold from parent test case
-        cat_externalvariablesjson: "", // Empty for placeholder
-        cat_expectedattachmentsjson: "", // Empty for placeholder
-        cat_attachmentsjson: "", // Empty for placeholder
-        cat_suggestedactionsjson: "", // Null for placeholder
-
-        // Timestamp fields - use proper types for placeholder
-        cat_messagesenttimestamp: new Date().toISOString(),
-        cat_responsereceivedtimestamp: new Date().toISOString(),
-        cat_latencyms: 0, // Integer field - use 0 instead of empty string
-
-        // Relationships
+        cat_testutterance: "",
+        cat_expectedresponse: "",
+        cat_expectedtopicname: "",
+        cat_comparisonoperator: null,
+        cat_operationtypecode: null,
+        cat_adaptivecardpayload: "",
+        cat_generativeansweroutcomecode: null,
+        cat_passthreshold: null,
+        cat_externalvariablesjson: "",
+        cat_expectedattachmentsjson: "",
+        cat_attachmentsjson: "",
+        cat_suggestedactionsjson: "",
+        cat_messagesenttimestamp: null,
+        cat_responsereceivedtimestamp: null,
+        cat_latencyms: 0,
         "cat_CopilotTestRunId@odata.bind": `/cat_copilottestruns(${testRunId})`,
         "cat_CopilotTestId@odata.bind": `/cat_copilottests(${parentTestCase.id})`,
       };
 
-      try {
-        const response = await this.context.webAPI.createRecord(
-          "cat_copilottestresult",
-          testResultData
-        );
-
-        return response.id;
-      } catch (error) {
-        // Check if it's a table not found error
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        throw error;
-      }
+      return this.createTestResultRecord(testResultData);
     }, "Create placeholder test result");
   }
 
   /**
-   * Update parent test result based on child test results
-   * @param parentTestResultId - GUID of parent test result
-   * @param childResults - Array of child test result codes and critical flags
-   * @returns Promise resolving to boolean indicating success
+   * Update parent test result based on child test results with rollup logic
+   * Applies business rules to determine parent test outcome from child test results
+   * @param parentTestResultId - GUID of parent test result to update
+   * @param childResults - Array of child test result codes and critical flags for rollup calculation
+   * @returns Promise resolving to boolean indicating success or failure of update operation
    */
   async updateParentTestResult(
     parentTestResultId: string,
@@ -241,12 +236,13 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         (result) =>
           result.critical && result.resultCode === RESULT_CODES.UNKNOWN
       );
-      const hasPending = childResults.some(
-        (result) => result.resultCode === RESULT_CODES.PENDING
+      const hasCriticalPending = childResults.some(
+        (result) =>
+          result.critical && result.resultCode === RESULT_CODES.PENDING
       );
-      const allPassed = childResults.every(
-        (result) => result.resultCode === RESULT_CODES.SUCCESS
-      );
+      const allCriticalPassed = childResults
+        .filter((result) => result.critical)
+        .every((result) => result.resultCode === RESULT_CODES.SUCCESS);
 
       let parentResultCode: number;
 
@@ -260,11 +256,11 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       } else if (hasCriticalUnknown) {
         // Critical subtest failing with "unknown" makes parent "unknown"
         parentResultCode = RESULT_CODES.UNKNOWN;
-      } else if (hasPending) {
-        // Any pending subtests make parent pending (if no critical failures)
+      } else if (hasCriticalPending) {
+        // Any critical pending subtests make parent pending
         parentResultCode = RESULT_CODES.PENDING;
-      } else if (allPassed) {
-        // All tests passed successfully
+      } else if (allCriticalPassed) {
+        // All critical tests passed successfully
         parentResultCode = RESULT_CODES.SUCCESS;
       } else {
         // Mixed results (non-critical failures don't affect parent result per requirements)
@@ -288,9 +284,9 @@ export class AgentTestResultOperations extends DataverseOperationBase {
   }
 
   /**
-   * Get test result code by ID
-   * @param testResultId - GUID of the test result
-   * @returns Promise resolving to result code or null
+   * Get test result code by ID for validation and rollup operations
+   * @param testResultId - GUID of the test result record to query
+   * @returns Promise resolving to result code (1=Success, 2=Failed, 3=Unknown, 4=Error, 5=Pending) or null if not found
    */
   async getTestResultCode(testResultId: string): Promise<number | null> {
     return this.executeOperationSafely(async () => {
@@ -304,9 +300,10 @@ export class AgentTestResultOperations extends DataverseOperationBase {
   }
 
   /**
-   * Get test execution history from cat_copilottestresult table
-   * @param testRunId - Test run ID to filter results (required)
-   * @returns Promise resolving to test execution history summary
+   * Get test execution history from cat_copilottestresult table with comprehensive result analysis
+   * Provides aggregated counts of test results by status for reporting and progress tracking
+   * @param testRunId - Test run ID to filter results for specific execution session
+   * @returns Promise resolving to test execution history summary with counts by result type
    */
   async getTestExecutionHistory(testRunId: string): Promise<{
     success: number;
@@ -317,9 +314,8 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     total: number;
   }> {
     const result = await this.executeOperationSafely(async () => {
-      // Only count parent test results (exclude child tests from multiturn conversations)
-      // Child tests have cat_Parent field populated, parent tests have cat_Parent as null
-      const queryString = `?$select=cat_resultcode&$filter=_cat_copilottestrunid_value eq '${testRunId}' and cat_Parent eq null`;
+      // Only count parent tests and normal tests (exclude child tests by filtering parent lookup value as null)
+      const queryString = `?$select=cat_resultcode&$filter=_cat_copilottestrunid_value eq '${testRunId}' and _cat_parent_value eq null`;
       const response = await this.context.webAPI.retrieveMultipleRecords(
         "cat_copilottestresult",
         queryString
@@ -379,51 +375,16 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     );
   }
 
-  // Private helper methods
-  private extractAdaptiveCardJson(agentResponse: AgentResponse): string {
-    return agentResponse.adaptiveCards && agentResponse.adaptiveCards.length > 0
-      ? JSON.stringify(agentResponse.adaptiveCards)
-      : "";
-  }
-
   /**
    * Extract suggested actions JSON from agent response based on position column
-   * Implements Power Automate expression logic for position-based suggested actions extraction
-   * Power Automate Expression:
-   * if(empty(Agent Response based on position column), null,
-   *    if(empty(suggestedActions of Agent Response based on position column), null,
-   *       string(suggestedActions of Agent Response based on position column)))
-   *
    * @param agentResponse - The agent response containing allResponses data (includes suggested actions)
-   * @param testCase - The test case for context (currently unused but kept for consistency)
    * @returns String JSON of suggested actions or null
    */
   private extractSuggestedActionsJson(
-    agentResponse: AgentResponse,
-    testCase: AgentTestCase
+    agentResponse: AgentResponse
   ): string | null {
-    console.log(
-      "[extractSuggestedActionsJson] Starting position-based extraction..."
-    );
-    console.log(
-      "[extractSuggestedActionsJson] agentResponse.responseIndex:",
-      agentResponse.responseIndex
-    );
-    console.log(
-      "[extractSuggestedActionsJson] agentResponse.allResponses:",
-      agentResponse.allResponses
-    );
-
-    // Power Automate Expression Implementation:
-    // if(empty(Agent Response based on position column), null,
-    //    if(empty(suggestedActions of Agent Response based on position column), null,
-    //       string(suggestedActions of Agent Response based on position column)))
-
     // First check: empty(Agent Response based on position column) → return null
     if (!agentResponse.allResponses) {
-      console.log(
-        "[extractSuggestedActionsJson] allResponses is empty, returning null"
-      );
       return null;
     }
 
@@ -431,44 +392,22 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     try {
       allResponsesArray = JSON.parse(agentResponse.allResponses);
       if (!Array.isArray(allResponsesArray) || allResponsesArray.length === 0) {
-        console.log(
-          "[extractSuggestedActionsJson] allResponses is not a valid array, returning null"
-        );
         return null;
       }
     } catch (error) {
-      console.log(
-        "[extractSuggestedActionsJson] Error parsing allResponses:",
-        error
-      );
       return null;
     }
 
     // Simple position logic: null/undefined = 0, otherwise use specified position
     const position = agentResponse.responseIndex ?? 0;
 
-    // Debug logging for position validation
-    console.log(
-      "[extractSuggestedActionsJson] Using position:",
-      position,
-      "Array length:",
-      allResponsesArray.length
-    );
-
     // Check if position is within bounds
     if (position < 0 || position >= allResponsesArray.length) {
-      console.log(
-        "[extractSuggestedActionsJson] Position out of bounds, returning null"
-      );
       return null;
     }
 
     // Get response at the specified position
     const responseAtPosition = allResponsesArray[position];
-    console.log(
-      "[extractSuggestedActionsJson] Response at position:",
-      responseAtPosition
-    );
 
     // Second check: empty(suggestedActions of Agent Response based on position column) → return null
     if (
@@ -477,9 +416,6 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       !Array.isArray(responseAtPosition.suggestedActions) ||
       responseAtPosition.suggestedActions.length === 0
     ) {
-      console.log(
-        "[extractSuggestedActionsJson] No suggested actions at position, returning null"
-      );
       return null;
     }
 
@@ -488,58 +424,20 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       const suggestedActionsJson = JSON.stringify(
         responseAtPosition.suggestedActions
       );
-      console.log(
-        "[extractSuggestedActionsJson] Returning suggested actions JSON:",
-        suggestedActionsJson
-      );
       return suggestedActionsJson;
     } catch (error) {
-      console.log(
-        "[extractSuggestedActionsJson] Error stringifying suggested actions:",
-        error
-      );
       return null;
     }
   }
 
   /**
    * Extract attachments JSON from agent response based on position column
-   * Implements Power Automate expression logic for position-based attachment extraction
-   * Power Automate Expression:
-   * if(empty(Agent Response based on position column), "",
-   *    if(empty(attachments of Agent Response based on position column), "",
-   *       string(attachments of Agent Response based on position column)))
-   *
    * @param agentResponse - The agent response containing all responses data
-   * @param testCase - The test case for context (currently unused but kept for consistency)
    * @returns String JSON of attachments or empty string
    */
-  private extractAttachmentsJson(
-    agentResponse: AgentResponse,
-    testCase: AgentTestCase
-  ): string {
-    console.log(
-      "[extractAttachmentsJson] Starting position-based extraction..."
-    );
-    console.log(
-      "[extractAttachmentsJson] agentResponse.responseIndex:",
-      agentResponse.responseIndex
-    );
-    console.log(
-      "[extractAttachmentsJson] agentResponse.allResponses:",
-      agentResponse.allResponses
-    );
-
-    // Power Automate Expression Implementation:
-    // if(empty(Agent Response based on position column), "",
-    //    if(empty(attachments of Agent Response based on position column), "",
-    //       string(attachments of Agent Response based on position column)))
-
+  private extractAttachmentsJson(agentResponse: AgentResponse): string {
     // First check: empty(Agent Response based on position column) → return ""
     if (!agentResponse.allResponses) {
-      console.log(
-        "[extractAttachmentsJson] allResponses is empty, returning empty string"
-      );
       return "";
     }
 
@@ -547,44 +445,22 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     try {
       allResponsesArray = JSON.parse(agentResponse.allResponses);
       if (!Array.isArray(allResponsesArray) || allResponsesArray.length === 0) {
-        console.log(
-          "[extractAttachmentsJson] allResponses is not a valid array, returning empty string"
-        );
         return "";
       }
     } catch (error) {
-      console.log(
-        "[extractAttachmentsJson] Error parsing allResponses:",
-        error
-      );
       return "";
     }
 
     // Simple position logic: null/undefined = 0, otherwise use specified position
     const position = agentResponse.responseIndex ?? 0;
 
-    // Debug logging for position validation
-    console.log(
-      "[extractAttachmentsJson] Using position:",
-      position,
-      "Array length:",
-      allResponsesArray.length
-    );
-
     // Check if position is within bounds
     if (position < 0 || position >= allResponsesArray.length) {
-      console.log(
-        "[extractAttachmentsJson] Position out of bounds, returning empty string"
-      );
       return "";
     }
 
     // Get response at the specified position
     const responseAtPosition = allResponsesArray[position];
-    console.log(
-      "[extractAttachmentsJson] Response at position:",
-      responseAtPosition
-    );
 
     // Second check: empty(attachments of Agent Response based on position column) → return ""
     if (
@@ -593,53 +469,40 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       !Array.isArray(responseAtPosition.attachments) ||
       responseAtPosition.attachments.length === 0
     ) {
-      console.log(
-        "[extractAttachmentsJson] No attachments at position, returning empty string"
-      );
       return "";
     }
 
     // Final: string(attachments of Agent Response based on position column)
     try {
       const attachmentsJson = JSON.stringify(responseAtPosition.attachments);
-      console.log(
-        "[extractAttachmentsJson] Returning attachments JSON:",
-        attachmentsJson
-      );
       return attachmentsJson;
     } catch (error) {
-      console.log(
-        "[extractAttachmentsJson] Error stringifying attachments:",
-        error
-      );
       return "";
     }
   }
 
+  /**
+   * Calculate result code based on test type and validation logic
+   * Applies comprehensive business rules to determine test outcome based on agent response analysis
+   * @param testCase - Test case definition with validation criteria and type information
+   * @param configuration - Agent configuration for validation context
+   * @param agentResponseText - Position-based response text for validation
+   * @param isMatch - Optional match result from MessagingService validation
+   * @param agentResponse - Optional full agent response for accessing adaptive cards
+   * @returns Result code (1=Success, 2=Failed, 3=Unknown, 4=Error, 5=Pending)
+   * @private
+   */
   private calculateResultCode(
     testCase: AgentTestCase,
     configuration: AgentConfiguration,
     agentResponseText: string,
-    adaptiveCardJson: string,
-    expectedAttachmentsJson: string,
     isMatch?: boolean, // Add isMatch parameter from MessagingService validation
     agentResponse?: AgentResponse // Add agentResponse to access adaptiveCards
   ): number {
     const testType = testCase.testTypeCode;
     const isEmpty = (value: string) => !value || value.trim() === "";
 
-    console.log(
-      `DEBUG: calculateResultCode - testCase.name: ${
-        testCase.name
-      }, testType: ${testType}, isEmpty(agentResponseText): ${isEmpty(
-        agentResponseText
-      )}`
-    );
-
     if (isEmpty(agentResponseText)) {
-      console.log(
-        `DEBUG: calculateResultCode - Returning ERROR (${RESULT_CODES.ERROR}) due to empty agentResponseText`
-      );
       return RESULT_CODES.ERROR; // No response
     }
 
@@ -650,9 +513,6 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           const resultCode = isMatch
             ? RESULT_CODES.SUCCESS
             : RESULT_CODES.FAILED;
-          console.log(
-            `DEBUG: calculateResultCode - RESPONSE_MATCH with isMatch=${isMatch}, returning ${resultCode}`
-          );
           return resultCode;
         }
         const responseMatchResult = ResponseValidationEngine.validateResponse(
@@ -662,37 +522,20 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         )
           ? RESULT_CODES.SUCCESS
           : RESULT_CODES.FAILED;
-        console.log(
-          `DEBUG: calculateResultCode - RESPONSE_MATCH validation result: ${responseMatchResult}`
-        );
         return responseMatchResult;
       }
 
-      case TEST_TYPES.TOPIC_MATCH: {
-        const topicMatchResult =
-          configuration.isEnrichedWithConversationTranscripts
-            ? RESULT_CODES.PENDING
-            : RESULT_CODES.UNKNOWN;
-        console.log(
-          `DEBUG: calculateResultCode - TOPIC_MATCH, isEnriched=${configuration.isEnrichedWithConversationTranscripts}, returning ${topicMatchResult}`
-        );
-        return topicMatchResult;
-      }
-
+      case TEST_TYPES.TOPIC_MATCH:
       case TEST_TYPES.PLAN_VALIDATION: {
         // Plan Validation works the same as Topic Match
-        const planValidationResult =
+        const dataverseTranscriptResult =
           configuration.isEnrichedWithConversationTranscripts
             ? RESULT_CODES.PENDING
             : RESULT_CODES.UNKNOWN;
-        console.log(
-          `DEBUG: calculateResultCode - PLAN_VALIDATION, isEnriched=${configuration.isEnrichedWithConversationTranscripts}, returning ${planValidationResult}`
-        );
-        return planValidationResult;
+        return dataverseTranscriptResult;
       }
 
       case TEST_TYPES.ADAPTIVE_CARD: {
-        // New logic: Handle adaptive cards based on operation type code
         const operationTypeCode = testCase.operationTypeCode ?? 1; // Default to Comparison Operator
 
         // Handle different operation types with their specific result codes
@@ -703,15 +546,33 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           // Invoke Actions
           return RESULT_CODES.ERROR;
         } else {
-          // Comparison Operator - only call validation for this type
+          // Comparison Operator - use extracted attachments for consistency
+          const extractedAttachmentsJson = agentResponse
+            ? this.extractAttachmentsJson(agentResponse)
+            : "";
+
+          // Convert the extracted JSON string to AdaptiveCard array for validation
+          let actualAdaptiveCards: AdaptiveCard[] = [];
+          try {
+            if (
+              extractedAttachmentsJson &&
+              extractedAttachmentsJson.trim() !== ""
+            ) {
+              actualAdaptiveCards = JSON.parse(extractedAttachmentsJson);
+            }
+          } catch (parseError) {
+            // If parsing fails, use empty array
+            actualAdaptiveCards = [];
+          }
+
           const validationResult =
             ResponseValidationEngine.validateAdaptiveCards(
               operationTypeCode,
               testCase.comparisonOperatorCode ?? 1, // Default to Equals
               testCase.expectedAttachmentsJson || "",
               testCase.validationInstructions || "",
-              agentResponse?.adaptiveCards || [] // Use actual adaptive cards from agent response
-            );
+              actualAdaptiveCards // Use extracted and parsed attachments
+            ) as { success: boolean; reason: string };
 
           return validationResult.success
             ? RESULT_CODES.SUCCESS
@@ -741,6 +602,17 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     }
   }
 
+  /**
+   * Generate detailed result reason based on test type and validation outcome
+   * Provides specific reasoning for test result based on business logic and validation type
+   * @param testCase - Test case with type and validation configuration
+   * @param configuration - Agent configuration affecting validation capabilities
+   * @param agentResponseText - Response text for analysis
+   * @param resultCode - Calculated result code for context
+   * @param agentResponse - Optional agent response for adaptive card access
+   * @returns Human-readable reason explaining the test result
+   * @private
+   */
   private generateResultReason(
     testCase: AgentTestCase,
     configuration: AgentConfiguration,
@@ -766,18 +638,12 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           : "Not an exact match between the expected response and received message as per comparison operator";
 
       case TEST_TYPES.TOPIC_MATCH:
-        return configuration.isEnrichedWithConversationTranscripts
-          ? "Pending analysis of Conversation Transcripts"
-          : "Cannot be evaluated without Conversation Transcripts enrichment";
-
       case TEST_TYPES.PLAN_VALIDATION:
-        // Plan Validation works the same as Topic Match
         return configuration.isEnrichedWithConversationTranscripts
           ? "Pending analysis of Conversation Transcripts"
           : "Cannot be evaluated without Conversation Transcripts enrichment";
 
       case TEST_TYPES.ADAPTIVE_CARD: {
-        // New logic: Generate reason based on operation type code
         const operationTypeCode = testCase.operationTypeCode ?? 1;
 
         if (operationTypeCode === 2) {
@@ -787,24 +653,36 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           // Invoke Actions
           return "Invoke Actions is not currently supported with Microsoft Authentication";
         } else {
-          // Comparison Operator
-          // Get the detailed reason from validation result
+          // Comparison Operator - use extracted attachments for consistency
+          const extractedAttachmentsJson = agentResponse
+            ? this.extractAttachmentsJson(agentResponse)
+            : "";
+
+          // Convert the extracted JSON string to array for validation
+          let actualAdaptiveCards: AdaptiveCard[] = [];
+          try {
+            if (
+              extractedAttachmentsJson &&
+              extractedAttachmentsJson.trim() !== ""
+            ) {
+              actualAdaptiveCards = JSON.parse(extractedAttachmentsJson);
+            }
+          } catch (parseError) {
+            // If parsing fails, use empty array
+            actualAdaptiveCards = [];
+          }
+
           const validationResult =
             ResponseValidationEngine.validateAdaptiveCards(
               operationTypeCode,
               testCase.comparisonOperatorCode ?? 1,
               testCase.expectedAttachmentsJson || "",
               testCase.validationInstructions || "",
-              agentResponse?.adaptiveCards || []
-            );
+              actualAdaptiveCards
+            ) as { success: boolean; reason: string };
           return validationResult.reason;
         }
       }
-
-      // Comment out the old logic for now
-      // return resultCode === RESULT_CODES.SUCCESS
-      //   ? "Exact match between the expected attachment(s) JSON and the received attachment(s) JSON"
-      //   : "Not an exact match between the expected attachment(s) JSON and the received attachment(s) JSON";
 
       case TEST_TYPES.GENERATIVE_ANSWER: {
         const outcomeCode = testCase.generativeAnswerOutcomeCode;
@@ -827,6 +705,14 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     }
   }
 
+  /**
+   * Generate unique name for test result record
+   * Uses conversation ID if available, otherwise creates timestamped name
+   * @param testCase - Test case providing fallback name
+   * @param agentResponse - Agent response containing conversation ID
+   * @returns Unique name string for test result identification
+   * @private
+   */
   private generateUniqueName(
     testCase: AgentTestCase,
     agentResponse: AgentResponse
@@ -837,6 +723,13 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     );
   }
 
+  /**
+   * Calculate timestamps for test result record
+   * Computes message timestamp based on response time and current time
+   * @param agentResponse - Agent response containing response time data
+   * @returns Object with messageTimestamp and currentTime Date objects
+   * @private
+   */
   private calculateTimestamps(agentResponse: AgentResponse): {
     messageTimestamp: Date;
     currentTime: Date;
@@ -863,45 +756,42 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     const [timeWithoutMs, milliseconds] = timeWithoutZ.split(".");
 
     // Pad milliseconds to 7 digits (microseconds precision)
-    // JavaScript only provides 3 digits, so we pad with additional digits
     const paddedMs = (milliseconds || "000").padEnd(7, "0");
 
     // Reconstruct in the desired format
     return `${datePart}T${timeWithoutMs}.${paddedMs}Z`;
   }
 
+  /**
+   * Generate position-based response value for validation and storage
+   * Creates appropriate response value based on test type and position requirements
+   * @param testCase - Test case definition with position and type information
+   * @param agentResponse - Full agent response object for additional data access
+   * @returns Generated response value based on test type and position
+   * @private
+   */
   private generateResponseValue(
-    agentResponseText: string,
-    adaptiveCardJson: string,
     testCase: AgentTestCase,
     agentResponse: AgentResponse
   ): string {
-    // NEW IMPLEMENTATION: Parse all responses from agent (should already be filtered by MessagingService based on isStartConversationEventSent)
     let allResponsesArray: ParsedAgentResponse[] = [];
     try {
       if (agentResponse.allResponses) {
         const parsedResponses = JSON.parse(agentResponse.allResponses);
         allResponsesArray = parsedResponses;
-        console.log("DEBUG: Parsed allResponses array:", allResponsesArray);
       }
     } catch (error) {
-      console.log("DEBUG: Error parsing allResponses:", error);
       allResponsesArray = [];
     }
 
     const expectedPosition = testCase.expectedPositionOfTheResponseActivity;
     const isEmpty = (value: string) => !value || value.trim() === "";
 
-    console.log("DEBUG: expectedPosition:", expectedPosition);
-    console.log("DEBUG: allResponsesArray length:", allResponsesArray.length);
-
     // Check if Agent Response is empty (overall response) - this checks if allResponses exists and has content
     const isAgentResponseEmpty =
       !agentResponse.allResponses ||
       agentResponse.allResponses.trim() === "" ||
       allResponsesArray.length === 0;
-
-    console.log("DEBUG: isAgentResponseEmpty:", isAgentResponseEmpty);
 
     // Get the response at the expected position
     let responseAtPosition: ParsedAgentResponse | null = null;
@@ -915,19 +805,10 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       responseAtPosition = allResponsesArray[0]; // Default to first response
     }
 
-    console.log("DEBUG: responseAtPosition:", responseAtPosition);
-
     // Check if Agent Response based on position column is empty (response object doesn't exist)
     const isResponseAtPositionEmpty = !responseAtPosition;
 
-    console.log("DEBUG: isResponseAtPositionEmpty:", isResponseAtPositionEmpty);
-
-    // CORRECTED Power Automate logic:
-    // if(or(empty(Agent Response), empty(Agent Response based on position column)), 'No response', ...)
     if (isAgentResponseEmpty || isResponseAtPositionEmpty) {
-      console.log(
-        "DEBUG: Returning 'No response' due to empty overall response or no response at position"
-      );
       return "No response";
     }
 
@@ -935,18 +816,11 @@ export class AgentTestResultOperations extends DataverseOperationBase {
     const textAtPosition =
       ((responseAtPosition as ParsedAgentResponse)?.text as string) || "";
 
-    console.log("DEBUG: textAtPosition:", textAtPosition);
-    console.log("DEBUG: isEmpty(textAtPosition):", isEmpty(textAtPosition));
-
-    // CORRECTED: Now check if the TEXT at position is empty (not the response object itself)
-    // if(empty(text of Agent Response based on position column), ...)
     if (isEmpty(textAtPosition)) {
       // Check Adaptive Card attachments of Agent Response based on position column
       const attachmentsAtPosition =
         ((responseAtPosition as ParsedAgentResponse)
           ?.attachments as unknown[]) || [];
-
-      console.log("DEBUG: attachmentsAtPosition:", attachmentsAtPosition);
 
       const adaptiveCardsAtPosition = attachmentsAtPosition.filter(
         (att: unknown) => {
@@ -964,118 +838,32 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         }
       );
 
-      console.log("DEBUG: adaptiveCardsAtPosition:", adaptiveCardsAtPosition);
-
-      // if(not(empty(Adaptive Card attachments of Agent Response based on position column)), ...)
       if (adaptiveCardsAtPosition && adaptiveCardsAtPosition.length > 0) {
-        console.log(
-          "DEBUG: Returning 'No response, but attachments (Adaptive Cards, etc.)'"
-        );
         return "No response, but attachments (Adaptive Cards, etc.)";
       } else {
-        console.log(
-          "DEBUG: Returning 'No response' due to no adaptive cards and no text"
-        );
         return "No response";
       }
     }
 
-    // Return Agent Response based on position column (the text) - this is the final else case
-    console.log("DEBUG: Returning textAtPosition:", textAtPosition);
     return textAtPosition;
-
-    /* ORIGINAL IMPLEMENTATION - COMMENTED OUT FOR TESTING
-    // Determine the expected scenario based on the test case settings
-    let scenario = "";
-    if (
-      testCase.isStartConversationEventSent === false &&
-      testCase.expectedPositionOfTheResponseActivity == null
-    ) {
-      scenario = "Scenario 1: No start conversation, default position (0)";
-    } else if (
-      testCase.isStartConversationEventSent === false &&
-      testCase.expectedPositionOfTheResponseActivity != null
-    ) {
-      scenario = `Scenario 2: No start conversation, specific position (${testCase.expectedPositionOfTheResponseActivity})`;
-    } else if (
-      testCase.isStartConversationEventSent === true &&
-      testCase.expectedPositionOfTheResponseActivity == null
-    ) {
-      scenario =
-        "Scenario 3: With start conversation, default position (0 = start conversation)";
-    } else if (
-      testCase.isStartConversationEventSent === true &&
-      testCase.expectedPositionOfTheResponseActivity != null
-    ) {
-      scenario = `Scenario 4: With start conversation, specific position (${testCase.expectedPositionOfTheResponseActivity})`;
-    }
-
-    // Parse all responses from agent (should already be filtered by MessagingService based on isStartConversationEventSent)
-    // Logic handled in MessagingService:
-    // - If isStartConversationEventSent = false: startConversation activity is excluded from allActivities
-    // - If isStartConversationEventSent = true: startConversation activity is included in allActivities
-    // This affects:
-    // 1. cat_actualcompleteresponse (stored as agentResponse.allResponses)
-    // 2. cat_response (generated by this method using expectedPositionOfTheResponseActivity)
-    // 3. cat_result and cat_resultreason (calculated based on response at position)
-    let allResponsesArray: string[] = [];
-    try {
-      if (agentResponse.allResponses) {
-        const parsedResponses = JSON.parse(agentResponse.allResponses);
-        allResponsesArray = parsedResponses
-          .map((r: { text?: string }) => r.text || "")
-          .filter((text: string) => text.trim() !== "");
-      }
-    } catch (error) {
-      allResponsesArray = agentResponseText ? [agentResponseText] : [];
-    }
-
-    const expectedPosition = testCase.expectedPositionOfTheResponseActivity;
-
-    // Power Automate expression: if(or(Agent Response is empty, lessOrEquals(length(Agent Response), cat_expectedpositionoftheresponseactivity)), 'No response', ...)
-    const isEmpty = (value: string) => !value || value.trim() === "";
-    const isAgentResponseEmpty =
-      allResponsesArray.length === 0 ||
-      allResponsesArray.every((r) => isEmpty(r));
-    const isPositionOutOfBounds =
-      expectedPosition !== undefined &&
-      allResponsesArray.length <= expectedPosition;
-
-    if (isAgentResponseEmpty || isPositionOutOfBounds) {
-      return "No response";
-    }
-
-    // Get the response at the expected position
-    let responseAtPosition = "";
-    if (
-      expectedPosition !== undefined &&
-      expectedPosition >= 0 &&
-      expectedPosition < allResponsesArray.length
-    ) {
-      responseAtPosition = allResponsesArray[expectedPosition];
-    } else if (allResponsesArray.length > 0) {
-      // Default to first response (index 0) when position not specified
-      responseAtPosition = allResponsesArray[0];
-    } else {
-      // Fallback to agentResponseText if no responses in array
-      responseAtPosition = agentResponseText;
-    }
-
-    // Power Automate expression: if(empty(Agent Response based on cat_expectedpositionoftheresponseactivity), ...)
-    if (isEmpty(responseAtPosition)) {
-      // Power Automate expression: if(not(empty(Adaptive Card of Agent Response based cat_expectedpositionoftheresponseactivity)), 'No response, but attachments (Adaptive Cards, etc.)', 'No response')
-      if (!isEmpty(adaptiveCardJson) && adaptiveCardJson !== "[]") {
-        return "No response, but attachments (Adaptive Cards, etc.)";
-      } else {
-        return "No response";
-      }
-    }
-
-    // Power Automate expression: Agent Response based on cat_expectedpositionoftheresponseactivity
-    return responseAtPosition;
-    */
   }
 
+  /**
+   * Build comprehensive test result data object for Dataverse storage
+   * Constructs complete record with all required fields for test result tracking
+   * @param testCase - Test case providing base configuration and validation data
+   * @param testRunId - ID of the parent test run
+   * @param agentResponse - Complete agent response with timing and content data
+   * @param uniqueName - Unique identifier for this test result
+   * @param resultCode - Calculated result code (1=Success, 2=Failed, etc.)
+   * @param resultReason - Human-readable explanation of the result
+   * @param responseValue - Position-based response value for validation
+   * @param messageTimestamp - Timestamp when message was sent
+   * @param currentTime - Current processing time
+   * @param parentTestResultId - Optional parent test result for hierarchical tests
+   * @returns Complete data object ready for Dataverse record creation
+   * @private
+   */
   private buildTestResultData(
     testCase: AgentTestCase,
     testRunId: string,
@@ -1103,25 +891,20 @@ export class AgentTestResultOperations extends DataverseOperationBase {
       cat_responsereceivedtimestamp: this.formatTimestamp(currentTime),
       "cat_CopilotTestRunId@odata.bind": `/cat_copilottestruns(${testRunId})`,
       "cat_CopilotTestId@odata.bind": `/cat_copilottests(${testCase.id})`,
-
-      // Map test case fields to result - handle undefined integer fields properly
       cat_comparisonoperator: testCase.comparisonOperatorCode ?? null,
-      cat_operationtypecode: testCase.operationTypeCode ?? null, // Add new operation type code field
-      cat_adaptivecardpayload: testCase.adaptiveCardPayload, // Add adaptive card payload field
+      cat_operationtypecode: testCase.operationTypeCode ?? null,
+      cat_adaptivecardpayload: testCase.adaptiveCardPayload,
       cat_testutterance: testCase.testUtterance,
-      cat_expectedresponse: testCase.expectedResponse, // Always map expectedResponse directly
+      cat_expectedresponse: testCase.expectedResponse,
       cat_expectedtopicname: testCase.expectedTopicName,
-      cat_expectedtools: testCase.expectedTools, // Add new expected tools field for Plan Validation
-      cat_passthreshold: testCase.cat_passthreshold ?? null, // Copy pass threshold from test case
+      cat_expectedtools: testCase.expectedTools,
+      cat_passthreshold: testCase.cat_passthreshold ?? null,
       cat_generativeansweroutcomecode:
         testCase.generativeAnswerOutcomeCode ?? null,
       cat_externalvariablesjson: testCase.externalVariablesJson,
       cat_isstartconversationeventsent: testCase.isStartConversationEventSent,
     };
 
-    // Handle expected position logic
-    // With the new start conversation filtering logic, the position can be used directly
-    // since the allActivities array is already filtered based on isStartConversationEventSent
     if (testCase.expectedPositionOfTheResponseActivity !== undefined) {
       testResultData.cat_expectedpositionoftheresponseactivity =
         testCase.expectedPositionOfTheResponseActivity;
@@ -1146,27 +929,13 @@ export class AgentTestResultOperations extends DataverseOperationBase {
         testCase.expectedAttachmentsJson;
     }
 
-    // Always populate actual attachments JSON regardless of whether expected attachments are provided
-    // OLD LOGIC - COMMENTED OUT: Using global adaptiveCards instead of position-based extraction
-    // if (agentResponse.adaptiveCards && agentResponse.adaptiveCards.length > 0) {
-    //   testResultData.cat_attachmentsjson = JSON.stringify(
-    //     agentResponse.adaptiveCards
-    //   );
-    // } else {
-    //   testResultData.cat_attachmentsjson = "";
-    // }
-
-    // NEW LOGIC: Position-based attachments extraction following Power Automate expression pattern
-    testResultData.cat_attachmentsjson = this.extractAttachmentsJson(
-      agentResponse,
-      testCase
-    );
+    // Position-based attachments extraction
+    testResultData.cat_attachmentsjson =
+      this.extractAttachmentsJson(agentResponse);
 
     // Add suggested actions JSON based on position column
-    testResultData.cat_suggestedactionsjson = this.extractSuggestedActionsJson(
-      agentResponse,
-      testCase
-    );
+    testResultData.cat_suggestedactionsjson =
+      this.extractSuggestedActionsJson(agentResponse);
 
     // Add parent reference if provided
     if (parentTestResultId) {

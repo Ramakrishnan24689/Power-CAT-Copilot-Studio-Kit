@@ -1,3 +1,24 @@
+/**
+ * TestExecutor.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides core test execution engine for PowerApps PCF Agent Testing framework.
+ * Orchestrates complete test execution lifecycle including agent authentication,
+ * test case execution (single-turn and multiturn), result tracking, and enrichment operations.
+ * Handles parallel test execution with configurable concurrency control and comprehensive error handling.
+ *
+ * Exports:
+ *   - TestRunner: Primary service class for agent test execution and lifecycle management.
+ *   - Semaphore: Concurrency control implementation for parallel test execution.
+ *
+ * Usage:
+ *   const testRunner = new TestRunner(context, errorLogger);
+ *   await testRunner.initialize(agentConfig);
+ *   const summary = await testRunner.runCompleteTestSuite(testRunId, progressCallback);
+ */
+
 import { ConversationManager } from "../agent/ConversationManager";
 import { MessagingService } from "../agent/MessagingService";
 import { AgentTestResultOperations } from "../dataverse/AgentTestResultOperations";
@@ -36,6 +57,17 @@ const TEST_RUN_STATUS = {
   ERROR: 6,
 } as const;
 
+/**
+ * TestRunner
+ *
+ * Core test execution service for PowerApps PCF Agent Testing framework.
+ * Orchestrates complete test lifecycle including agent authentication, parallel execution,
+ * result tracking, and post-execution enrichment operations.
+ *
+ * This service integrates multiple components to deliver comprehensive testing capabilities
+ * with support for both single-turn and multiturn conversation patterns, configurable
+ * concurrency control, and real-time progress monitoring for UI integration.
+ */
 export class TestRunner {
   private conversationManager: ConversationManager;
   private messagingService: MessagingService;
@@ -46,9 +78,21 @@ export class TestRunner {
   private postExecOps: PostExecuteActions;
   private multiturnManager: MultiturnConversationManager;
   private configuration?: AgentConfiguration;
+  private context: ComponentFramework.Context<unknown>;
+  private errorLogger?: (error: string) => void;
 
-  constructor(context: ComponentFramework.Context<unknown>) {
-    this.conversationManager = new ConversationManager();
+  /**
+   * Creates a new TestRunner instance with required Dataverse operation dependencies.
+   * @param context - The PowerApps Component Framework context for Dataverse operations.
+   * @param onError - Optional error callback function for logging and error handling.
+   */
+  constructor(
+    context: ComponentFramework.Context<unknown>,
+    onError?: (error: string) => void
+  ) {
+    this.context = context;
+    this.errorLogger = onError;
+    this.conversationManager = new ConversationManager(context, onError);
     this.messagingService = new MessagingService(this.conversationManager);
     this.testResultOps = new AgentTestResultOperations(context);
     this.testSetOps = new AgentTestSetOperations(context);
@@ -62,9 +106,23 @@ export class TestRunner {
   }
 
   /**
-   * Initializes the test runner with agent configuration
-   * Sets up the conversation manager and prepares for test execution
-   * @param agentConfig - Configuration for the agent connection and settings
+   * Sets the error logger callback for cloud configuration warnings and errors
+   * @param logger - Function that handles error logging
+   */
+  setErrorLogger(logger: (error: string) => void): void {
+    this.errorLogger = logger;
+    this.conversationManager = new ConversationManager(this.context, logger);
+    this.messagingService = new MessagingService(this.conversationManager);
+    this.multiturnManager = new MultiturnConversationManager(
+      this.messagingService,
+      this.context
+    );
+  }
+
+  /**
+   * Initializes the TestRunner with agent configuration and validates connectivity.
+   * @param agentConfig - The agent configuration containing authentication and connection details.
+   * @returns Promise that resolves when initialization and validation are complete.
    */
   async initialize(agentConfig: AgentConfiguration): Promise<void> {
     this.configuration = agentConfig;
@@ -75,9 +133,8 @@ export class TestRunner {
   }
 
   /**
-   * Validates that the agent connection is working properly
-   * Creates a test conversation to verify bot identifier and connection
-   * @throws Error if agent connection fails
+   * Validates agent connectivity and readiness for test execution.
+   * @returns Promise that resolves when agent connection is validated successfully.
    */
   private async validateAgentConnection(): Promise<void> {
     try {
@@ -110,10 +167,10 @@ export class TestRunner {
           `Invalid bot identifier: The bot identifier "${
             this.configuration?.botIdentifier || "unknown"
           }" was not found. Please verify:
-1. The bot identifier is correct
-2. The agent is published and accessible
-3. You have permission to access this agent in the specified environment
-Original error: ${errorMessage}`
+                1. The bot identifier is correct
+                2. The agent is published and accessible
+                3. You have permission to access this agent in the specified environment
+                Original error: ${errorMessage}`
         );
       }
 
@@ -133,11 +190,12 @@ Original error: ${errorMessage}`
       } else if (
         errorMessage.toLowerCase().includes("auth") ||
         errorMessage.toLowerCase().includes("unauthorized") ||
-        errorMessage.toLowerCase().includes("401")
+        errorMessage.toLowerCase().includes("401") ||
+        errorMessage.toLowerCase().includes("clientid") ||
+        errorMessage.toLowerCase().includes("tenantid")
       ) {
-        throw new Error(
-          `Authentication failed during agent validation: Please check your credentials and permissions. Original error: ${errorMessage}`
-        );
+        // For authentication errors, re-throw original error without wrapping
+        throw error;
       } else {
         throw new Error(`Agent connection validation failed: ${errorMessage}`);
       }
@@ -145,11 +203,10 @@ Original error: ${errorMessage}`
   }
 
   /**
-   * Executes a single test case (either single-turn or multiturn)
-   * Handles different test types and creates appropriate test results
-   * @param testCase - The test case to execute
-   * @param testRunId - ID of the current test run for result tracking
-   * @returns Promise resolving to object with success status and result code
+   * Executes a single test case with comprehensive result tracking.
+   * @param testCase - The test case containing test data and configuration.
+   * @param testRunId - Unique identifier of the current test run for result tracking.
+   * @returns Promise resolving to execution result with success status and result code.
    */
   async executeTest(
     testCase: AgentTestCase,
@@ -163,9 +220,7 @@ Original error: ${errorMessage}`
           testRunId,
           this.configuration!
         );
-
-        // For multiturn tests, we need to get the actual result code from Dataverse
-        // For now, return based on success, but this should be improved to get actual code
+        // For multiturn tests, return based on immediate success; donut will be aligned by monitoring via DB history
         return {
           success,
           resultCode: success ? RESULT_CODES.SUCCESS : RESULT_CODES.FAILED,
@@ -196,12 +251,17 @@ Original error: ${errorMessage}`
 
       return { success, resultCode };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
       return { success: false, resultCode: RESULT_CODES.ERROR }; // Error code
     }
   }
 
+  /**
+   * Executes all test cases with parallel processing and comprehensive progress tracking.
+   * @param testCases - Array of test cases to execute in the current test run.
+   * @param testRunId - Unique identifier of the test run for result tracking.
+   * @param onProgress - Optional callback for real-time progress updates during execution.
+   * @returns Promise resolving to comprehensive test execution summary with metrics.
+   */
   async executeAllTests(
     testCases: AgentTestCase[],
     testRunId: string,
@@ -308,7 +368,7 @@ Original error: ${errorMessage}`
         // Update summary for error
         this.updateSummaryWithResultCode(summary, RESULT_CODES.ERROR);
 
-        // Account for failed test case (count only parent test case for UI)
+        // Account for failed test case
         completedCount += 1; // Count only the parent test case
 
         onProgress(completedCount);
@@ -365,6 +425,12 @@ Original error: ${errorMessage}`
     }
   }
 
+  /**
+   * Executes a complete test suite with full lifecycle management.
+   * @param testRunId - Unique identifier of the test run to execute.
+   * @param onProgress - Optional callback for real-time progress updates during execution.
+   * @returns Promise resolving to comprehensive test execution summary with detailed metrics.
+   */
   async runCompleteTestSuite(
     testRunId: string,
     onProgress?: (
@@ -419,7 +485,7 @@ Original error: ${errorMessage}`
         onProgress
       );
 
-      // Determine final status based on test execution, not test results
+      // Determine final status based on test execution
       // Test run should only be marked as ERROR when there are execution exceptions,
       // not when individual test cases fail their assertions
       const finalStatus: number = TEST_RUN_STATUS.COMPLETE; // Complete (3) - all tests executed successfully
@@ -433,8 +499,7 @@ Original error: ${errorMessage}`
 
       // Invoke the rollup columns update action after test completion
       try {
-        const rollupSuccess =
-          await this.postExecOps.invokeRunRollupColumnsUpdates(testRunId);
+        await this.postExecOps.invokeRunRollupColumnsUpdates(testRunId);
       } catch (error) {
         // Log the error but don't fail the test run
       }
@@ -471,96 +536,67 @@ Original error: ${errorMessage}`
     summary: TestExecutionSummary,
     resultCode: number
   ): void {
-    console.log(
-      `DEBUG: Processing result code ${resultCode} for summary update`
-    );
-    console.log(`DEBUG: Summary before update:`, {
-      totalTests: summary.totalTests,
-      successTests: summary.successTests,
-      failedTests: summary.failedTests,
-      errorTests: summary.errorTests,
-      unknownTests: summary.unknownTests,
-      pendingTests: summary.pendingTests,
-    });
-
     switch (resultCode) {
       case RESULT_CODES.SUCCESS: // Success
         summary.successTests++;
         summary.resultCodeBreakdown!.success++;
-        console.log(
-          `DEBUG: Incremented successTests to ${summary.successTests}`
-        );
         break;
       case RESULT_CODES.FAILED: // Failed
         summary.failedTests++;
         summary.resultCodeBreakdown!.failed++;
-        console.log(`DEBUG: Incremented failedTests to ${summary.failedTests}`);
         break;
       case RESULT_CODES.UNKNOWN: // Unknown
         summary.unknownTests = (summary.unknownTests || 0) + 1;
         summary.resultCodeBreakdown!.unknown++;
-        console.log(
-          `DEBUG: Incremented unknownTests to ${summary.unknownTests}`
-        );
         break;
       case RESULT_CODES.ERROR: // Error
         summary.errorTests++;
         summary.resultCodeBreakdown!.error++;
-        console.log(`DEBUG: Incremented errorTests to ${summary.errorTests}`);
         break;
       case RESULT_CODES.PENDING: // Pending
         summary.pendingTests = (summary.pendingTests || 0) + 1;
         summary.resultCodeBreakdown!.pending++;
-        console.log(
-          `DEBUG: Incremented pendingTests to ${summary.pendingTests}`
-        );
         break;
       default:
         // Default to error for unexpected codes
         summary.errorTests++;
         summary.resultCodeBreakdown!.error++;
-        console.log(
-          `DEBUG: Unexpected result code ${resultCode}, incremented errorTests to ${summary.errorTests}`
-        );
         break;
     }
-
-    console.log(`DEBUG: Summary after update:`, {
-      totalTests: summary.totalTests,
-      successTests: summary.successTests,
-      failedTests: summary.failedTests,
-      errorTests: summary.errorTests,
-      unknownTests: summary.unknownTests,
-      pendingTests: summary.pendingTests,
-    });
   }
 
   /**
    * Checks if the test runner has been properly initialized
    * @returns True if the conversation manager is ready for test execution
    */
-
   isInitialized(): boolean {
     return this.conversationManager.isInitialized();
   }
 }
 
 /**
- * Simple semaphore implementation for controlling concurrency
+ * Semaphore
+ *
+ * Lightweight semaphore implementation for controlling concurrent test execution.
+ * Provides permit-based access control to limit simultaneous operations and prevent
+ * resource exhaustion during parallel test processing.
  */
 class Semaphore {
   private permits: number;
   private waitQueue: (() => void)[] = [];
 
+  /**
+   * Creates a new Semaphore with the specified number of permits.
+   * @param permits - Maximum number of concurrent operations allowed.
+   */
   constructor(permits: number) {
     this.permits = permits;
   }
 
   /**
-   * Acquires a permit from the semaphore, blocking if none are available
-   * Used to control concurrency by limiting the number of simultaneous operations
+   * Acquires a permit from the semaphore for resource access.
+   * @returns Promise that resolves when a permit is successfully acquired.
    */
-
   async acquire(): Promise<void> {
     return new Promise<void>((resolve) => {
       if (this.permits > 0) {
@@ -573,10 +609,8 @@ class Semaphore {
   }
 
   /**
-   * Releases a permit back to the semaphore
-   * Allows waiting operations to proceed if any are in the queue
+   * Releases a permit back to the semaphore for other operations to use.
    */
-
   release(): void {
     this.permits++;
     if (this.waitQueue.length > 0) {

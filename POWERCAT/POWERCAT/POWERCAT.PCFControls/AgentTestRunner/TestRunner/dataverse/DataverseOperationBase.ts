@@ -1,7 +1,24 @@
 /**
- * Base class for Dataverse operations
- * Provides common functionality and patterns for all Dataverse services
+ * DataverseOperationBase.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides abstract base class for all Dataverse operation implementations with consistent
+ * error handling, context management, and action execution patterns. Includes standardized
+ * metadata definitions for Dataverse actions and utility methods for organization access.
+ *
+ * Exports:
+ *   - ActionMetadata: Interface for Dataverse action metadata definitions.
+ *   - DataverseOperationBase: Abstract base class for Dataverse operations.
+ *
+ * Usage:
+ *   class MyOperations extends DataverseOperationBase {
+ *     constructor(context) { super(context, "MyOperations"); }
+ *     async myMethod() { return this.executeOperation(async () => { ... }, "My operation"); }
+ *   }
  */
+
 export interface ActionMetadata {
   boundParameter: string;
   parameterTypes: Record<
@@ -15,28 +32,19 @@ export interface ActionMetadata {
   operationName: string;
 }
 
-interface ActionExecutionRequest {
-  entity: {
-    entityType: string;
-    id: string | null;
-  };
-  DataverseUriHost: string;
-  CopilotTestRunId: string;
-  getMetadata(): ActionMetadata;
-}
-
 /**
  * Abstract base class for all Dataverse operation classes
- * Provides common context, error handling, and utility methods
+ * Provides common context, error handling, and utility methods for consistent operation patterns
+ * @abstract DataverseOperationBase
  */
 export abstract class DataverseOperationBase {
   protected context: ComponentFramework.Context<unknown>;
   protected serviceName: string;
 
   /**
-   * Initialize base Dataverse operation class
-   * @param context - Power Platform Component Framework context
-   * @param serviceName - Name of the derived service for logging
+   * Initialize base Dataverse operation class with context and service identification
+   * @param context - Power Platform Component Framework context for API access
+   * @param serviceName - Name of the derived service class for logging and identification
    */
   constructor(
     context: ComponentFramework.Context<unknown>,
@@ -47,9 +55,9 @@ export abstract class DataverseOperationBase {
   }
 
   /**
-   * Helper method to extract error message from unknown error type
-   * @param error - Error object or unknown type
-   * @returns Error message string
+   * Helper method to extract error message from unknown error type for consistent error reporting
+   * @param error - Error object or unknown type from catch blocks
+   * @returns Human-readable error message string
    */
   protected extractErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : "Unknown error";
@@ -57,9 +65,11 @@ export abstract class DataverseOperationBase {
 
   /**
    * Execute a Dataverse operation with consistent error handling and logging
-   * @param operation - The Dataverse operation to execute
-   * @param operationName - Description of the operation for logging
+   * Throws errors for proper exception handling in calling code
+   * @param operation - The Dataverse operation function to execute
+   * @param operationName - Description of the operation for logging and debugging
    * @returns Promise resolving to operation result
+   * @throws {Error} Re-throws original error after processing for proper error handling
    */
   protected async executeOperation<T>(
     operation: () => Promise<T>,
@@ -69,15 +79,16 @@ export abstract class DataverseOperationBase {
       return await operation();
     } catch (error) {
       const errorMessage = this.extractErrorMessage(error);
-      throw error;
+      throw errorMessage;
     }
   }
 
   /**
-   * Execute a Dataverse operation safely (won't throw, returns null on failure)
-   * @param operation - The Dataverse operation to execute
-   * @param operationName - Description of the operation for logging
-   * @returns Promise resolving to operation result or null
+   * Execute a Dataverse operation safely without throwing exceptions
+   * Returns null on failure for operations where error handling is optional
+   * @param operation - The Dataverse operation function to execute
+   * @param operationName - Description of the operation for logging and debugging
+   * @returns Promise resolving to operation result or null on failure
    */
   protected async executeOperationSafely<T>(
     operation: () => Promise<T>,
@@ -87,13 +98,16 @@ export abstract class DataverseOperationBase {
       return await operation();
     } catch (error) {
       const errorMessage = this.extractErrorMessage(error);
+      console.error(
+        `[${this.serviceName}] Failed to execute operation "${operationName}": ${errorMessage}`
+      );
       return null;
     }
   }
 
   /**
-   * Get organization URL from context
-   * @returns Organization URL string
+   * Get organization URL from Power Platform context for API operations
+   * @returns Organization URL string or empty string if not available
    */
   protected getOrgUrl(): string {
     return (
@@ -106,8 +120,8 @@ export abstract class DataverseOperationBase {
   }
 
   /**
-   * Get organization host from context (without protocol and paths)
-   * @returns Organization host string (e.g., "copilotstudiokit-plan.crm.dynamics.com")
+   * Get organization hostname from context without protocol and paths for action requests
+   * @returns Organization host string (e.g., "organization.crm.dynamics.com") or fallback value
    */
   protected getOrgHost(): string {
     const orgUrl = this.getOrgUrl();
@@ -124,11 +138,14 @@ export abstract class DataverseOperationBase {
   }
 
   /**
-   * Create action-specific request based on action metadata
-   * @param actionName - Name of the action to invoke
-   * @param entityId - GUID of the entity
-   * @param actionRequest - Request parameters
-   * @returns Action execution request object
+   * Create action-specific request based on predefined action metadata
+   * Dynamically builds request object with proper parameters for Dataverse actions
+   * @param actionName - Name of the Dataverse action to invoke
+   * @param entityId - GUID of the target entity record
+   * @param actionRequest - Request parameters specific to the action
+   * @returns Action execution request object with metadata and parameters
+   * @throws {Error} When action name is not recognized in metadata definitions
+   * @private
    */
   private createActionRequest(
     actionName: string,
@@ -140,7 +157,7 @@ export abstract class DataverseOperationBase {
       id: entityId,
     };
 
-    // Define action metadata based on the provided XML schema
+    // Define action metadata based on Dataverse action schemas
     const actionMetadata: Record<string, ActionMetadata> = {
       cat_RunRollupColumnsUpdates: {
         boundParameter: "entity",
@@ -247,12 +264,13 @@ export abstract class DataverseOperationBase {
   }
 
   /**
-   * Execute a standard Dataverse fetch action
-   * @param entityType - Dataverse entity logical name
-   * @param entityId - GUID of the entity
-   * @param actionName - Name of the action to invoke
-   * @param actionRequest - Request body for the action
-   * @returns Promise resolving to boolean indicating success
+   * Execute a standard Dataverse action with consistent error handling and response processing
+   * Handles authentication, response parsing, and error scenarios for action execution
+   * @param entityType - Dataverse entity logical name (not used in current implementation)
+   * @param entityId - GUID of the target entity record
+   * @param actionName - Name of the Dataverse action to invoke
+   * @param actionRequest - Request body parameters for the action
+   * @returns Promise resolving to boolean indicating success or failure
    */
   protected async executeDataverseAction(
     entityType: string,
@@ -269,35 +287,17 @@ export abstract class DataverseOperationBase {
           actionRequest
         );
 
-        // Execute using PCF WebAPI - use unknown cast to avoid TypeScript issues
         const webAPI = this.context.webAPI as unknown as {
           execute: (request: unknown) => Promise<Response>;
         };
         const response = await webAPI.execute(actionExecutionRequest);
 
         if (response.ok) {
-          // Try to get response body if available
-          try {
-            const responseBody = await (response.json?.() ??
-              Promise.resolve({}));
-          } catch (textError) {
-            // Response might not have JSON content, which is fine
-          }
-
           return true;
         } else {
-          let errorText = "";
-          try {
-            errorText = await response.text();
-          } catch (e) {
-            errorText = "Unable to read error response";
-          }
-
-          // If it's a 401, this might be an authentication issue
-          if (response.status === 401) {
-            // Handle authentication error
-          }
-
+          console.error(
+            `[${this.serviceName}] Dataverse action "${actionName}" failed with HTTP status: ${response.status} ${response.statusText}`
+          );
           return false;
         }
       } catch (error) {

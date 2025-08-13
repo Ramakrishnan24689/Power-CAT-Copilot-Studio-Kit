@@ -1,14 +1,39 @@
 /**
- * Agent Test Set Operations for Dataverse
- * Handles operations related to agent test sets and test cases
+ * AgentTestSetOperations.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides comprehensive service for managing agent test sets and test cases within the
+ * Microsoft Dataverse environment. Handles retrieval, mapping, and management of test data
+ * structures with support for hierarchical multiturn test scenarios.
+ *
+ * Exports:
+ *   - AgentTestSetOperations: Main class for test set and test case operations.
+ *
+ * Usage:
+ *   const testSetOps = new AgentTestSetOperations(context);
+ *   const testSet = await testSetOps.getTestSet(testSetId);
+ *   const testCases = await testSetOps.getTestCases(testSetId);
  */
 
 import { DataverseOperationBase } from "./DataverseOperationBase";
 import type { AgentTestSet, AgentTestCase } from "../shared/models/DataModels";
 
 /**
- * Service for managing agent test set and test case operations in Dataverse
- * Handles retrieval and management of test data structures
+ * Service for managing agent test set and test case operations in Microsoft Dataverse
+ *
+ * Provides comprehensive functionality for retrieving and managing test data structures
+ * with full support for hierarchical multiturn test scenarios.
+ *
+ * Business Logic:
+ * - Retrieves test sets with associated metadata
+ * - Loads test cases with complete attribute mapping
+ * - Supports parent-child test relationships for multiturn scenarios
+ * - Implements optimized data loading patterns for performance
+ * - Maintains referential integrity across test hierarchies
+ *
+ * @extends DataverseOperationBase
  */
 export class AgentTestSetOperations extends DataverseOperationBase {
   constructor(context: ComponentFramework.Context<unknown>) {
@@ -16,9 +41,12 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   }
 
   /**
-   * Retrieve Agent Test Set information by ID
-   * @param testSetId - GUID of the test set
-   * @returns Promise resolving to AgentTestSet object
+   * Retrieve Agent Test Set information by unique identifier
+   *
+   * @param testSetId - GUID of the test set to retrieve
+   * @returns Promise resolving to AgentTestSet object with id and name
+   * @throws Error if test set not found or access denied
+   * @public
    */
   async getTestSet(testSetId: string): Promise<AgentTestSet> {
     return this.executeOperation(async () => {
@@ -36,9 +64,12 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   }
 
   /**
-   * Retrieve all test cases for a test set
-   * @param testSetId - GUID of the test set
-   * @returns Promise resolving to array of AgentTestCase objects
+   * Retrieve all test cases for a specified test set
+   *
+   * @param testSetId - GUID of the test set containing the test cases
+   * @returns Promise resolving to array of AgentTestCase objects with child tests loaded
+   * @throws Error if test set not found or query execution fails
+   * @public
    */
   async getTestCases(testSetId: string): Promise<AgentTestCase[]> {
     return this.executeOperation(async () => {
@@ -91,9 +122,12 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   }
 
   /**
-   * Retrieve child test cases for a parent test
+   * Retrieve child test cases for a parent test in multiturn scenarios
+   *
    * @param parentTestId - GUID of the parent test case
    * @returns Promise resolving to array of child AgentTestCase objects
+   * @throws Error if parent test not found or query execution fails
+   * @public
    */
   async getChildTestCases(parentTestId: string): Promise<AgentTestCase[]> {
     return this.executeOperation(async () => {
@@ -142,10 +176,12 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   // Private helper methods
 
   /**
-   * Map Dataverse entities to AgentTestCase objects
+   * Map Dataverse entities to strongly-typed AgentTestCase objects
+   *
    * @param entities - Raw entities from Dataverse response
    * @param testSetId - GUID of the test set (optional, used when not in entity data)
-   * @returns Array of mapped AgentTestCase objects
+   * @returns Array of mapped AgentTestCase objects with full type safety
+   * @private
    */
   private mapTestCaseEntities(
     entities: Record<string, unknown>[],
@@ -163,7 +199,7 @@ export class AgentTestSetOperations extends DataverseOperationBase {
       expectedPositionOfTheResponseActivity:
         entity.cat_expectedpositionoftheresponseactivity as number,
       expectedTopicName: entity.cat_expectedtopicname as string,
-      expectedTools: entity.cat_expectedtools as string, // Add expectedTools mapping
+      expectedTools: entity.cat_expectedtools as string,
       isStartConversationEventSent:
         entity.cat_isstartconversationeventsent as boolean,
       externalVariablesJson: entity.cat_externalvariablesjson as string,
@@ -182,8 +218,13 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   }
 
   /**
-   * Load child test cases for multiturn test cases
+   * Load child test cases for multiturn test scenarios
+   * Automatically identifies multiturn test cases (testTypeCode = 5) and loads
+   * their associated child test cases to support hierarchical test execution.
+   *
    * @param testCases - Array of test cases to check for multiturn tests
+   * @returns Promise that resolves when all child test cases are loaded
+   * @private
    */
   private async loadChildTestCases(testCases: AgentTestCase[]): Promise<void> {
     for (const testCase of testCases) {

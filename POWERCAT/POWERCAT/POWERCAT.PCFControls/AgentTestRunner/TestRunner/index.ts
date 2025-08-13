@@ -1,6 +1,17 @@
 /**
- * Agent Test Runner PCF Control
- * Main control implementation for executing Agent tests
+ * index.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides main PCF control implementation for Agent Test Runner.
+ *
+ * Exports:
+ *   - TestRunner: Main PCF control class implementing StandardControl interface.
+ *
+ * Usage:
+ *   // Automatically instantiated by PowerApps framework
+ *   // Control configured through ControlManifest.Input.xml
  */
 
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
@@ -9,9 +20,11 @@ import { FluentTestRunnerManager } from "./ui/FluentTestRunnerUI";
 import { TestRunnerController } from "./testing/ExecutionController";
 
 /**
- * TestRunner PCF Control
- * Provides a user interface for executing and monitoring Agent tests
- * Business logic is handled by TestRunnerController for better separation of concerns
+ * TestRunner
+ *
+ * Main PCF control for executing and monitoring Agent tests.
+ * Provides user interface integration with test execution services and comprehensive
+ * business logic separation through controller pattern implementation.
  */
 export class TestRunner
   implements ComponentFramework.StandardControl<IInputs, IOutputs>
@@ -30,11 +43,11 @@ export class TestRunner
   private entityId: string | null = null;
 
   /**
-   * Initialize the PCF control
-   * @param context - PCF context containing parameters and platform capabilities
-   * @param notifyOutputChanged - Callback to notify framework of output changes
-   * @param state - State dictionary for control persistence
-   * @param container - HTML container element for the control
+   * Initializes the PCF control with required services and UI components.
+   * @param context - PCF context containing parameters and platform capabilities.
+   * @param notifyOutputChanged - Callback to notify framework of output changes.
+   * @param state - State dictionary for control persistence.
+   * @param container - HTML container element for the control.
    */
   public init(
     context: ComponentFramework.Context<IInputs>,
@@ -71,13 +84,21 @@ export class TestRunner
       this.entityId
     );
 
+    // Set up error logging bridge from TestRunnerService to Controller
+    this.testRunnerService.setErrorLogger((error: string) => {
+      // Route errors to controller's logging system
+      if (this.controller) {
+        this.controller.logError(error);
+      }
+    });
+
     // Initialize the controller which will handle all business logic
     this.controller.initialize();
   }
 
   /**
-   * Update the view when parameters change
-   * @param context - Updated PCF context
+   * Updates the view when parameters change.
+   * @param context - Updated PCF context.
    */
   public updateView(context: ComponentFramework.Context<IInputs>): void {
     // Update context reference
@@ -86,15 +107,15 @@ export class TestRunner
   }
 
   /**
-   * Get the outputs for the PCF control
-   * @returns Output values for the control
+   * Gets the outputs for the PCF control.
+   * @returns Output values for the control.
    */
   public getOutputs(): IOutputs {
     return {};
   }
 
   /**
-   * Clean up resources when the control is destroyed
+   * Cleans up resources when the control is destroyed.
    */
   public destroy(): void {
     // Clean up controller

@@ -1,5 +1,18 @@
 /**
- * FluentUI Test Execution Chart with DonutChart - Enhanced with legend and percentages
+ * FluentChart.tsx
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides FluentUI test execution chart with DonutChart visualization.
+ * Displays test result data with interactive legend, hover effects, and mobile responsiveness.
+ * Integrates with test execution summary data for comprehensive result visualization.
+ *
+ * Exports:
+ *   - FluentChart: React component for rendering test execution donut charts with legends.
+ *
+ * Usage:
+ *   const chart = <FluentChart summary={testExecutionSummary} />;
  */
 
 import React, { useMemo, useState, useCallback } from "react";
@@ -189,7 +202,7 @@ const useStyles = makeStyles({
     color: tokens.colorBrandForeground2,
   },
 
-  // Chart segment hover effects (applied via CSS custom properties)
+  // Chart segment hover effects
   chartHighlighted: {
     filter: "brightness(1.15) saturate(1.1)",
     transform: "scale(1.05)",
@@ -197,6 +210,10 @@ const useStyles = makeStyles({
   },
 });
 
+/**
+ * FluentChart component for displaying test execution results in a donut chart.
+ * @param summary - Test execution summary containing result data.
+ */
 const FluentChart: React.FC<{ summary: TestExecutionSummary }> = ({
   summary,
 }) => {
@@ -207,12 +224,14 @@ const FluentChart: React.FC<{ summary: TestExecutionSummary }> = ({
     null
   );
 
-  // Hover handlers for bidirectional effects
+  /**
+   * Handles bidirectional hover effects between legend and chart segments.
+   * @param segmentLabel - The label of the segment being hovered or null to clear highlighting.
+   */
   const handleLegendHover = useCallback((segmentLabel: string | null) => {
     setHighlightedSegment(segmentLabel);
 
     // Apply chart segment highlighting via DOM manipulation
-    // Target FluentUI chart paths more reliably
     const chartContainer = document.querySelector(
       ".ms-Chart, [class*='Chart'], [data-testid='chart']"
     );
@@ -257,6 +276,10 @@ const FluentChart: React.FC<{ summary: TestExecutionSummary }> = ({
     }
   }, []);
 
+  /**
+   * Handles chart segment hover effects.
+   * @param segmentLabel - The label of the chart segment being hovered.
+   */
   const handleChartHover = useCallback((segmentLabel: string | null) => {
     setHighlightedSegment(segmentLabel);
   }, []);
@@ -337,9 +360,7 @@ const FluentChart: React.FC<{ summary: TestExecutionSummary }> = ({
             chartTitle: "",
             chartData: chartData,
           }}
-          hideLegend={true} // We'll create our own legend
-          //height={220}
-          //width={220}
+          hideLegend={true}
           innerRadius={55}
           hideTooltip={false}
           showLabelsInPercent={false}

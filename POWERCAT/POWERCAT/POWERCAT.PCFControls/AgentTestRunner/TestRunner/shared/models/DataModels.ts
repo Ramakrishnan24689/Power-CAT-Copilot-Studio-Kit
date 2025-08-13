@@ -1,11 +1,31 @@
+/**
+ * DataModels.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides comprehensive type definitions for agent testing framework components.
+ * Defines interfaces for test configurations, responses, results, and execution metadata
+ *
+ * Usage:
+ *   import type { AgentTestCase, AgentResponse } from './DataModels';
+ *   const testCase: AgentTestCase = { id: '...', name: '...', ... };
+ *   const response: AgentResponse = { message: '...', timestamp: new Date(), ... };
+ */
+
 import type { Activity } from "@microsoft/agents-activity";
 
-// Common types for agent responses
+/**
+ * Adaptive card content structure for agent responses
+ */
 export interface AdaptiveCard {
   contentType: string;
   content: Record<string, unknown>;
 }
 
+/**
+ * Attachment content structure for agent responses
+ */
 export interface Attachment {
   contentType: string;
   content?: Record<string, unknown>;
@@ -13,6 +33,9 @@ export interface Attachment {
   name?: string;
 }
 
+/**
+ * Test run configuration and metadata
+ */
 export interface AgentTestRun {
   id: string;
   name: string;
@@ -20,6 +43,9 @@ export interface AgentTestRun {
   testSetId: string;
 }
 
+/**
+ * Agent configuration settings for test execution
+ */
 export interface AgentConfiguration {
   id: string;
   clientId: string;
@@ -31,12 +57,18 @@ export interface AgentConfiguration {
   isGeneratedAnswersAnalysisEnabled: boolean;
 }
 
+/**
+ * Test set definition with optional test cases collection
+ */
 export interface AgentTestSet {
   id: string;
   name: string;
   testCases?: AgentTestCase[];
 }
 
+/**
+ * Individual test case configuration with validation settings
+ */
 export interface AgentTestCase {
   id: string;
   name: string;
@@ -47,22 +79,25 @@ export interface AgentTestCase {
   generativeAnswerOutcomeCode?: number;
   expectedPositionOfTheResponseActivity?: number;
   expectedTopicName?: string;
-  expectedTools?: string; // New field for Plan Validation test type (type 6)
+  expectedTools?: string;
+  cat_passthreshold?: number;
   isStartConversationEventSent?: boolean;
   externalVariablesJson?: string;
   expectedAttachmentsJson?: string;
   secondsBeforeGettingAnswer?: number;
   comparisonOperatorCode?: number;
-  operationTypeCode?: number; // New field for Adaptive Card operation type (1=Comparison Operator, 2=AI Validation, 3=Invoke Actions)
-  validationInstructions?: string; // New field for validation instructions (used with Contains/Does not contain operations)
-  adaptiveCardPayload?: string; // New field for adaptive card payload data
-  parentId?: string; // For multiturn conversation support
+  operationTypeCode?: number; // Adaptive Card operation type (1=Comparison, 2=AI Validation, 3=Invoke Actions)
+  validationInstructions?: string;
+  adaptiveCardPayload?: string;
+  parentId?: string; // Multiturn conversation support
   childTests?: AgentTestCase[]; // Child test cases for multiturn conversations
-  order?: number; // For child test execution order
-  critical?: boolean; // For determining if child test failure should stop parent execution (Yes/No choice field)
-  cat_passthreshold?: number; // Pass threshold for test evaluation
+  order?: number; // Child test execution order
+  critical?: boolean; // Critical test failure impact on parent execution
 }
 
+/**
+ * Test result metadata
+ */
 export interface AgentTestResult {
   id?: string;
   name: string;
@@ -81,6 +116,9 @@ export interface AgentTestResult {
   attachments?: Attachment[];
 }
 
+/**
+ * Agent response data with content and metadata
+ */
 export interface AgentResponse {
   message: string;
   timestamp: Date;
@@ -89,16 +127,18 @@ export interface AgentResponse {
   adaptiveCards?: AdaptiveCard[];
   attachments?: Attachment[];
   error?: string;
-  isMatch?: boolean; // Added for response comparison
-  conversationId?: string; // Added to track conversation ID for each test case
-  suggestedActions?: SuggestedAction[]; // Added for suggested actions
-  allResponses?: string; // JSON string of full responses (with suggested actions & attachments)
+  isMatch?: boolean; // Response comparison result
+  conversationId?: string;
+  suggestedActions?: SuggestedAction[]; // Suggested actions collection
+  allResponses?: string; // JSON string of full responses with suggested actions & attachments
   responseIndex?: number; // Expected position of the response activity
-  specificResponse?: string; // The specific response used for comparison
+  specificResponse?: string; // Specific response used for comparison
   startConversationActivity?: Activity; // Start conversation activity for multiturn scenarios
 }
 
-// Define interface for suggested actions
+/**
+ * Suggested action structure for agent responses
+ */
 export interface SuggestedAction {
   type: string;
   title: string;
@@ -106,6 +146,9 @@ export interface SuggestedAction {
   value: string | Record<string, unknown>;
 }
 
+/**
+ * Test execution summary with comprehensive metrics and result breakdown
+ */
 export interface TestExecutionSummary {
   totalTests: number;
   successTests: number;
@@ -116,15 +159,15 @@ export interface TestExecutionSummary {
   startTime: Date;
   endTime?: Date;
   duration?: number;
-  successRate?: number; // Success rate percentage
-  averageLatency?: number; // Average latency in milliseconds
+  successRate?: number;
+  averageLatency?: number;
 
   // Detailed result code breakdown
   resultCodeBreakdown?: {
-    success: number; // Code 1
-    failed: number; // Code 2
-    unknown: number; // Code 3
-    error: number; // Code 4
-    pending: number; // Code 5
+    success: number;
+    failed: number;
+    unknown: number;
+    error: number;
+    pending: number;
   };
 }

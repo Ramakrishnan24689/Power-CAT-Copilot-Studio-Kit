@@ -1,6 +1,20 @@
 /**
- * Agent Test Run Operations for Dataverse
- * Handles operations related to agent test runs
+ * AgentTestRunOperations.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Provides Dataverse operations for managing agent test run records and status updates.
+ * Handles retrieval of test run information and status management with support for
+ * enrichment configuration settings during test execution lifecycle.
+ *
+ * Exports:
+ *   - AgentTestRunOperations: Main class for test run operations and status management.
+ *
+ * Usage:
+ *   const testRunOps = new AgentTestRunOperations(context);
+ *   const testRun = await testRunOps.getTestRun(testRunId);
+ *   await testRunOps.updateTestRunStatus(testRunId, statusCode, config);
  */
 
 import { DataverseOperationBase } from "./DataverseOperationBase";
@@ -11,7 +25,8 @@ import type {
 
 /**
  * Service for managing agent test run operations in Dataverse
- * Handles retrieval and updates of test run data
+ * Handles retrieval and updates of test run data with enrichment status management
+ * @class AgentTestRunOperations
  */
 export class AgentTestRunOperations extends DataverseOperationBase {
   constructor(context: ComponentFramework.Context<unknown>) {
@@ -19,9 +34,10 @@ export class AgentTestRunOperations extends DataverseOperationBase {
   }
 
   /**
-   * Retrieve Agent Test Run information by ID
-   * @param testRunId - GUID of the test run
-   * @returns Promise resolving to AgentTestRun object
+   * Retrieve Agent Test Run information by ID from Dataverse
+   * @param testRunId - GUID of the test run record
+   * @returns Promise resolving to AgentTestRun object with configuration and test set references
+   * @throws {Error} When test run retrieval fails or record not found
    */
   async getTestRun(testRunId: string): Promise<AgentTestRun> {
     return this.executeOperation(async () => {
@@ -42,10 +58,11 @@ export class AgentTestRunOperations extends DataverseOperationBase {
 
   /**
    * Update test run status code and optionally enrichment status codes
-   * @param testRunId - GUID of the test run
-   * @param statusCode - New status code to set
+   * Handles status transitions and enrichment configuration when completing test runs
+   * @param testRunId - GUID of the test run record to update
+   * @param statusCode - New status code to set (1=Not Run, 2=Running, 3=Complete, 4=Not Available, 5=Pending, 6=Error)
    * @param configuration - Optional configuration for enrichment status (only used when completing test run)
-   * @returns Promise resolving to boolean indicating success
+   * @returns Promise resolving to boolean indicating success or failure
    */
   async updateTestRunStatus(
     testRunId: string,
@@ -60,7 +77,6 @@ export class AgentTestRunOperations extends DataverseOperationBase {
       // If configuration is provided, also update enrichment status codes
       if (configuration) {
         // Set enrichment status codes based on configuration flags
-        // 5 = Enabled, 4 = Disabled
         updateData.cat_appinsightsenrichmentstatuscode =
           configuration.isAzureApplicationInsightsEnabled ? 5 : 4;
         updateData.cat_generatedanswersanalysiscode =

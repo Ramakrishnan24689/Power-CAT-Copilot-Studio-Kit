@@ -1,8 +1,25 @@
+/**
+ * MultiturnConversationManager.ts
+ *
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ *
+ * Manages multiturn conversation scenarios for Agent testing. Orchestrates
+ * the execution of parent-child test structures, handles conversation context,
+ * and coordinates between messaging services and test execution engines.
+ *
+ * Exports:
+ *   - MultiturnConversationManager: Main manager for multiturn test execution.
+ *
+ * Usage:
+ *   const manager = new MultiturnConversationManager(messagingService, context);
+ *   const success = await manager.executeMultiturnTest(parentTestCase, testRunId, configuration);
+ */
+
 import { MessagingService } from "./MessagingService";
 import { MultiturnDataverseBridge } from "./MultiturnDataverseBridge";
 import { MultiturnTestOrchestrator } from "./MultiturnTestOrchestrator";
 import { TestExecutionEngine } from "./TestExecutionEngine";
-import { ResponseValidationEngine } from "../shared/utils/ResponseValidationEngine";
 import type {
   AgentTestCase,
   AgentResponse,
@@ -13,7 +30,6 @@ import type {
  * Constants for MultiturnConversationManager
  */
 const MULTITURN_CONVERSATION_CONSTANTS = {
-  // User-friendly error messages
   ERROR_MESSAGES: {
     SERVICES_REQUIRED:
       "Required services are not available. Please refresh and try again.",
@@ -23,14 +39,18 @@ const MULTITURN_CONVERSATION_CONSTANTS = {
 } as const;
 
 /**
- * Manages multiturn conversation scenarios for agent testing
+ * MultiturnConversationManager orchestrates multiturn test execution.
+ * Manages conversation context, parent-child test relationships, and coordinates
+ * execution through specialized service components.
  */
 export class MultiturnConversationManager {
   private readonly conversationManager: MultiturnTestOrchestrator;
   private readonly executionEngine: TestExecutionEngine;
 
   /**
-   * Initialize MultiturnConversationManager with required services
+   * Initializes MultiturnConversationManager with required services.
+   * @param messagingService - Service for agent communication
+   * @param context - Component framework context for Dataverse operations
    */
   constructor(
     messagingService: MessagingService,
@@ -44,7 +64,6 @@ export class MultiturnConversationManager {
 
     const bridge = new MultiturnDataverseBridge(context);
 
-    // Initialize specialized service components
     this.conversationManager = new MultiturnTestOrchestrator(
       messagingService,
       bridge
@@ -56,7 +75,12 @@ export class MultiturnConversationManager {
   }
 
   /**
-   * Executes a complete multiturn conversation test with parent-child structure
+   * Executes a complete multiturn conversation test with parent-child structure.
+   * @param parentTestCase - Parent test case containing child tests
+   * @param testRunId - ID of the test run
+   * @param configuration - Agent configuration
+   * @param onProgressUpdate - Optional progress callback
+   * @returns Promise resolving to overall success status
    */
   async executeMultiturnTest(
     parentTestCase: AgentTestCase,
@@ -68,7 +92,6 @@ export class MultiturnConversationManager {
       message: string
     ) => void
   ): Promise<boolean> {
-    // Establish conversation context
     const conversationId =
       await this.conversationManager.establishConversationContext(
         parentTestCase
@@ -80,7 +103,6 @@ export class MultiturnConversationManager {
       );
     }
 
-    // Create parent test result placeholder
     const parentTestResultId =
       await this.conversationManager.createParentTestResult(
         parentTestCase,
@@ -88,11 +110,6 @@ export class MultiturnConversationManager {
         conversationId
       );
 
-    if (!parentTestResultId) {
-      // Log warning but continue execution
-    }
-
-    // Execute child tests using execution engine
     const childResults = await this.executionEngine.executeChildTests(
       parentTestCase.childTests!,
       conversationId,
@@ -101,66 +118,6 @@ export class MultiturnConversationManager {
       parentTestResultId || undefined
     );
 
-    // Generate execution summary
-    const summary = this.executionEngine.generateExecutionSummary(childResults);
-
-    // Return overall success status
-    return summary.overallSuccess;
-  }
-
-  /**
-   * Validates response against expected outcome
-   */
-  async compareResponses(
-    response: AgentResponse,
-    testCase: AgentTestCase
-  ): Promise<boolean> {
-    try {
-      if (!testCase.expectedResponse) {
-        // No expected response means we just check for successful execution
-        return response.success && !response.error;
-      }
-
-      // Use ResponseValidationEngine for response comparison
-      const comparisonMethod = testCase.comparisonOperatorCode ?? 1;
-
-      const isMatch = ResponseValidationEngine.validateResponse(
-        response.message,
-        testCase.expectedResponse,
-        comparisonMethod
-      );
-
-      return isMatch;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Gets the comparison method for a test case
-   */
-  getComparisonMethod(testCase: AgentTestCase): number {
-    return testCase.comparisonOperatorCode ?? 1;
-  }
-
-  /**
-   * Checks if test execution should terminate early based on test criticality
-   */
-  shouldTerminateEarly(testCase: AgentTestCase, testPassed: boolean): boolean {
-    return testCase.critical === true && !testPassed;
-  }
-
-  /**
-   * Evaluates overall success of multiturn test based on child results
-   */
-  evaluateOverallSuccess(
-    childResults: {
-      testCase: AgentTestCase;
-      response: AgentResponse;
-      success: boolean;
-      actualResultCode: number;
-    }[]
-  ): boolean {
-    return this.executionEngine.evaluateOverallSuccess(childResults);
+    return this.executionEngine.allTestsPassed(childResults);
   }
 }
