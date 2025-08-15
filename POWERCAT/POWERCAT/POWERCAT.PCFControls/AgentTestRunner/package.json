@@ -2,6 +2,7 @@
   "name": "pcf-project",
   "version": "1.0.0",
   "description": "Project containing your PowerApps Component Framework (PCF) control.",
+  "sideEffects": false,
   "scripts": {
     "build": "pcf-scripts build --webpack-config webpack.config.js",
     "build:fresh": "npm install && npm run clean && npm run build",

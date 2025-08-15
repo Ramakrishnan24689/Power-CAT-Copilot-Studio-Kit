@@ -47,9 +47,10 @@ export class TestRunExecutorService {
     while (!recordId && attempts < maxAttempts) {
       await new Promise((resolve) => setTimeout(resolve, checkInterval));
       recordId = this.formContext.data.entity.getId();
+      console.log("Current Record ID:", recordId);
       attempts++;
     }
-
+    console.log("Final Record ID:", recordId);
     return recordId ? recordId.replace(/[{},]/g, "") : null;
   }
 
@@ -160,6 +161,60 @@ export class TestRunExecutorService {
   }
 
   /**
+   * @function executeTestWithMicrosoftAuth
+   * @description Opens the Microsoft Authentication custom page on the right side with full height.
+   */
+  private async executeTestWithMicrosoftAuth(): Promise<void> {
+    try {
+      // Wait for record ID to be available
+      const recordId = await this.waitForRecordId();
+      console.log("Entity name:", this.formContext.data.entity.getEntityName());
+      console.log("Record ID:", recordId);
+
+      if (!recordId) {
+        throw new Error("Unable to get record ID for the custom page");
+      }
+
+      // Open custom page on the right side with full height
+      const pageInput = {
+        pageType: "custom",
+        name: "cat_agenttestrunner_18503", // Correct custom page name from Dataverse
+        entityName: this.formContext.data.entity.getEntityName(),
+        recordId: recordId,
+      };
+
+      const navigationOptions = {
+        target: 2, // Opens in dialog
+        position: 2, // Opens on the far side (right side)
+        height: { value: 100, unit: "%" }, // Full height
+        width: { value: 40, unit: "%" }, // 40% width for side panel
+        title: "Microsoft Authentication",
+      };
+
+      console.log("Page input:", pageInput);
+      console.log("Navigation options:", navigationOptions);
+
+      const result = await (Xrm.Navigation as any).navigateTo(
+        pageInput,
+        navigationOptions
+      );
+      console.log("Custom page opened successfully:", result);
+    } catch (error) {
+      console.error("Error opening custom page:", error);
+      this.formContext.ui.setFormNotification(
+        "Error opening Microsoft Auth page: " +
+          (error instanceof Error ? error.message : "Unknown error"),
+        "ERROR",
+        "MICROSOFT_AUTH_ERROR"
+      );
+      setTimeout(() => {
+        this.formContext.ui.clearFormNotification("MICROSOFT_AUTH_ERROR");
+      }, 8000);
+      throw error; // Re-throw to let the caller handle it
+    }
+  }
+
+  /**
    * @function onSave
    * @description Handler for the OnSave event of the form.
    * @param executionContext - Dynamics 365 event context.
@@ -206,7 +261,8 @@ export class TestRunExecutorService {
 
       // Run only if end-user authentication is enabled
       if (
-        copilotConfig.cat_userauthenticationcode === CONFIG.USER_AUTH_ENABLED
+        copilotConfig.cat_userauthenticationcode ===
+        CONFIG.USER_AUTHENTICATION.ENTRA_ID_V2
       ) {
         authData = await service.authService.getAuthorizationCode();
         if (!authData.authCode || !authData.codeVerifier) {
@@ -218,12 +274,33 @@ export class TestRunExecutorService {
           "This agent configuration is configured with end-user authentication, which relies on Entra ID tokens with a limited lifetime. Consider splitting your test set if it takes longer than an hour to complete.";
       }
 
-      await service.invokeDataverseAction(
-        copilotConfigId,
-        authData.authCode,
-        authData.codeVerifier,
-        testRunWarningMessage
-      );
+      // Extract authentication code for better readability
+      const authCode = copilotConfig.cat_userauthenticationcode;
+
+      // Define authentication types that use Dataverse action
+      const dataverseActionAuthTypes = [
+        CONFIG.USER_AUTHENTICATION.ENTRA_ID_V2,
+        CONFIG.USER_AUTHENTICATION.NO_AUTH,
+      ];
+
+      // Handle different authentication types
+      if (dataverseActionAuthTypes.indexOf(authCode) !== -1) {
+        await service.invokeDataverseAction(
+          copilotConfigId,
+          authData.authCode,
+          authData.codeVerifier,
+          testRunWarningMessage
+        );
+      } else if (
+        authCode === CONFIG.USER_AUTHENTICATION.MICROSOFT_AUTHENTICATION
+      ) {
+        await service.executeTestWithMicrosoftAuth();
+      } else {
+        // Handle unsupported authentication types
+        throw new Error(
+          `Unsupported authentication type: ${authCode}. Please check the copilot configuration.`
+        );
+      }
     } catch (error) {
       const { ERROR } = CONFIG.NOTIFICATIONS;
       formContext.ui.setFormNotification(
