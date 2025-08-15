@@ -165,7 +165,7 @@ export class TestRunner {
       if (errorMessage.includes("404") || errorMessage.includes("Not Found")) {
         throw new Error(
           `Invalid bot identifier: The bot identifier "${
-            this.configuration?.botIdentifier || "unknown"
+            this.configuration?.agentIdentifier || "unknown"
           }" was not found. Please verify:
                 1. The bot identifier is correct
                 2. The agent is published and accessible
@@ -177,6 +177,7 @@ export class TestRunner {
       // Provide specific error messages for common issues
       if (
         errorMessage.toLowerCase().includes("bot") ||
+        errorMessage.toLowerCase().includes("agent") ||
         errorMessage.toLowerCase().includes("identifier") ||
         errorMessage.toLowerCase().includes("agent")
       ) {

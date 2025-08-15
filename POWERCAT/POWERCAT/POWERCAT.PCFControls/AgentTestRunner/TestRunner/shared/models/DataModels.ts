@@ -51,7 +51,7 @@ export interface AgentConfiguration {
   clientId: string;
   tenantId: string;
   environmentId: string;
-  botIdentifier: string;
+  agentIdentifier: string;
   isAzureApplicationInsightsEnabled: boolean;
   isEnrichedWithConversationTranscripts: boolean;
   isGeneratedAnswersAnalysisEnabled: boolean;

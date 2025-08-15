@@ -41,7 +41,7 @@ export class AgentConfigurationOperations extends DataverseOperationBase {
       const response = await this.context.webAPI.retrieveRecord(
         "cat_copilotconfiguration",
         configId,
-        "?$select=cat_clientid,cat_tenantid,cat_environmentid,cat_botidentifier,cat_isazureapplicationinsightsenabled,cat_isenrichedwithconversationtranscripts,cat_isgeneratedanswersanalysisenabled"
+        "?$select=cat_clientid,cat_tenantid,cat_environmentid,cat_agentidentifier,cat_isazureapplicationinsightsenabled,cat_isenrichedwithconversationtranscripts,cat_isgeneratedanswersanalysisenabled"
       );
 
       return {
@@ -49,7 +49,7 @@ export class AgentConfigurationOperations extends DataverseOperationBase {
         clientId: response.cat_clientid,
         tenantId: response.cat_tenantid,
         environmentId: response.cat_environmentid,
-        botIdentifier: response.cat_botidentifier,
+        agentIdentifier: response.cat_agentidentifier,
         isGeneratedAnswersAnalysisEnabled:
           response.cat_isgeneratedanswersanalysisenabled,
         isAzureApplicationInsightsEnabled:

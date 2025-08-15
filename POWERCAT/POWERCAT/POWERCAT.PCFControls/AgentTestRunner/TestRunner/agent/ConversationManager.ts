@@ -129,7 +129,7 @@ export class ConversationManager {
 
     this.config = {
       environmentId: agentConfig.environmentId,
-      agentIdentifier: agentConfig.botIdentifier,
+      agentIdentifier: agentConfig.agentIdentifier,
       appClientId: agentConfig.clientId,
       tenantId: agentConfig.tenantId,
       cloud: cloud,
@@ -141,7 +141,7 @@ export class ConversationManager {
         clientId: agentConfig.clientId,
         tenantId: agentConfig.tenantId,
         environmentId: agentConfig.environmentId,
-        botIdentifier: agentConfig.botIdentifier,
+        agentIdentifier: agentConfig.agentIdentifier,
       });
     }
 

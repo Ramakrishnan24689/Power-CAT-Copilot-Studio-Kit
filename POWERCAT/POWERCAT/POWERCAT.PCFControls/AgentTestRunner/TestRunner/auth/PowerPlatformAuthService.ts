@@ -33,7 +33,7 @@ export interface AgentConfig {
   clientId: string;
   tenantId: string;
   environmentId: string;
-  botIdentifier: string;
+  agentIdentifier: string;
 }
 
 /**
@@ -52,7 +52,7 @@ export class PowerPlatformAuthService {
   /**
    * Initialize MSAL instance with agent configuration
    * Sets up authentication parameters and creates MSAL client for token acquisition
-   * @param agentConfig - Configuration containing clientId, tenantId, environmentId, and botIdentifier
+   * @param agentConfig - Configuration containing clientId, tenantId, environmentId, and agentIdentifier
    * @throws {Error} When required configuration parameters are missing
    */
   initialize(agentConfig: AgentConfig): void {
