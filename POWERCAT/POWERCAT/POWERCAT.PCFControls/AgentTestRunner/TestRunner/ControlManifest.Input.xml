@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="TestRunner" version="3.0.5" display-name-key="TestRunner" description-key="TestRunner_Desc" control-type="standard">
+  <control namespace="PowerCAT" constructor="TestRunner" version="3.0.10" display-name-key="TestRunner" description-key="TestRunner_Desc" control-type="standard">
     
     <external-service-usage enabled="true">
       <domain>login.microsoftonline.com</domain>        <!-- Azure AD Authentication -->

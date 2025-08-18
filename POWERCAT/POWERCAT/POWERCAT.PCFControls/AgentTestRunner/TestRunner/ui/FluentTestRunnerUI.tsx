@@ -36,7 +36,7 @@ import {
   MessageBarBody,
   Text,
   Tooltip,
-  CounterBadge,
+  CounterBadge, // Keep for commented out Results Available badge
 } from "@fluentui/react-components";
 import {
   CheckmarkCircle24Regular,
@@ -81,7 +81,7 @@ const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
   },
 
   BUTTON_TEXTS: {
-    RUNNING: "Running Tests...",
+    RUNNING: "Running Tests",
     RUN_ALL: "Run All Tests",
   },
 
@@ -95,7 +95,7 @@ const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
 
   MESSAGES: {
     READY_STATUS: "Ready to execute tests",
-    INITIALIZING: "Initializing...",
+    INITIALIZING: "Initializing",
     MEMORY_WARNING: "Keep only last 100 logs to prevent memory issues",
     EXECUTION_IN_PROGRESS: "Progress",
     TEST_RUN_IN_PROGRESS: "Test Run is in progress",
@@ -386,7 +386,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
               appearance="primary"
               icon={<PlaySolidIcon />}
               size="large"
-              disabled={isRunning || hasExistingResults}
+              disabled={isRunning /* || hasExistingResults */} // Temporarily allow re-runs
               onClick={onRunTests}
             >
               {buttonText}
@@ -395,12 +395,14 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
         </div>
 
         <div className={styles.statusSection}>
+          {/* Temporarily commented out Results Available badge
           {hasExistingResults && (
             <Badge appearance="filled" color="success">
               <CounterBadge count={summary?.totalTests || 0} />
               Results Available
             </Badge>
           )}
+          */}
 
           {isRunning && (
             <Badge appearance="filled" color="important">
@@ -762,7 +764,7 @@ export class FluentTestRunnerManager {
    * Indicates that agent configuration and test cases are being loaded from Dataverse.
    */
   public logConfigurationLoaded(): void {
-    this.logInfo("🔧 Loading agent configuration and test cases..");
+    this.logInfo("🔧 Loading agent configuration and test cases");
   }
 
   /**
@@ -770,7 +772,7 @@ export class FluentTestRunnerManager {
    * Indicates that credential validation and agent connection process has begun.
    */
   public logAuthenticationStarted(): void {
-    this.logInfo("🔐 Starting authentication and agent connection process..");
+    this.logInfo("🔐 Starting authentication and agent connection process");
   }
 
   /**
