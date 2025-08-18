@@ -418,7 +418,7 @@ export class TestRunnerController {
       // Set status immediately to show failure
       this.fluentUIManager.setStatus("❌ Test execution failed");
 
-      // Clear any progress to ensure error is visible
+      // Clear progress only when stopping execution completely
       this.fluentUIManager.clearResults();
 
       // Simplified error logging - avoid duplicates
@@ -813,8 +813,10 @@ export class TestRunnerController {
           `Test results found (${historyData.total} results for this test run)`
         );
 
-        // Hide progress bar since tests are complete
-        this.fluentUIManager.clearResults(); // Clear any existing progress display
+        // Hide progress bar since tests are complete - only clear if not running
+        if (!this.isExecuting) {
+          this.fluentUIManager.clearResults(); // Clear any existing progress display
+        }
 
         // Set donut from latest DB state to ensure codes match final rollup
         this.fluentUIManager?.setSummary(historicalSummary);

@@ -6,7 +6,7 @@
  *
  * Provides secure Power Platform authentication using Microsoft Authentication Library (MSAL).
  * Handles token acquisition, caching, and management for Power Platform API operations
- * with support for both silent and interactive authentication flows.
+ * with support for SSO silent authentication flows leveraging existing user context.
  *
  * Exports:
  *   - AgentConfig: Configuration interface for authentication parameters.
@@ -21,8 +21,8 @@
 import {
   PublicClientApplication,
   Configuration,
-  AccountInfo,
   AuthenticationResult,
+  InteractionRequiredAuthError,
 } from "@azure/msal-browser";
 
 /**
@@ -39,7 +39,7 @@ export interface AgentConfig {
 /**
  * Power Platform Authentication service using MSAL (Microsoft Authentication Library)
  * Provides secure token acquisition for Power Platform operations with automatic token caching
- * and support for both silent and interactive authentication flows.
+ * and support for SSO silent authentication flows leveraging existing user context.
  * @class PowerPlatformAuthService
  */
 export class PowerPlatformAuthService {
@@ -51,7 +51,7 @@ export class PowerPlatformAuthService {
 
   /**
    * Initialize MSAL instance with agent configuration
-   * Sets up authentication parameters and creates MSAL client for token acquisition
+   * Sets up authentication parameters and creates MSAL client for SSO token acquisition
    * @param agentConfig - Configuration containing clientId, tenantId, environmentId, and agentIdentifier
    * @throws {Error} When required configuration parameters are missing
    */
@@ -63,17 +63,19 @@ export class PowerPlatformAuthService {
 
     this.config = agentConfig;
 
-    // Configure MSAL with secure settings for browser environment
+    // Get client URL from current window context
+    const clientUrl =
+      typeof window !== "undefined" ? window.location.origin : "";
+
+    // Configure MSAL using SSO
     const msalConfig: Configuration = {
       auth: {
         clientId: agentConfig.clientId,
         authority: `https://login.microsoftonline.com/${agentConfig.tenantId}`,
-        redirectUri:
-          typeof window !== "undefined" ? window.location.origin : "",
+        redirectUri: clientUrl,
       },
       cache: {
-        cacheLocation: "localStorage", // Persistent storage for better UX
-        storeAuthStateInCookie: true, // Additional security for certain browsers
+        cacheLocation: "localStorage",
       },
     };
 
@@ -81,9 +83,9 @@ export class PowerPlatformAuthService {
   }
 
   /**
-   * Acquire authentication token for Power Platform API calls
-   * Returns cached token if valid, otherwise performs full authentication flow
-   * @returns {Promise<string>} Access token for API operations
+   * Acquire authentication token using SSO silent flow with account resolution
+   * Returns cached token if valid, otherwise performs SSO silent authentication
+   * @returns {Promise<string>} Access token for Agent SDK operations
    * @throws {Error} When authentication initialization or token acquisition fails
    */
   async acquireToken(): Promise<string> {
@@ -94,11 +96,40 @@ export class PowerPlatformAuthService {
 
     this.validateInitialization();
 
-    await this.initializeMsalInstance();
-    const accounts = await this.ensureUserIsLoggedIn();
-    const token = await this.acquireTokenSilentOrInteractive(accounts);
+    try {
+      // Initialize the MSAL application
+      await this.msalInstance!.initialize();
 
-    return token;
+      // Try to get existing accounts first
+      const accounts = this.msalInstance!.getAllAccounts();
+
+      // Use acquireTokenSilent with account hint if available
+      const silentRequest = {
+        scopes: this.scopes,
+        account: accounts.length > 0 ? accounts[0] : undefined, // Use first account if available
+      };
+
+      const authResult = await this.msalInstance!.acquireTokenSilent(
+        silentRequest
+      );
+
+      if (!authResult || !authResult.accessToken) {
+        throw new Error("SSO silent returned invalid result");
+      }
+
+      return this.cacheAndReturnToken(authResult);
+    } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        throw new Error(
+          `Authentication failed. Please check app registration permissions: ${error.message}.`
+        );
+      }
+
+      throw new Error(
+        "Failed to authenticate for Agent SDK access. Error: " +
+          this.getErrorMessage(error)
+      );
+    }
   }
 
   /**
@@ -130,91 +161,7 @@ export class PowerPlatformAuthService {
   private validateInitialization(): void {
     if (!this.msalInstance || !this.config) {
       throw new Error(
-        "PowerPlatform Auth not initialized - call initialize() first"
-      );
-    }
-  }
-
-  /**
-   * Initialize the MSAL instance asynchronously for browser compatibility
-   * @private
-   */
-  private async initializeMsalInstance(): Promise<void> {
-    await this.msalInstance!.initialize();
-  }
-
-  /**
-   * Ensure user has valid account, perform interactive login if needed
-   * @returns {Promise<AccountInfo[]>} Array of authenticated user accounts
-   * @private
-   */
-  private async ensureUserIsLoggedIn(): Promise<AccountInfo[]> {
-    const accounts = this.msalInstance!.getAllAccounts();
-
-    if (accounts.length === 0) {
-      await this.performInteractiveLogin();
-      return this.msalInstance!.getAllAccounts();
-    }
-
-    return accounts;
-  }
-
-  /**
-   * Attempt silent token acquisition first, fallback to interactive if needed
-   * @param accounts - Authenticated user accounts from MSAL
-   * @returns {Promise<string>} Access token for API operations
-   * @private
-   */
-  private async acquireTokenSilentOrInteractive(
-    accounts: AccountInfo[]
-  ): Promise<string> {
-    try {
-      // Try silent token acquisition first
-      const result = await this.msalInstance!.acquireTokenSilent({
-        scopes: this.scopes,
-        account: accounts[0],
-      });
-
-      return this.cacheAndReturnToken(result);
-    } catch (silentError) {
-      // Silent failed, try interactive authentication
-      const result = await this.performInteractiveLoginForToken();
-      return this.cacheAndReturnToken(result);
-    }
-  }
-
-  /**
-   * Perform interactive login popup when no cached accounts exist
-   * @throws {Error} When interactive login fails
-   * @private
-   */
-  private async performInteractiveLogin(): Promise<void> {
-    try {
-      await this.msalInstance!.loginPopup({ scopes: this.scopes });
-    } catch (loginError) {
-      throw new Error(
-        `Interactive login failed: ${this.getErrorMessage(loginError)}`
-      );
-    }
-  }
-
-  /**
-   * Perform interactive token acquisition popup when silent acquisition fails
-   * @returns {Promise<AuthenticationResult>} Authentication result with access token
-   * @throws {Error} When interactive token acquisition fails
-   * @private
-   */
-  private async performInteractiveLoginForToken(): Promise<AuthenticationResult> {
-    try {
-      const result = await this.msalInstance!.loginPopup({
-        scopes: this.scopes,
-      });
-      return result;
-    } catch (interactiveError) {
-      throw new Error(
-        `Interactive token acquisition failed: ${this.getErrorMessage(
-          interactiveError
-        )}`
+        "PowerPlatform Auth not initialized - call initialize() with config first"
       );
     }
   }

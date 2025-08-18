@@ -160,7 +160,7 @@ export class TestRunExecutorService {
 
   /**
    * @function executeTestWithMicrosoftAuth
-   * @description Opens the Agent Test Runner custom page for executing tests.
+   * @description Opens the Agent Test Runner custom page for executing tests with Microsoft authentication.
    */
   private async executeTestWithMicrosoftAuth(): Promise<void> {
     try {
@@ -187,7 +187,11 @@ export class TestRunExecutorService {
         title: "Agent Test Runner",
       };
 
-      await (Xrm.Navigation as any).navigateTo(pageInput, navigationOptions);
+      await (Xrm.Navigation as any)
+        .navigateTo(pageInput, navigationOptions)
+        .then(() => {
+          this.formContext.data.refresh(true);
+        });
     } catch (error) {
       this.formContext.ui.setFormNotification(
         "Error opening Agent Test Runner page: " +
@@ -291,7 +295,7 @@ export class TestRunExecutorService {
     } catch (error) {
       const { ERROR } = CONFIG.NOTIFICATIONS;
       formContext.ui.setFormNotification(
-        `An error occurred while opening the Agent Test Runner custom page. ${
+        `An error occurred while running the test. Please check the Agent Configuration. ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
         ERROR.type,
