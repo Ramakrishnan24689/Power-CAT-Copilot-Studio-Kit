@@ -274,11 +274,10 @@ export class TestRunnerController {
    * @returns Promise that resolves when initialization is complete.
    */
   public async initialize(): Promise<void> {
-    // Temporarily commented out Results Available badge
-    // this.fluentUIManager.setHasExistingResults(this.hasExistingResults);
+    this.fluentUIManager.setHasExistingResults(this.hasExistingResults);
 
-    // Load existing test execution history
-    await this.loadTestExecutionHistory();
+    // Comment out loading previous results during initialization per user request
+    // await this.loadTestExecutionHistory();
   }
 
   /**
@@ -401,8 +400,7 @@ export class TestRunnerController {
 
       // Mark that tests have been executed
       this.hasExistingResults = true;
-      // Temporarily commented out Results Available badge
-      // this.fluentUIManager.setHasExistingResults(true);
+      this.fluentUIManager.setHasExistingResults(true);
 
       this.fluentUIManager.setStatus(
         TEST_RUNNER_CONTROLLER_CONSTANTS.STATUS_MESSAGES.EXECUTION_COMPLETED
@@ -615,8 +613,7 @@ export class TestRunnerController {
 
         // Disable the Run All Tests button since results already exist
         this.hasExistingResults = true;
-        // Temporarily commented out Results Available badge
-        // this.fluentUIManager.setHasExistingResults(true);
+        this.fluentUIManager.setHasExistingResults(true);
 
         // Update status to show historical data is loaded
         this.fluentUIManager.setStatus(
@@ -624,11 +621,11 @@ export class TestRunnerController {
         );
 
         this.log(
-          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.INFO,
+          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.SUCCESS,
           TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_MESSAGES.EXECUTION_IS_COMPLETE
         );
       }
-      // else {
+      // } else {
       //   // No historical data - keep summary section hidden and button enabled
       //   this.log(
       //     TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.INFO,
@@ -806,12 +803,9 @@ export class TestRunnerController {
         this.stopProgressMonitoring();
         this.hasExistingResults = true;
 
-        // Temporarily commented out Results Available badge
-        // Only set hasExistingResults in UI if we're not currently executing tests
-        // During execution, we want to show completion, not "Results Available"
-        // if (!this.isExecuting) {
-        //   this.fluentUIManager.setHasExistingResults(true);
-        // }
+        if (!this.isExecuting) {
+          this.fluentUIManager.setHasExistingResults(true);
+        }
 
         this.fluentUIManager.setStatus(
           `Test results found (${historyData.total} results for this test run)`
@@ -826,7 +820,7 @@ export class TestRunnerController {
         this.fluentUIManager?.setSummary(historicalSummary);
 
         this.log(
-          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.INFO,
+          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.SUCCESS,
           TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_MESSAGES.EXECUTION_IS_COMPLETE
         );
       } else {

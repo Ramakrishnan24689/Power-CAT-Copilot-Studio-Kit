@@ -122,20 +122,20 @@ interface UILogEntry {
  */
 const useStyles = makeStyles({
   container: {
-    padding: tokens.spacingVerticalXL,
+    padding: tokens.spacingVerticalL,
     maxWidth: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_CONTAINER_WIDTH,
     margin: FLUENT_TEST_RUNNER_UI_CONSTANTS.LAYOUT_VALUES.CONTAINER_MARGIN,
     display: "flex",
     flexDirection: "column",
-    gap: tokens.spacingVerticalL,
+    gap: tokens.spacingVerticalM,
   },
   controlsCard: {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: tokens.spacingVerticalL,
-    gap: tokens.spacingHorizontalL,
+    padding: tokens.spacingVerticalM,
+    gap: tokens.spacingHorizontalM,
     border: "none",
     boxShadow: tokens.shadow4,
   },
@@ -147,13 +147,13 @@ const useStyles = makeStyles({
     fontWeight: "normal",
   },
   progressCard: {
-    padding: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalM,
     background: `linear-gradient(135deg, ${tokens.colorNeutralBackground1} 0%, ${tokens.colorNeutralBackground2} 100%)`,
     border: "none",
     boxShadow: tokens.shadow4,
   },
   logCard: {
-    padding: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalM,
     maxHeight: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_LOG_HEIGHT,
     overflow: "auto",
     background: tokens.colorNeutralBackground1,
@@ -386,7 +386,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
               appearance="primary"
               icon={<PlaySolidIcon />}
               size="large"
-              disabled={isRunning /* || hasExistingResults */} // Temporarily allow re-runs
+              disabled={isRunning || hasExistingResults}
               onClick={onRunTests}
             >
               {buttonText}
@@ -427,7 +427,8 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
             {/* Status */}
             <MessageBar
               intent={
-                status.includes("✅")
+                status.includes("✅") ||
+                status.includes("completed successfully")
                   ? "success"
                   : status.includes("❌")
                   ? "error"
@@ -536,6 +537,8 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
                         ? "danger"
                         : log.level === "warning"
                         ? "warning"
+                        : log.level === "success"
+                        ? "success"
                         : "brand"
                     }
                   >
