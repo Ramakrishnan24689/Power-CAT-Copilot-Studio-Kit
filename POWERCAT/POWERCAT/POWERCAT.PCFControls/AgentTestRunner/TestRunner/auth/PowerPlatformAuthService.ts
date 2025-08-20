@@ -75,7 +75,7 @@ export class PowerPlatformAuthService {
         redirectUri: clientUrl,
       },
       cache: {
-        cacheLocation: "localStorage",
+        cacheLocation: "memoryStorage",
       },
     };
 
@@ -103,26 +103,65 @@ export class PowerPlatformAuthService {
       // Try to get existing accounts first
       const accounts = this.msalInstance!.getAllAccounts();
 
-      // Use acquireTokenSilent with account hint if available
-      const silentRequest = {
-        scopes: this.scopes,
-        account: accounts.length > 0 ? accounts[0] : undefined, // Use first account if available
-      };
+      let authResult: AuthenticationResult;
 
-      const authResult = await this.msalInstance!.acquireTokenSilent(
-        silentRequest
-      );
+      if (accounts.length > 0) {
+        // Set the active account for MSAL
+        this.msalInstance!.setActiveAccount(accounts[0]);
+
+        // Use acquireTokenSilent with account hint if available
+        const silentRequest = {
+          scopes: this.scopes,
+          account: accounts[0],
+        };
+
+        authResult = await this.msalInstance!.acquireTokenSilent(silentRequest);
+      } else {
+        // No accounts available, need interactive login
+        const interactiveRequest = {
+          scopes: this.scopes,
+        };
+
+        authResult = await this.msalInstance!.acquireTokenPopup(
+          interactiveRequest
+        );
+
+        // Set the account as active after successful login
+        if (authResult.account) {
+          this.msalInstance!.setActiveAccount(authResult.account);
+        }
+      }
 
       if (!authResult || !authResult.accessToken) {
-        throw new Error("SSO silent returned invalid result");
+        throw new Error("Authentication returned invalid result");
       }
 
       return this.cacheAndReturnToken(authResult);
     } catch (error) {
       if (error instanceof InteractionRequiredAuthError) {
-        throw new Error(
-          `Authentication failed. Please check app registration permissions: ${error.message}.`
-        );
+        // If silent auth fails, try interactive authentication
+        try {
+          const interactiveRequest = {
+            scopes: this.scopes,
+          };
+
+          const authResult = await this.msalInstance!.acquireTokenPopup(
+            interactiveRequest
+          );
+
+          // Set the account as active after successful login
+          if (authResult.account) {
+            this.msalInstance!.setActiveAccount(authResult.account);
+          }
+
+          return this.cacheAndReturnToken(authResult);
+        } catch (interactiveError) {
+          throw new Error(
+            `Authentication failed. Please check app registration permissions: ${this.getErrorMessage(
+              interactiveError
+            )}.`
+          );
+        }
       }
 
       throw new Error(

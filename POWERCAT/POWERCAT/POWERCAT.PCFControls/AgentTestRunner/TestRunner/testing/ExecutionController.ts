@@ -819,10 +819,12 @@ export class TestRunnerController {
         // Set donut from latest DB state to ensure codes match final rollup
         this.fluentUIManager?.setSummary(historicalSummary);
 
-        this.log(
-          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.SUCCESS,
-          TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_MESSAGES.EXECUTION_IS_COMPLETE
-        );
+        if (!this.isExecuting) {
+          this.log(
+            TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_LEVELS.SUCCESS,
+            TEST_RUNNER_CONTROLLER_CONSTANTS.LOG_MESSAGES.EXECUTION_IS_COMPLETE
+          );
+        }
       } else {
         // Tests are still in progress, show current progress
         this.fluentUIManager.setProgress(
