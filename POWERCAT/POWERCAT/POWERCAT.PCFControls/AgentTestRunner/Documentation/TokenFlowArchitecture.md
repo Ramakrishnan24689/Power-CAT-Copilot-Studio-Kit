@@ -1,13 +1,13 @@
-# Agent Test Runner - Current PCF Architecture & Azure App Registration Guide
+# Agent Test Runner Guide
 
 ## 📋 **Table of Contents**
 
-1. [Current PCF Architecture](#current-pcf-architecture)
+1. [Architecture](#architecture)
 2. [Azure App Registration Setup](#azure-app-registration-setup)
 3. [Environment ID and Agent Identifier Setup](#environment-id-and-agent-identifier-setup)
 4. [Troubleshooting Guide](#troubleshooting-guide)
 
-## 🏗️ **Current PCF Architecture**
+## 🏗️ **Architecture**
 
 The Agent Test Runner uses a **direct browser-to-Agent SDK** architecture that is efficient for testing scenarios.
 
@@ -24,10 +24,22 @@ sequenceDiagram
 
     User->>PCF: Initiate Test Run
     PCF->>MSAL: Initialize Authentication
-    MSAL->>AAD: Silent Token Request
-    AAD-->>MSAL: Access Token
-    MSAL-->>PCF: Cached Token
+    MSAL->>MSAL: Check for Existing Accounts
 
+    alt Existing Account Found
+        MSAL->>AAD: Silent Token Request
+        AAD-->>MSAL: Access Token
+        Note over MSAL: Silent Authentication Success
+    else No Account or Silent Auth Fails
+        MSAL->>User: Show Login Popup
+        User->>MSAL: Provide Credentials
+        MSAL->>AAD: Interactive Token Request
+        AAD-->>MSAL: Access Token
+        MSAL->>MSAL: Set Active Account
+        Note over MSAL: Interactive Authentication Success
+    end
+
+    MSAL-->>PCF: Cached Token
     PCF->>SDK: Create Client with Token
     SDK->>Agent: Test Message
     Agent-->>SDK: Agent Response
@@ -118,7 +130,7 @@ Based on the [Microsoft Agents Sample Documentation](https://github.com/microsof
    - Go to **Authentication** in your app registration
    - Click **Add a platform**
    - Select **Single-page application (SPA)**
-   - Enter your Dynamics CRM URL: `https://[your-org].crm.dynamics.com`
+   - Enter your Environment URL: `https://[your-org].crm.dynamics.com`
    - Click **Configure**
 
 2. **Configure Token Settings**
@@ -153,9 +165,9 @@ Based on the [Microsoft Agents Sample Documentation](https://github.com/microsof
    - Note the **Environment ID** value
    - Note the **Schema name** value. This is your **Agent Identifier**. Format: `cr123_agentname` or similar
 
-### **Step 4: Configure Agent Test Runner**
+### **Step 4: Configure Agent Configuration**
 
-Update your **Agent Configuration** record in Dataverse with the values from previous steps:
+Create **Agent Configuration** record in Dataverse with the values from previous steps:
 
 | Field                   | Value                                | Example                                |
 | ----------------------- | ------------------------------------ | -------------------------------------- |
@@ -174,7 +186,7 @@ Update your **Agent Configuration** record in Dataverse with the values from pre
 - **Cause**: Redirect URI mismatch in Azure App Registration
 - **Solution**:
   1. Go to Azure App Registration > Authentication
-  2. Ensure redirect URI matches your Dynamics URL exactly
+  2. Ensure redirect URI matches your Environment URL exactly
   3. Use format: `https://[your-org].crm.dynamics.com`
 
 #### **Error: "AADSTS65001: The user or administrator has not consented"**
@@ -184,6 +196,24 @@ Update your **Agent Configuration** record in Dataverse with the values from pre
   1. Go to Azure App Registration > API permissions
   2. Ensure "CopilotStudio.Copilots.Invoke" permission is added
   3. Click "Grant admin consent"
+
+#### **Login Popup Appears Every Time**
+
+- **Cause**: Account not being cached or browser settings preventing token storage
+- **Solution**:
+  1. Ensure browser allows popup windows for your Dynamics domain
+  2. Check if browser is in incognito/private mode (will require login each time)
+  3. Verify browser isn't blocking third-party cookies
+  4. Clear browser cache and try again
+  5. Check if organization policies are forcing re-authentication
+
+#### **"InteractionRequiredAuthError" in Browser Console**
+
+- **Cause**: Normal behavior when silent authentication fails and interactive login is triggered
+- **Expected Behavior**:
+  - This is not an error - it's expected when silent auth fails
+  - The system automatically shows login popup
+- **Action Required**: None - this is normal authentication flow
 
 ### **Agent SDK Errors**
 
@@ -211,7 +241,7 @@ Update your **Agent Configuration** record in Dataverse with the values from pre
   2. Check if agent allows the user's security role
   3. Verify environment permissions
 
-### **PCF Control Errors**
+### **Agent Test Runner Control Errors**
 
 #### **Error: "Failed to initialize authentication service"**
 
