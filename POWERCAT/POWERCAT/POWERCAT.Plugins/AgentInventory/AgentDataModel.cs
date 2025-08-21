@@ -92,5 +92,19 @@ namespace POWERCAT.Plugins.AgentInventory
             public string ModifiedOn { get; set; }
             public string ModifiedBy { get; set; }
         }
+
+        /// <summary>
+        /// Represents Agent Uage Data
+        /// </summary>
+        public class AgentTenantUsageData
+        {
+            public string EnvironmentID { get; set; }
+            public string EnvironmentName { get; set; }
+            public string AgentName { get; set; }
+            public string AgentID { get; set; }
+            public string Feature { get; set; }
+            public int BilledMessages { get; set; }
+            public int NonBilledMessages { get; set; }
+        }
     }
 }
