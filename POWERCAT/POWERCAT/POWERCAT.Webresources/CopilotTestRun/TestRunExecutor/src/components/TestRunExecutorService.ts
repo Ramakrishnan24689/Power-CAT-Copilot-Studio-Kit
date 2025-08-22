@@ -183,7 +183,7 @@ export class TestRunExecutorService {
         target: 2, // Opens in dialog
         position: 2, // Opens on the far side (right side)
         height: { value: 100, unit: "%" }, // Full height
-        width: { value: 40, unit: "%" }, // 40% width for side panel
+        width: { value: 45, unit: "%" }, // 40% width for side panel
         title: "Agent Test Runner",
       };
 
