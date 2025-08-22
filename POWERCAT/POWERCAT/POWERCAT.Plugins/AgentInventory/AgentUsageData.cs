@@ -89,6 +89,7 @@ namespace POWERCAT.Plugins.AgentInventory
 
                     if (failedRecords.Length > 0)
                     {
+                        result = false;
                         string errorMessage = failedRecords.Length > 1000000 ? failedRecords.ToString().Substring(0, 1000000) : failedRecords.ToString();
                         AppendErrorDetails(logId, errorMessage);
                         _tracingService.Trace("Error occured while updating usage data.");
@@ -97,6 +98,10 @@ namespace POWERCAT.Plugins.AgentInventory
                     {
                         result = true;
                     }
+                }
+                else
+                {
+                    result = true;
                 }
                 return result;
             }
@@ -269,13 +274,20 @@ namespace POWERCAT.Plugins.AgentInventory
         /// <returns>Value converted as int.</returns>
         public int ConvertStringToNearestInt(string stringValue)
         {
-            if (string.IsNullOrEmpty(stringValue))
+            try
             {
-                return 0;
+                if (string.IsNullOrEmpty(stringValue))
+                {
+                    return 0;
+                }
+                decimal decimalValue = Convert.ToDecimal(stringValue);
+                int roundedIntValue = (int)Math.Round(decimalValue);
+                return roundedIntValue;
             }
-            decimal decimalValue = Convert.ToDecimal(stringValue);
-            int roundedIntValue = (int)Math.Round(decimalValue);
-            return roundedIntValue;
+            catch(Exception ex)
+            {
+                throw ex;
+            }
         }
         /// <summary>
         /// Append error details based on failed records.

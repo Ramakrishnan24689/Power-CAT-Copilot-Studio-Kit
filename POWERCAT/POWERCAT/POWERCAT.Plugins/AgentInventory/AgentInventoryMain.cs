@@ -88,11 +88,9 @@ namespace POWERCAT.Plugins.AgentInventory
                     //Create usage data in TenantUsageData table
                     bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId);
 
-                    if (result)
-                    {
-                        context.OutputParameters["cat_UsageOutput"] = result;
-                    }
-                    else
+                    context.OutputParameters["cat_UsageOutput"] = result;
+                    
+                    if(result == false)
                     {
                         tracingService.Trace($"Plugin execution failed.");
                     }
