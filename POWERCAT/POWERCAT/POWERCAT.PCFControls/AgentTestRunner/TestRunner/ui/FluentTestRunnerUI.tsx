@@ -99,6 +99,8 @@ const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
     MEMORY_WARNING: "Keep only last 100 logs to prevent memory issues",
     EXECUTION_IN_PROGRESS: "Progress",
     TEST_RUN_IN_PROGRESS: "Test Run is in progress",
+    PAGE_CLOSE_WARNING:
+      "⚠️ Do not close this page until test execution is completed",
   },
 
   STYLE_VALUES: {
@@ -122,19 +124,19 @@ interface UILogEntry {
  */
 const useStyles = makeStyles({
   container: {
-    padding: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalS,
     maxWidth: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_CONTAINER_WIDTH,
     margin: FLUENT_TEST_RUNNER_UI_CONSTANTS.LAYOUT_VALUES.CONTAINER_MARGIN,
     display: "flex",
     flexDirection: "column",
-    gap: tokens.spacingVerticalM,
+    gap: tokens.spacingVerticalS,
   },
   controlsCard: {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: tokens.spacingVerticalM,
+    padding: tokens.spacingVerticalS,
     gap: tokens.spacingHorizontalM,
     border: "none",
     boxShadow: tokens.shadow4,
@@ -147,13 +149,13 @@ const useStyles = makeStyles({
     fontWeight: "normal",
   },
   progressCard: {
-    padding: tokens.spacingVerticalM,
+    padding: tokens.spacingVerticalS,
     background: `linear-gradient(135deg, ${tokens.colorNeutralBackground1} 0%, ${tokens.colorNeutralBackground2} 100%)`,
     border: "none",
     boxShadow: tokens.shadow4,
   },
   logCard: {
-    padding: tokens.spacingVerticalM,
+    padding: tokens.spacingVerticalS,
     maxHeight: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_LOG_HEIGHT,
     overflow: "auto",
     background: tokens.colorNeutralBackground1,
@@ -207,9 +209,10 @@ const useStyles = makeStyles({
   summaryCards: {
     display: "flex",
     flexDirection: "column",
-    gap: tokens.spacingVerticalL,
+    gap: tokens.spacingVerticalS,
   },
   summaryCard: {
+    padding: tokens.spacingVerticalS,
     border: "none",
     boxShadow: tokens.shadow4,
   },
@@ -235,6 +238,22 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: "12px",
+  },
+  warningMessage: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground1,
+    fontStyle: "italic",
+    textAlign: "right",
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+  },
+  headerStatusSection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: tokens.spacingVerticalS,
+    minWidth: "300px",
   },
 });
 
@@ -385,7 +404,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
             <Button
               appearance="primary"
               icon={<PlaySolidIcon />}
-              size="large"
+              size="medium"
               disabled={isRunning || hasExistingResults}
               onClick={onRunTests}
             >
@@ -394,7 +413,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
           </Tooltip>
         </div>
 
-        <div className={styles.statusSection}>
+        <div className={styles.headerStatusSection}>
           {/* Temporarily commented out Results Available badge
           {hasExistingResults && (
             <Badge appearance="filled" color="success">
@@ -409,6 +428,15 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
               Running
             </Badge>
           )}
+
+          {/* Warning message displayed when tests are running */}
+          {isRunning && (
+            <div className={styles.warningMessage}>
+              <Text size={200}>
+                {FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.PAGE_CLOSE_WARNING}
+              </Text>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -418,7 +446,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
         <Card className={styles.progressCard}>
           <CardHeader
             header={
-              <Text weight="bold" size={500}>
+              <Text weight="bold" size={400}>
                 {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.STATUS_TITLE}
               </Text>
             }
@@ -493,9 +521,9 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
           <Card className={styles.summaryCard}>
             <CardHeader
               header={
-                <Title3>
+                <Text weight="bold" size={400}>
                   {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.SUMMARY_TITLE}
-                </Title3>
+                </Text>
               }
             />
             <CardPreview>
@@ -511,9 +539,9 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
           <Card className={`${styles.logCard} ${styles.summaryCard}`}>
             <CardHeader
               header={
-                <Title3>
+                <Text weight="bold" size={400}>
                   {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.LOG_TITLE}
-                </Title3>
+                </Text>
               }
             />
 
