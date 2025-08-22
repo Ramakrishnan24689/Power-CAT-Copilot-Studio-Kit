@@ -23,11 +23,11 @@ import type { TestExecutionSummary } from "../shared/models/DataModels";
 // Constants for FluentChart component
 const FLUENT_CHART_CONSTANTS = {
   CHART_COLORS: {
-    SUCCESS: "#637CEF", // Success results
+    SUCCESS: "#13A10E", // Success results
     FAILED: "#E3008C", // Failed results
     PENDING: "#00BCF2", // Pending results
-    ERROR: "#FFB900", // Error results
-    UNKNOWN: "#8764B8", // Unknown results
+    ERROR: "#CA5010", // Error results
+    UNKNOWN: "#AE8C00", // Unknown results
   },
 
   CHART_LABELS: {

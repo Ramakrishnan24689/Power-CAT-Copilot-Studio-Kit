@@ -125,11 +125,13 @@ interface UILogEntry {
 const useStyles = makeStyles({
   container: {
     padding: tokens.spacingVerticalS,
-    maxWidth: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_CONTAINER_WIDTH,
-    margin: FLUENT_TEST_RUNNER_UI_CONSTANTS.LAYOUT_VALUES.CONTAINER_MARGIN,
+    width: "100%",
+    maxWidth: "100%",
+    margin: "0",
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalS,
+    boxSizing: "border-box",
   },
   controlsCard: {
     display: "flex",
@@ -140,6 +142,8 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalM,
     border: "none",
     boxShadow: tokens.shadow4,
+    width: "100%",
+    boxSizing: "border-box",
   },
   fabricIcon: {
     fontFamily: "'Segoe MDL2 Assets', 'FabricMDL2Icons'",
@@ -153,6 +157,8 @@ const useStyles = makeStyles({
     background: `linear-gradient(135deg, ${tokens.colorNeutralBackground1} 0%, ${tokens.colorNeutralBackground2} 100%)`,
     border: "none",
     boxShadow: tokens.shadow4,
+    width: "100%",
+    boxSizing: "border-box",
   },
   logCard: {
     padding: tokens.spacingVerticalS,
@@ -161,6 +167,8 @@ const useStyles = makeStyles({
     background: tokens.colorNeutralBackground1,
     border: "none",
     boxShadow: tokens.shadow4,
+    width: "100%",
+    boxSizing: "border-box",
   },
   logEntry: {
     padding: `${tokens.spacingVerticalXS} ${FLUENT_TEST_RUNNER_UI_CONSTANTS.STYLE_VALUES.PADDING_TEMPLATE}`,
@@ -215,6 +223,8 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalS,
     border: "none",
     boxShadow: tokens.shadow4,
+    width: "100%",
+    boxSizing: "border-box",
   },
   infoSection: {
     display: "flex",
@@ -238,6 +248,9 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: "12px",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   warningMessage: {
     fontSize: tokens.fontSizeBase200,
