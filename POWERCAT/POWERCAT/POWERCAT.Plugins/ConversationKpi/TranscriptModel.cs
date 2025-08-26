@@ -20,6 +20,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string type { get; set; }
         public int timestamp { get; set; }
         public From from { get; set; }
+        // *** CHANGED: Removed JsonConverter attribute and changed to JToken ***
         [JsonProperty("value")]
         public JToken valueToken { get; set; }
         [JsonIgnore]
