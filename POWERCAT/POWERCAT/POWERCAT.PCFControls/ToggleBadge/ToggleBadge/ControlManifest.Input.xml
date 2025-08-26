@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="PowerCAT" constructor="ToggleBadge" version="1.0.0" display-name-key="ToggleBadge_Display_Key" description-key="ToggleBadge_Desc" control-type="virtual" >
+    
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
+    <property name="toggleState" display-name-key="ToggleBadge_ToggleState_Display_Key" of-type="TwoOptions" usage="bound" required="false" />
+    <property name="onText" display-name-key="ToggleBadge_OnText_Display_Key" default-value="On" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="offText" display-name-key="ToggleBadge_OffText_Display_Key" default-value="Off" of-type="SingleLine.Text" usage="input" required="false" />
+    <property name="size" display-name-key="ToggleBadge_Size_Display_Key" of-type="SingleLine.Text" usage="input" required="false" />
+    <resources>
+      <code path="index.ts" order="1"/>
+      <platform-library name="React" version="16.14.0" />
+      <platform-library name="Fluent" version="9.46.2" />
+      <resx path="strings/ToggleBadge.1033.resx" version="1.0.0"/>
+    </resources>
+  </control>
+</manifest>
