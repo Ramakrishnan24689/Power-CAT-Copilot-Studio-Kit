@@ -86,10 +86,19 @@ export class MessagingService {
   /**
    * Processes agent response activities and extracts all components.
    * @param activities - Activities from agent response
+   * @param testCase - Optional test case to determine processing strategy
    * @returns Object containing processed response, adaptive cards, attachments, and suggested actions
    */
-  private processAgentResponse(activities: Activity[]) {
-    const processedResponse = this.messageProcessor.processResponse(activities);
+  private processAgentResponse(
+    activities: Activity[],
+    testCase?: AgentTestCase
+  ) {
+    // For RESPONSE_MATCH tests, use direct text only (no adaptive card text extraction)
+    const processedResponse =
+      testCase?.testTypeCode === 1
+        ? this.messageProcessor.processDirectTextResponse(activities)
+        : this.messageProcessor.processResponse(activities);
+
     const adaptiveCards =
       this.messageProcessor.extractAdaptiveCards(activities);
     const attachments = this.messageProcessor.extractAttachments(activities);
@@ -138,21 +147,30 @@ export class MessagingService {
       }
     }
 
-    if (testCase.expectedAttachmentsJson) {
-      isMatch = ResponseValidationEngine.validateAdaptiveCards(
-        1, // Operation type 1 = Comparison Operator
-        testCase.comparisonOperatorCode ?? 1, // Default to Equals
-        testCase.expectedAttachmentsJson,
-        testCase.validationInstructions || "", // For Contains/Does not contain operations
-        adaptiveCards || [],
-        true // Return boolean only for MessagingService compatibility
-      ) as boolean;
-    } else if (testCase.expectedResponse) {
-      isMatch = ResponseValidationEngine.validateResponse(
-        specificResponse,
-        testCase.expectedResponse,
-        testCase.comparisonOperatorCode
-      );
+    // Validate strictly based on test type, not expected values presence
+    if (testCase.testTypeCode === 1) {
+      // TEST_TYPES.RESPONSE_MATCH
+      // For RESPONSE_MATCH tests, ALWAYS validate text response only
+      if (testCase.expectedResponse) {
+        isMatch = ResponseValidationEngine.validateResponse(
+          specificResponse,
+          testCase.expectedResponse,
+          testCase.comparisonOperatorCode
+        );
+      }
+    } else if (testCase.testTypeCode === 3) {
+      // TEST_TYPES.ADAPTIVE_CARD
+      // For ADAPTIVE_CARD tests, validate adaptive cards only
+      if (testCase.expectedAttachmentsJson) {
+        isMatch = ResponseValidationEngine.validateAdaptiveCards(
+          1, // Operation type 1 = Comparison Operator
+          testCase.comparisonOperatorCode ?? 1, // Default to Equals
+          testCase.expectedAttachmentsJson,
+          testCase.validationInstructions || "", // For Contains/Does not contain operations
+          adaptiveCards || [],
+          true // Return boolean only for MessagingService compatibility
+        ) as boolean;
+      }
     }
 
     return { isMatch, specificResponse };
@@ -236,7 +254,7 @@ export class MessagingService {
         adaptiveCards,
         attachments,
         suggestedActions,
-      } = this.processAgentResponse(activities);
+      } = this.processAgentResponse(activities, testCase);
 
       let isMatch: boolean | undefined;
       let specificResponse: string = processedResponse || "";
@@ -333,7 +351,7 @@ export class MessagingService {
         adaptiveCards,
         attachments,
         suggestedActions,
-      } = this.processAgentResponse(allActivities);
+      } = this.processAgentResponse(allActivities, testCase);
 
       let isMatch: boolean | undefined;
       let specificResponse: string = processedResponse || "";

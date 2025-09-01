@@ -91,9 +91,13 @@ export class MessageProcessor {
    * Processes agent response activities using multiple extraction strategies.
    * Implements fallback logic to extract meaningful text content from various activity formats.
    * @param activities - Array of activities received from the agent.
+   * @param includeAdaptiveCardText - Whether to extract text from adaptive cards (default: true)
    * @returns Extracted text content or appropriate fallback message.
    */
-  processResponse(activities: Activity[]): string {
+  processResponse(
+    activities: Activity[],
+    includeAdaptiveCardText = true
+  ): string {
     if (!this.isValidActivitiesArray(activities)) {
       return FALLBACK_MESSAGES.NO_RESPONSE;
     }
@@ -120,19 +124,41 @@ export class MessageProcessor {
       }
     }
 
-    // Strategy 3: Extract text content from activity attachments
-    for (const activity of activities) {
-      if (activity.attachments) {
-        const textFromAttachments = this.extractTextFromAttachments(
-          activity.attachments
-        );
-        if (textFromAttachments) {
-          return textFromAttachments;
+    // Strategy 3: Extract text content from activity attachments (only if enabled)
+    if (includeAdaptiveCardText) {
+      for (const activity of activities) {
+        if (activity.attachments) {
+          const textFromAttachments = this.extractTextFromAttachments(
+            activity.attachments
+          );
+          if (textFromAttachments) {
+            return textFromAttachments;
+          }
         }
       }
     }
 
     return FALLBACK_MESSAGES.NO_TEXT_CONTENT;
+  }
+
+  /**
+   * Processes agent response activities for direct text only (no adaptive card text extraction).
+   * Used specifically for RESPONSE_MATCH tests where only direct agent text should be validated.
+   * @param activities - Array of activities received from the agent.
+   * @returns Direct text content only or empty string if no direct text found.
+   */
+  processDirectTextResponse(activities: Activity[]): string {
+    if (!this.isValidActivitiesArray(activities)) {
+      return "";
+    }
+
+    // Only extract direct text content from activities, no fallback strategies
+    const allTextContent = activities
+      .filter((activity) => this.isNonEmptyString(activity.text))
+      .map((activity) => activity.text!.trim())
+      .join(" ");
+
+    return allTextContent;
   }
 
   /**
