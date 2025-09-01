@@ -21,25 +21,22 @@ import React, { useMemo, useCallback } from "react";
 import {
   Card,
   CardHeader,
-  CardPreview,
   Button,
   ProgressBar,
-  Title3,
   Spinner,
   makeStyles,
   tokens,
   FluentProvider,
   webLightTheme,
   Badge,
-  Divider,
   MessageBar,
   MessageBarBody,
+  MessageBarTitle,
   Text,
-  Tooltip,
-  CounterBadge, // Keep for commented out Results Available badge
+  Link,
 } from "@fluentui/react-components";
 import {
-  CheckmarkCircle24Regular,
+  CheckmarkCircle24Filled,
   ErrorCircle24Regular,
   Warning24Regular,
   Info24Regular,
@@ -48,7 +45,49 @@ import { createRoot, Root } from "react-dom/client";
 import type { TestExecutionSummary } from "../shared/models/DataModels";
 import FluentChart from "./FluentChart";
 
-// Constants for FluentUI TestRunner components
+const ReadyCheckmarkIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="48"
+    height="48"
+    viewBox="0 0 48 49"
+    fill="none"
+  >
+    <path
+      d="M24 4.5C35.0457 4.5 44 13.4543 44 24.5C44 35.5457 35.0457 44.5 24 44.5C12.9543 44.5 4 35.5457 4 24.5C4 13.4543 12.9543 4.5 24 4.5Z"
+      fill="url(#paint0_linear_7624_2330)"
+    />
+    <path
+      d="M32.6339 18.1161C33.122 18.6043 33.122 19.3957 32.6339 19.8839L21.6339 30.8839C21.1457 31.372 20.3543 31.372 19.8661 30.8839L15.3661 26.3839C14.878 25.8957 14.878 25.1043 15.3661 24.6161C15.8543 24.128 16.6457 24.128 17.1339 24.6161L20.75 28.2322L30.8661 18.1161C31.3543 17.628 32.1457 17.628 32.6339 18.1161Z"
+      fill="url(#paint1_linear_7624_2330)"
+    />
+    <defs>
+      <linearGradient
+        id="paint0_linear_7624_2330"
+        x1="5.42857"
+        y1="12"
+        x2="33.0334"
+        y2="40.6803"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="#DCDCDC" />
+        <stop offset="1" stopColor="#85908F" />
+      </linearGradient>
+      <linearGradient
+        id="paint1_linear_7624_2330"
+        x1="18.375"
+        y1="19.1271"
+        x2="21.586"
+        y2="34.2408"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop stopColor="white" />
+        <stop offset="1" stopColor="#E3FFD9" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
 const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
   SERVICE_NAME: "FluentTestRunnerUI",
 
@@ -60,9 +99,6 @@ const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
   } as const,
 
   UI_LIMITS: {
-    MAX_CONTAINER_WIDTH: "1200px",
-    MAX_LOG_HEIGHT: "400px",
-    MAX_LOG_SCROLL_HEIGHT: "300px",
     RECENT_LOGS_LIMIT: 50,
     MAX_LOGS_LIMIT: 100,
   },
@@ -85,43 +121,28 @@ const FLUENT_TEST_RUNNER_UI_CONSTANTS = {
     RUN_ALL: "Run All Tests",
   },
 
-  TITLES: {
-    MAIN_TITLE: "PowerCAT Test Runner",
-    STATUS_TITLE: "Current Status",
-    PROGRESS_TITLE: "Progress",
-    SUMMARY_TITLE: "Test Execution Summary",
-    LOG_TITLE: "Execution Logs",
-  },
-
   MESSAGES: {
     READY_STATUS: "Ready to execute tests",
-    INITIALIZING: "Initializing",
-    MEMORY_WARNING: "Keep only last 100 logs to prevent memory issues",
-    EXECUTION_IN_PROGRESS: "Progress",
-    TEST_RUN_IN_PROGRESS: "Test Run is in progress",
-    PAGE_CLOSE_WARNING:
-      "⚠️ Do not close this page until test execution is completed",
+    LEARN_MORE: "Learn more",
   },
 
   STYLE_VALUES: {
     PADDING_TEMPLATE: "0",
     BORDER_WIDTH: "1px solid",
   },
+
+  URLS: {
+    LEARN_MORE:
+      "https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/MicrosoftAuthentication.md",
+  },
 } as const;
 
-/**
- * UI-specific log entry interface for display purposes
- */
 interface UILogEntry {
   level: (typeof FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS)[keyof typeof FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS];
   message: string;
   timestamp: Date;
 }
 
-/**
- * Styles for the TestRunner UI components
- * Uses FluentUI design tokens for consistent theming
- */
 const useStyles = makeStyles({
   container: {
     padding: tokens.spacingVerticalS,
@@ -132,6 +153,7 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalS,
     boxSizing: "border-box",
+    minHeight: "100%",
   },
   controlsCard: {
     display: "flex",
@@ -152,23 +174,19 @@ const useStyles = makeStyles({
     display: "inline-block",
     fontWeight: "normal",
   },
-  progressCard: {
-    padding: tokens.spacingVerticalS,
-    background: `linear-gradient(135deg, ${tokens.colorNeutralBackground1} 0%, ${tokens.colorNeutralBackground2} 100%)`,
-    border: "none",
-    boxShadow: tokens.shadow4,
-    width: "100%",
-    boxSizing: "border-box",
-  },
+
   logCard: {
     padding: tokens.spacingVerticalS,
-    maxHeight: FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.MAX_LOG_HEIGHT,
-    overflow: "auto",
+    flex: "1 1 auto",
+    minHeight: "200px",
+    overflow: "hidden",
     background: tokens.colorNeutralBackground1,
     border: "none",
     boxShadow: tokens.shadow4,
     width: "100%",
     boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
   },
   logEntry: {
     padding: `${tokens.spacingVerticalXS} ${FLUENT_TEST_RUNNER_UI_CONSTANTS.STYLE_VALUES.PADDING_TEMPLATE}`,
@@ -183,14 +201,6 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground2,
     },
   },
-  logTimestamp: {
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase100,
-    fontWeight: tokens.fontWeightRegular,
-    fontFamily: tokens.fontFamilyMonospace,
-    minWidth: "80px",
-    flexShrink: 0,
-  },
   logMessage: {
     lineHeight: tokens.lineHeightBase300,
     color: tokens.colorNeutralForeground1,
@@ -200,11 +210,7 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
   },
-  progressBarWrapper: {
-    display: "flex",
-    flexDirection: "column",
-    gap: tokens.spacingVerticalS,
-  },
+
   customProgressBar: {
     height: "12px",
     borderRadius: "6px",
@@ -219,13 +225,7 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalS,
   },
-  summaryCard: {
-    padding: tokens.spacingVerticalS,
-    border: "none",
-    boxShadow: tokens.shadow4,
-    width: "100%",
-    boxSizing: "border-box",
-  },
+
   infoSection: {
     display: "flex",
     alignItems: "center",
@@ -233,11 +233,6 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalS,
     background: tokens.colorNeutralBackground2,
     borderRadius: tokens.borderRadiusMedium,
-  },
-  progressTextCenter: {
-    textAlign: "center",
-    padding: tokens.spacingVerticalS,
-    color: tokens.colorNeutralForeground2,
   },
   buttonSection: {
     display: "flex",
@@ -247,19 +242,10 @@ const useStyles = makeStyles({
   chartContainer: {
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
+    gap: "8px",
     width: "100%",
     maxWidth: "100%",
     overflow: "hidden",
-  },
-  warningMessage: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground1,
-    fontStyle: "italic",
-    textAlign: "right",
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalXS,
   },
   headerStatusSection: {
     display: "flex",
@@ -267,6 +253,212 @@ const useStyles = makeStyles({
     alignItems: "flex-end",
     gap: tokens.spacingVerticalS,
     minWidth: "300px",
+  },
+  readySection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: tokens.spacingVerticalM,
+    padding: tokens.spacingVerticalXXL,
+    textAlign: "center",
+  },
+  readyIcon: {
+    color: tokens.colorPaletteGreenBackground3,
+    fontSize: "48px",
+    marginBottom: tokens.spacingVerticalS,
+  },
+  readyToBeginContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "24px",
+    paddingBottom: "111px",
+    textAlign: "center",
+    minHeight: "80vh",
+    height: "100%",
+  },
+  readyIconLarge: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  readyContentSection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
+    textAlign: "center",
+  },
+  readyTitle: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase500,
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: tokens.lineHeightBase500,
+    color: tokens.colorNeutralForeground1,
+    margin: "0",
+  },
+  readyDescription: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightRegular,
+    lineHeight: tokens.lineHeightBase300,
+    color: tokens.colorNeutralForeground2,
+    textAlign: "center",
+    margin: "0",
+    whiteSpace: "pre-line",
+  },
+  readyLink: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    color: tokens.colorBrandForeground1,
+    textDecoration: "none",
+  },
+  runTestsButton: {
+    backgroundColor: "#0f6cbd",
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
+    borderRadius: tokens.borderRadiusMedium,
+    border: "none",
+  },
+  inProgressMessageBar: {
+    marginBottom: tokens.spacingVerticalM,
+  },
+  successMessageBar: {
+    marginBottom: tokens.spacingVerticalM,
+  },
+  progressCard: {
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusMedium,
+    boxShadow:
+      "0px 2px 4px 0px rgba(0,0,0,0.14), 0px 0px 2px 0px rgba(0,0,0,0.12)",
+    marginBottom: tokens.spacingVerticalM,
+    padding: "12px",
+  },
+  progressCardHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "6px",
+  },
+  progressIcon: {
+    color: "#0f6cbd",
+  },
+  progressTitle: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: tokens.lineHeightBase300,
+    color: tokens.colorNeutralForeground1,
+    margin: "0",
+  },
+  progressBarWrapper: {
+    marginLeft: "28px",
+    marginRight: "26px",
+    marginBottom: "8px",
+  },
+  progressBarStyle: {
+    height: "2px",
+    marginBottom: "3px",
+    "& .fui-ProgressBar__bar": {
+      backgroundColor: "#0f6cbd",
+    },
+    "& .fui-ProgressBar__track": {
+      backgroundColor: "#e6e6e6",
+    },
+  },
+
+  progressCountText: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightRegular,
+    lineHeight: tokens.lineHeightBase200,
+    color: tokens.colorNeutralForeground1,
+    margin: "0",
+  },
+  summaryCard: {
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusMedium,
+    boxShadow: "0px 4px 4px 0px rgba(0,0,0,0.25)",
+    marginBottom: tokens.spacingVerticalM,
+    overflow: "hidden",
+  },
+  summaryCardHeader: {
+    padding: "10px",
+    borderBottom: "none",
+  },
+  summaryCardTitle: {
+    fontFamily: tokens.fontFamilyBase,
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightSemibold,
+    lineHeight: tokens.lineHeightBase300,
+    color: tokens.colorNeutralForeground1,
+    margin: "0",
+  },
+  summaryCardBody: {
+    padding: "0 10px 10px 10px",
+  },
+  executionLogsCard: {
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderRadius: tokens.borderRadiusMedium,
+    boxShadow: "none",
+    marginBottom: tokens.spacingVerticalM,
+    overflow: "hidden",
+  },
+  successMessage: {
+    color: tokens.colorPaletteGreenForeground1,
+    fontWeight: tokens.fontWeightMedium,
+  },
+  statusLabel: {
+    fontWeight: tokens.fontWeightSemibold,
+    marginBottom: tokens.spacingVerticalXS,
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+  },
+  statusLabelSuccess: {
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  statusLabelInProgress: {
+    color: tokens.colorPaletteBlueForeground2,
+  },
+  statusMessage: {
+    color: tokens.colorNeutralForeground2,
+    marginBottom: tokens.spacingVerticalS,
+  },
+  statusLink: {
+    marginBottom: tokens.spacingVerticalM,
+  },
+  progressHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: tokens.spacingVerticalS,
+  },
+  progressLabel: {
+    fontWeight: tokens.fontWeightSemibold,
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalXS,
+  },
+  cancelButton: {
+    marginLeft: "auto",
+  },
+  thinProgressBar: {
+    height: "4px",
+    marginBottom: "2px",
+  },
+  progressText: {
+    textAlign: "left",
+    color: tokens.colorNeutralForeground2,
+  },
+  logTimestamp: {
+    color: tokens.colorNeutralForeground3,
+    marginLeft: "auto",
+    textAlign: "right",
   },
 });
 
@@ -279,34 +471,16 @@ const PlaySolidIcon: React.FC = () => {
   return <span className={styles.fabricIcon}>&#xF5B0;</span>;
 };
 
-/**
- * Props interface for the main TestRunner UI component
- */
 interface TestRunnerUIProps {
-  /** Whether tests are currently executing */
   isRunning: boolean;
-  /** Whether existing test results are available */
   hasExistingResults: boolean;
-  /** Current status message */
   status: string;
-  /** Progress information for active test execution */
   progress?: { completed: number; total: number };
-  /** Test execution summary data */
   summary?: TestExecutionSummary;
-  /** Log entries for execution tracking */
   logs: UILogEntry[];
-  /** Callback function to execute tests */
   onRunTests: () => void;
 }
 
-/**
- * Main TestRunner UI Component
- * Provides a comprehensive interface for test execution and monitoring
- */
-/**
- * Main TestRunner UI component with comprehensive test execution interface.
- * @param props - Component props including execution state and callbacks.
- */
 const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
   isRunning,
   hasExistingResults,
@@ -318,9 +492,6 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
 }) => {
   const styles = useStyles();
 
-  /**
-   * Memoized status icon based on current status
-   */
   const statusIcon = useMemo(() => {
     if (isRunning) return <Spinner size="small" />;
     if (
@@ -329,7 +500,7 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
       )
     )
       return (
-        <CheckmarkCircle24Regular color={tokens.colorPaletteGreenForeground1} />
+        <CheckmarkCircle24Filled color={tokens.colorPaletteGreenForeground1} />
       );
     if (
       status.includes(
@@ -346,14 +517,11 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
     return <Info24Regular color={tokens.colorBrandForeground1} />;
   }, [isRunning, status]);
 
-  /**
-   * Callback to get log level icon
-   */
   const getLogIcon = useCallback((level: string) => {
     switch (level) {
       case FLUENT_TEST_RUNNER_UI_CONSTANTS.LOG_LEVELS.SUCCESS:
         return (
-          <CheckmarkCircle24Regular
+          <CheckmarkCircle24Filled
             color={tokens.colorPaletteGreenForeground1}
           />
         );
@@ -370,9 +538,6 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
     }
   }, []);
 
-  /**
-   * Memoized progress percentage calculation
-   */
   const progressPercentage = useMemo(() => {
     if (
       !progress ||
@@ -386,17 +551,11 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
     );
   }, [progress]);
 
-  /**
-   * Memoized button text based on execution state
-   */
   const buttonText = useMemo(() => {
     if (isRunning) return FLUENT_TEST_RUNNER_UI_CONSTANTS.BUTTON_TEXTS.RUNNING;
     return FLUENT_TEST_RUNNER_UI_CONSTANTS.BUTTON_TEXTS.RUN_ALL;
   }, [isRunning]);
 
-  /**
-   * Memoized recent logs for performance
-   */
   const recentLogs = useMemo(() => {
     const recent = logs.slice(
       -FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS.RECENT_LOGS_LIMIT
@@ -407,191 +566,187 @@ const TestRunnerUI: React.FC<TestRunnerUIProps> = ({
 
   return (
     <div className={styles.container}>
-      {/* Header Section - Button left, Status right */}
-      <Card className={styles.controlsCard}>
-        <div className={styles.buttonSection}>
-          <Tooltip
-            content="Execute all configured test cases"
-            relationship="label"
-          >
+      {!isRunning &&
+        !progress &&
+        status === FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.READY_STATUS && (
+          <div className={styles.readyToBeginContainer}>
+            <div className={styles.readyIconLarge}>
+              <ReadyCheckmarkIcon />
+            </div>
+            <div className={styles.readyContentSection}>
+              <div className={styles.readyTitle}>Ready to begin</div>
+              <div className={styles.readyDescription}>
+                Agent test runner initialized and ready.{"\n"}
+                Click the button below to begin running the tests.{"\n"}
+                <Link
+                  href={FLUENT_TEST_RUNNER_UI_CONSTANTS.URLS.LEARN_MORE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.readyLink}
+                >
+                  Learn more
+                </Link>
+              </div>
+            </div>
             <Button
               appearance="primary"
               icon={<PlaySolidIcon />}
-              size="medium"
-              disabled={isRunning || hasExistingResults}
               onClick={onRunTests}
+              className={styles.runTestsButton}
             >
-              {buttonText}
+              Run all tests
             </Button>
-          </Tooltip>
-        </div>
+          </div>
+        )}
 
-        <div className={styles.headerStatusSection}>
-          {/* Temporarily commented out Results Available badge
-          {hasExistingResults && (
-            <Badge appearance="filled" color="success">
-              <CounterBadge count={summary?.totalTests || 0} />
-              Results Available
-            </Badge>
-          )}
-          */}
-
-          {isRunning && (
-            <Badge appearance="filled" color="important">
-              Running
-            </Badge>
-          )}
-
-          {/* Warning message displayed when tests are running */}
-          {isRunning && (
-            <div className={styles.warningMessage}>
-              <Text size={200}>
-                {FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.PAGE_CLOSE_WARNING}
-              </Text>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {(progress ||
-        isRunning ||
+      {(isRunning ||
+        progress ||
+        summary ||
         status !== FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.READY_STATUS) && (
-        <Card className={styles.progressCard}>
-          <CardHeader
-            header={
-              <Text weight="bold" size={400}>
-                {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.STATUS_TITLE}
-              </Text>
-            }
-          />
-          <div className={styles.progressSection}>
-            {/* Status */}
-            <MessageBar
-              intent={
-                status.includes("✅") ||
-                status.includes("completed successfully")
-                  ? "success"
-                  : status.includes("❌")
-                  ? "error"
-                  : status.includes("⚠️")
-                  ? "warning"
-                  : "info"
-              }
-            >
+        <>
+          {isRunning && (
+            <MessageBar className={styles.inProgressMessageBar} intent="info">
               <MessageBarBody>
-                <div className={styles.statusSection}>
-                  <Text>
-                    {isRunning && progress
-                      ? FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES
-                          .TEST_RUN_IN_PROGRESS
-                      : status}
-                  </Text>
-                </div>
+                <MessageBarTitle>In progress</MessageBarTitle>
+                Keep this window open until the tests are finished. This may
+                take a few minutes.{" "}
+                <Link
+                  href={FLUENT_TEST_RUNNER_UI_CONSTANTS.URLS.LEARN_MORE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Learn more
+                </Link>
               </MessageBarBody>
             </MessageBar>
+          )}
 
-            {progress && (
-              <>
-                <Divider />
-                <div className={styles.progressBarWrapper}>
-                  <Text size={300} weight="semibold">
-                    {
-                      FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES
-                        .EXECUTION_IN_PROGRESS
-                    }
+          {/* Success Message Bar */}
+          {!isRunning && summary && (
+            <MessageBar className={styles.successMessageBar} intent="success">
+              <MessageBarBody>
+                <MessageBarTitle>Success</MessageBarTitle>
+                All test executions completed successfully
+              </MessageBarBody>
+            </MessageBar>
+          )}
+
+          {/* Progress Card - Show when tests are running */}
+          {isRunning && progress && (
+            <Card className={styles.progressCard}>
+              <div className={styles.progressCardHeader}>
+                <Spinner size="extra-small" className={styles.progressIcon} />
+                <Text className={styles.progressTitle}>Running tests</Text>
+              </div>
+              <div className={styles.progressBarWrapper}>
+                <ProgressBar
+                  value={progressPercentage / 100}
+                  className={styles.progressBarStyle}
+                />
+                <Text className={styles.progressCountText}>
+                  {progress.completed}/{progress.total} tests complete
+                </Text>
+              </div>
+            </Card>
+          )}
+
+          {/* Test execution summary */}
+          {summary && (
+            <Card className={styles.summaryCard}>
+              <CardHeader
+                header={
+                  <Text className={styles.summaryCardTitle}>
+                    Test Execution Summary
                   </Text>
-                  <ProgressBar
-                    className={styles.customProgressBar}
-                    value={
-                      progressPercentage /
-                      FLUENT_TEST_RUNNER_UI_CONSTANTS.LAYOUT_VALUES
-                        .PERCENTAGE_CONVERSION
-                    }
-                    thickness="large"
-                  />
-                  <div className={styles.progressTextCenter}>
-                    <Text size={300}>
-                      {progress.completed} / {progress.total} tests completed
+                }
+              />
+              <div className={styles.summaryCardBody}>
+                <div className={styles.chartContainer}>
+                  <FluentChart summary={summary} />
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Execution Logs */}
+          {logs.length > 0 && (
+            <Card className={styles.executionLogsCard}>
+              <CardHeader
+                header={
+                  <Text weight="semibold" size={400}>
+                    Execution Logs
+                  </Text>
+                }
+              />
+              <div
+                style={{
+                  flex: "1 1 auto",
+                  overflow: "auto",
+                  minHeight: "0",
+                  padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
+                  gap: "0",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {recentLogs.map((log, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: tokens.spacingHorizontalXS,
+                      padding: `${tokens.spacingVerticalXXS} 0`,
+                      minHeight: "28px",
+                    }}
+                  >
+                    <Badge
+                      appearance="tint"
+                      color={
+                        log.level === "error"
+                          ? "danger"
+                          : log.level === "warning"
+                          ? "warning"
+                          : log.level === "success"
+                          ? "success"
+                          : "brand"
+                      }
+                      style={{
+                        minWidth: "fit-content",
+                        height: "16px",
+                        fontSize: "10px",
+                      }}
+                    >
+                      {log.level}
+                    </Badge>
+                    <Text
+                      style={{
+                        flex: "1",
+                        paddingLeft: tokens.spacingHorizontalXXS,
+                        fontSize: "14px",
+                        lineHeight: "20px",
+                      }}
+                    >
+                      {log.message}
+                    </Text>
+                    <Text
+                      size={200}
+                      style={{
+                        minWidth: "fit-content",
+                        fontSize: "12px",
+                        color: tokens.colorNeutralForeground3,
+                        paddingLeft: tokens.spacingHorizontalXS,
+                      }}
+                    >
+                      {log.timestamp.toLocaleTimeString()}
                     </Text>
                   </div>
-                </div>
-              </>
-            )}
-            {isRunning && !progress && (
-              <div className={styles.infoSection}>
-                <Spinner size="small" />
-                <Text>
-                  {FLUENT_TEST_RUNNER_UI_CONSTANTS.MESSAGES.INITIALIZING}
-                </Text>
+                ))}
               </div>
-            )}
-          </div>
-        </Card>
+            </Card>
+          )}
+        </>
       )}
-
-      <div className={styles.summaryCards}>
-        {summary && (
-          <Card className={styles.summaryCard}>
-            <CardHeader
-              header={
-                <Text weight="bold" size={400}>
-                  {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.SUMMARY_TITLE}
-                </Text>
-              }
-            />
-            <CardPreview>
-              <div className={styles.chartContainer}>
-                <FluentChart summary={summary} />
-              </div>
-            </CardPreview>
-          </Card>
-        )}
-
-        {/* Execution Log - Single line format */}
-        {logs.length > 0 && (
-          <Card className={`${styles.logCard} ${styles.summaryCard}`}>
-            <CardHeader
-              header={
-                <Text weight="bold" size={400}>
-                  {FLUENT_TEST_RUNNER_UI_CONSTANTS.TITLES.LOG_TITLE}
-                </Text>
-              }
-            />
-
-            <div
-              style={{
-                maxHeight:
-                  FLUENT_TEST_RUNNER_UI_CONSTANTS.UI_LIMITS
-                    .MAX_LOG_SCROLL_HEIGHT,
-                overflow: "auto",
-              }}
-            >
-              {recentLogs.map((log, index) => (
-                <div key={index} className={styles.logEntry}>
-                  <Text size={200} className={styles.logTimestamp}>
-                    {log.timestamp.toLocaleTimeString()}
-                  </Text>
-                  <Badge
-                    appearance="tint"
-                    color={
-                      log.level === "error"
-                        ? "danger"
-                        : log.level === "warning"
-                        ? "warning"
-                        : log.level === "success"
-                        ? "success"
-                        : "brand"
-                    }
-                  >
-                    {log.level}
-                  </Badge>
-                  <Text className={styles.logMessage}>{log.message}</Text>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
     </div>
   );
 };
