@@ -11,7 +11,7 @@ function navigateToAgentInventory(selectedControlItemsReferences) {
   }
 
   let selectedItem = selectedControlItemsReferences[0];
-  var id = selectedItem.Id.replace("{", "").replace("}", "");
+  let id = selectedItem.Id.replace("{", "").replace("}", "");
 
   const pageInput = {
     pageType: "custom",
