@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Text;
 using Microsoft.Xrm.Sdk;
 using Newtonsoft.Json;
 using static POWERCAT.Plugins.AgentInventory.AgentDataModel;
@@ -70,6 +71,28 @@ namespace POWERCAT.Plugins.AgentInventory
                     {
                         //Set output - list of connections extracted from workflows as json string
                         context.OutputParameters["cat_ExtractWorkFlowOutput"] = result;
+                    }
+                }
+                //Check if custom API call is for tenant usage report generation
+                else if (context.MessageName == "cat_GenerateTenantUsageReport")
+                {
+                    string logId = (string)context.InputParameters["cat_UsageLogId"];
+                    string base64EncodedUsageData = (string)context.InputParameters["cat_UsageInput"];
+
+                    //Decode the data
+                    byte[] decodedBytes = Convert.FromBase64String(base64EncodedUsageData);
+                    string decodedUsageCsv = Encoding.UTF8.GetString(decodedBytes);
+
+                    AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
+
+                    //Create usage data in TenantUsageData table
+                    bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId);
+
+                    context.OutputParameters["cat_UsageOutput"] = result;
+                    
+                    if(result == false)
+                    {
+                        tracingService.Trace($"Plugin execution failed.");
                     }
                 }
             }

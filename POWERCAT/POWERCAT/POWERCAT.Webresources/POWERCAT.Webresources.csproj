@@ -48,6 +48,7 @@
     <Content Include="Html\webchat.html" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="AgentInventory\" />
     <Folder Include="BotAuthenticationService\" />
     <Folder Include="ConversationKpi\" />
     <Folder Include="ResourceFiles\" />
