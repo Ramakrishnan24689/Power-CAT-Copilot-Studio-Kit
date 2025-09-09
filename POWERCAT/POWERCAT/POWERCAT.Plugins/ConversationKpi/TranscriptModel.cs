@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 
@@ -19,8 +20,21 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string type { get; set; }
         public int timestamp { get; set; }
         public From from { get; set; }
-        [JsonConverter(typeof(ValueConverter))]
-        public Value value { get; set; }
+        // *** CHANGED: Removed JsonConverter attribute and changed to JToken ***
+        [JsonProperty("value")]
+        public JToken valueToken { get; set; }
+        [JsonIgnore]
+        public Value value
+        {
+            get
+            {
+                if (valueToken != null && valueToken.Type == JTokenType.Object)
+                {
+                    return valueToken.ToObject<Value>();
+                }
+                return null;
+            }
+        }
         public string id { get; set; }
         public string channelId { get; set; }
         public string text { get; set; }
