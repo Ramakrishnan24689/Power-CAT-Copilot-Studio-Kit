@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="JsonEditor" version="13.24.2" display-name-key="JsonEditor" description-key="JsonEditor description" control-type="standard" >
+  <control namespace="PowerCAT" constructor="JsonEditor" version="13.24.3" display-name-key="JsonEditor" description-key="JsonEditor description" control-type="standard" >
     <external-service-usage enabled="false">
     </external-service-usage>
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
