@@ -25,17 +25,25 @@ export class AuthService {
 
   /**
    * @function generateRandomString
-   * @description Generates a random string of specified length.
+   * @description Generates a random string of specified length using unbiased random selection.
    * @param length - Length of the random string.
    * @returns Random string.
    */
   private generateRandomString(length: number): string {
-    return Array.from(crypto.getRandomValues(new Uint8Array(length)))
-      .map(
-        (byte) =>
-          CONFIG.AUTH.POSSIBLE_CHARS[byte % CONFIG.AUTH.POSSIBLE_CHARS.length]
-      )
-      .join("");
+    const chars = CONFIG.AUTH.POSSIBLE_CHARS;
+    const result = new Array(length);
+
+    for (let i = 0; i < length; i++) {
+      let randomByte;
+      // Use rejection sampling to avoid modulo bias
+      do {
+        randomByte = crypto.getRandomValues(new Uint8Array(1))[0];
+      } while (randomByte >= Math.floor(256 / chars.length) * chars.length);
+
+      result[i] = chars[randomByte % chars.length];
+    }
+
+    return result.join("");
   }
 
   /**
