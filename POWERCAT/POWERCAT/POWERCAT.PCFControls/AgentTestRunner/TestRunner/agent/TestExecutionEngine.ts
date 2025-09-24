@@ -184,20 +184,40 @@ export class TestExecutionEngine {
     parentTestResultId?: string,
     isFirstChildTest = false
   ): Promise<ChildTestResult> {
-    // Get start conversation activity if this is the first child test
-    const startConversationActivity = isFirstChildTest
-      ? this.conversationManager.getStartConversationActivity()
-      : null;
+    // Check if this is an invoke action test for multiturn child tests
+    const isInvokeAction =
+      childTest.testTypeCode === 3 && // ADAPTIVE_CARD
+      childTest.operationTypeCode === 3 && // Invoke Actions
+      childTest.adaptiveCardPayload;
 
-    // Send message and get response
-    const response =
-      await this.conversationManager.sendMessageInExistingConversation(
-        childTest.testUtterance || "",
-        conversationId,
-        childTest,
-        isFirstChildTest,
-        startConversationActivity || undefined
-      );
+    let response: AgentResponse;
+
+    if (isInvokeAction) {
+      // Use MessagingService.invokeAdaptiveCardAction with existing conversation
+      response = await this.conversationManager
+        .getMessagingService()
+        .invokeAdaptiveCardAction(
+          childTest.adaptiveCardPayload!,
+          conversationId,
+          childTest
+        );
+    } else {
+      // Regular child test execution
+      // Get start conversation activity if this is the first child test
+      const startConversationActivity = isFirstChildTest
+        ? this.conversationManager.getStartConversationActivity()
+        : null;
+
+      // Send message and get response
+      response =
+        await this.conversationManager.sendMessageInExistingConversation(
+          childTest.testUtterance || "",
+          conversationId,
+          childTest,
+          isFirstChildTest,
+          startConversationActivity || undefined
+        );
+    }
 
     // Create test result in Dataverse and get actual result code
     const { testResultId, actualResultCode } = await this.createChildTestResult(

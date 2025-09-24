@@ -544,7 +544,12 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           return RESULT_CODES.PENDING;
         } else if (operationTypeCode === 3) {
           // Invoke Actions
-          return RESULT_CODES.ERROR;
+          const validationResult = ResponseValidationEngine.validateResponse(
+            agentResponseText,
+            testCase.expectedResponse || "",
+            testCase.comparisonOperatorCode ?? 1
+          );
+          return validationResult ? RESULT_CODES.SUCCESS : RESULT_CODES.FAILED;
         } else {
           // Comparison Operator - use extracted attachments for consistency
           const extractedAttachmentsJson = agentResponse
@@ -650,8 +655,10 @@ export class AgentTestResultOperations extends DataverseOperationBase {
           // AI Validation
           return "Pending analysis with AI Builder";
         } else if (operationTypeCode === 3) {
-          // Invoke Actions
-          return "Invoke Actions is not currently supported with Microsoft Authentication";
+          // Invoke Actions - Updated to use Response Match style messages
+          return resultCode === RESULT_CODES.SUCCESS
+            ? "Exact match between the expected response and received response as per comparison operator"
+            : "Not an exact match between the expected response and received response as per comparison operator";
         } else {
           // Comparison Operator - use extracted attachments for consistency
           const extractedAttachmentsJson = agentResponse

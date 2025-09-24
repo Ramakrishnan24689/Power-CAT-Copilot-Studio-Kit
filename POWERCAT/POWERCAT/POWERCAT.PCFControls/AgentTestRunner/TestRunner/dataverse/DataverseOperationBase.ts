@@ -98,7 +98,7 @@ export abstract class DataverseOperationBase {
       return await operation();
     } catch (error) {
       const errorMessage = this.extractErrorMessage(error);
-      console.error(
+      throw new Error(
         `[${this.serviceName}] Failed to execute operation "${operationName}": ${errorMessage}`
       );
       return null;
@@ -295,10 +295,9 @@ export abstract class DataverseOperationBase {
         if (response.ok) {
           return true;
         } else {
-          console.error(
+          throw new Error(
             `[${this.serviceName}] Dataverse action "${actionName}" failed with HTTP status: ${response.status} ${response.statusText}`
           );
-          return false;
         }
       } catch (error) {
         return false;

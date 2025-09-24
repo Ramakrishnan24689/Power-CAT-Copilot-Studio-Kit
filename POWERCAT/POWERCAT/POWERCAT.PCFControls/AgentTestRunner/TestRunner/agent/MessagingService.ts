@@ -396,4 +396,115 @@ export class MessagingService {
       };
     }
   }
+
+  /**
+   * Invoke an adaptive card action
+   * @param actionPayload - The payload from cat_adaptivecardpayload to merge into value property
+   * @param conversationId - Existing conversation ID for multiturn scenarios
+   * @param testCase - Optional test case for validation context
+   * @returns Promise resolving to AgentResponse with action result
+   */
+  async invokeAdaptiveCardAction(
+    actionPayload: string,
+    conversationId: string,
+    testCase?: AgentTestCase
+  ): Promise<AgentResponse> {
+    const startTime = Date.now();
+    let allActivities: Activity[] = [];
+
+    try {
+      // Parse the action payload from the test case
+      let parsedPayload: Record<string, unknown>;
+      try {
+        parsedPayload = JSON.parse(actionPayload);
+      } catch (parseError) {
+        throw new Error(`Invalid adaptive card payload JSON: ${parseError}`);
+      }
+
+      const client = this.conversationManager.getClient();
+      if (!client) {
+        throw new Error("Client not available for invoke action");
+      }
+
+      // Create a simple invoke activity object and cast to Activity
+      const invokeActivityData = {
+        type: "invoke",
+        name: "adaptiveCard/action",
+        value: parsedPayload,
+      };
+
+      let activities;
+      try {
+        // Use sendActivity with the simple object, let the client handle the conversion
+        activities = await client.sendActivity(
+          invokeActivityData as unknown as Activity,
+          conversationId
+        );
+      } catch (apiError) {
+        // Handle token-related errors with refresh
+        if (
+          apiError instanceof Error &&
+          (apiError.message.includes("401") ||
+            apiError.message.includes("Unauthorized") ||
+            apiError.message.includes("token"))
+        ) {
+          await this.conversationManager.refreshToken();
+          const refreshedClient = this.conversationManager.getClient();
+          if (refreshedClient) {
+            activities = await refreshedClient.sendActivity(
+              invokeActivityData as unknown as Activity,
+              conversationId
+            );
+          } else {
+            throw new Error("Failed to get refreshed client");
+          }
+        } else {
+          throw apiError;
+        }
+      }
+
+      if (activities?.length) {
+        allActivities = [...allActivities, ...activities];
+      }
+
+      const responseTime = Date.now() - startTime;
+      const simplifiedResponses = this.createSimplifiedResponses(allActivities);
+      const allResponsesJson = JSON.stringify(simplifiedResponses);
+
+      const {
+        processedResponse,
+        adaptiveCards,
+        attachments,
+        suggestedActions,
+      } = this.processAgentResponse(allActivities, testCase);
+
+      return {
+        message: processedResponse || "",
+        timestamp: new Date(),
+        success: true,
+        responseTime,
+        adaptiveCards,
+        attachments,
+        suggestedActions,
+        isMatch: true, // Will be validated in AgentTestResultOperations
+        conversationId,
+        allResponses: allResponsesJson,
+        specificResponse: processedResponse || "",
+        responseIndex: 0,
+      };
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      return {
+        message: "",
+        timestamp: new Date(),
+        success: false,
+        responseTime,
+        error: `Error invoking adaptive card action: ${errorMessage}`,
+        conversationId,
+      };
+    }
+  }
 }

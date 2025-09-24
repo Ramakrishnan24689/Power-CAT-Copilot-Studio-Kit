@@ -145,4 +145,13 @@ export class MultiturnTestOrchestrator {
       conversationId,
     };
   }
+
+  /**
+   * Gets the messaging service instance for advanced operations.
+   * Used by TestExecutionEngine for invoke actions and other specialized messaging.
+   * @returns MessagingService instance
+   */
+  getMessagingService(): MessagingService {
+    return this.messagingService;
+  }
 }

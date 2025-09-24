@@ -228,11 +228,32 @@ export class TestRunner {
         };
       }
 
-      // Regular single-turn test execution
-      const agentResponse = await this.messagingService.sendMessage(
-        testCase.testUtterance,
-        testCase
-      );
+      // Check if this is an Adaptive Card test with Invoke Actions operation type
+      let agentResponse;
+
+      if (
+        testCase.testTypeCode === 3 && // ADAPTIVE_CARD
+        testCase.operationTypeCode === 3 && // Invoke Actions
+        testCase.adaptiveCardPayload
+      ) {
+        // First create a conversation for the invoke action
+        const conversationResult =
+          await this.conversationManager.createConversation();
+
+        // Use the invokeAdaptiveCardAction method with the conversation ID
+        agentResponse = await this.messagingService.invokeAdaptiveCardAction(
+          testCase.adaptiveCardPayload,
+          conversationResult.conversationId,
+          testCase
+        );
+      } else {
+        // Note: Invoke actions are only supported for multiturn child tests (testTypeCode: 5)
+        // Single-turn tests should use regular message sending
+        agentResponse = await this.messagingService.sendMessage(
+          testCase.testUtterance,
+          testCase
+        );
+      }
 
       // Create test result record and get the result code
       const testResultId = await this.testResultOps.createTestResult(
@@ -259,7 +280,7 @@ export class TestRunner {
   /**
    * Executes all test cases with parallel processing and comprehensive progress tracking.
    * @param testCases - Array of test cases to execute in the current test run.
-   * @param testRunId - Unique identifier of the test run for result tracking.
+   * @param testRunId - Unique identifier of the current test run for result tracking.
    * @param onProgress - Optional callback for real-time progress updates during execution.
    * @returns Promise resolving to comprehensive test execution summary with metrics.
    */

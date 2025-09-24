@@ -17,7 +17,7 @@
  */
 
 import { CopilotStudioClient } from "@microsoft/agents-copilotstudio-client";
-import type { ConnectionSettings } from "@microsoft/agents-copilotstudio-client";
+import type { ConnectionSettings, PowerPlatformCloud } from "@microsoft/agents-copilotstudio-client";
 import type { Activity } from "@microsoft/agents-activity";
 import { PowerPlatformAuthService } from "../auth/PowerPlatformAuthService";
 import { AgentConfigurationOperations } from "../dataverse/AgentConfigurationOperations";
@@ -93,13 +93,34 @@ export class ConversationManager {
    */
   async initialize(agentConfig: AgentConfiguration): Promise<void> {
     // Retrieve cloud parameter from environment variable
-    let cloud = "";
+    let cloud: PowerPlatformCloud | undefined = undefined;
 
     if (this.configurationOperations) {
       try {
         const cloudResult =
           await this.configurationOperations.getCloudParameterFromEnvironment();
-        cloud = cloudResult.cloud;
+        
+        // Map string cloud value to PowerPlatformCloud enum
+        switch (cloudResult.cloud?.toLowerCase()) {
+          case "public":
+          case "commercial":
+          case "":
+            cloud = undefined; // Default/Commercial cloud
+            break;
+          case "gcc":
+            cloud = "GCC" as PowerPlatformCloud;
+            break;
+          case "gcchigh":
+          case "gcc-high":
+            cloud = "GCCHigh" as PowerPlatformCloud;
+            break;
+          case "dod":
+            cloud = "DoD" as PowerPlatformCloud;
+            break;
+          default:
+            cloud = undefined;
+            break;
+        }
 
         // Log any errors or warnings about the cloud parameter
         if (cloudResult.error && this.onError) {
@@ -115,7 +136,7 @@ export class ConversationManager {
         }
 
         // Continue with default (Commercial cloud)
-        cloud = "";
+        cloud = undefined;
       }
     } else {
       // If no context was provided, log warning and use default
