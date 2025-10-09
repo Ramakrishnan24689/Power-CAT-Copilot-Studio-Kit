@@ -601,3 +601,42 @@ function sharepointValidation(formContext, selectedEntityTypeName) {
         }, 8000);
     });
 }
+
+/**
+ * @function validateTrackedVariablesOnChange
+ * @description Triggered when "cat_trackedvariables" field changes.
+ *              Allows only blank or non-empty JSON array of non-empty string.
+ * @param {object} executionContext - The execution context from the form.
+ */
+function validateTrackedVariablesOnChange(executionContext) {
+    const formContext = executionContext.getFormContext();
+    const trackedVariablesAttr = formContext.getAttribute("cat_trackedvariables");
+    const trackedVariablesControl = formContext.getControl("cat_trackedvariables");
+
+    if (!trackedVariablesAttr || !trackedVariablesControl) return;
+    const rawValue = trackedVariablesAttr.getValue();
+    const trimmedValue = rawValue ? rawValue.trim() : "";
+    let isValid = false;
+    if (!trimmedValue) {
+        isValid = true;
+    } else {
+        try {
+            const parsedValue = JSON.parse(trimmedValue);
+            isValid = Array.isArray(parsedValue) &&
+                parsedValue.length > 0 &&
+                parsedValue.every(
+                    item => typeof item === "string" && item.trim().length > 0
+                );
+        } catch (e) {
+            isValid = false;
+        }
+    }
+    if (!isValid) {
+        trackedVariablesControl.setNotification(
+            "Value must be blank or a non-empty JSON array of non-empty strings (e.g., [\"var1\", \"var2\"]).",
+            "INVALID_TRACKED_VARIABLES"
+        );
+    } else {
+        trackedVariablesControl.clearNotification("INVALID_TRACKED_VARIABLES");
+    }
+}
