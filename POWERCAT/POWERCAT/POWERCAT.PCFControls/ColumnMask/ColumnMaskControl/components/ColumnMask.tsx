@@ -26,7 +26,6 @@ export const ColumnMaskFunctional: React.FC<IColumnMaskProps> = ({
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Removed useEffect for style injection, since all styles are now in CSS
-
   React.useEffect(() => {
     setLocalValue(value ?? "");
   }, [value]);
@@ -43,24 +42,28 @@ export const ColumnMaskFunctional: React.FC<IColumnMaskProps> = ({
       }
     }
   };
-   /**
+
+  /**
    * Handles toggling between masked and plain text input.
    * Keeps the input focused.
    * @param e Mouse event from the toggle button
    */
-
   const handleToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowPlain(prev => !prev);   
+    setShowPlain((prev) => !prev);
     setTimeout(focusInput, 0);
   };
+
   /**
    * Handles changes to the input value.
    * @param _ev Change event
    * @param data Data containing the new value
    */
-  const handleChange = (_ev: React.ChangeEvent<HTMLInputElement>, data: { value: string }) => {
+  const handleChange = (
+    _ev: React.ChangeEvent<HTMLInputElement>,
+    data: { value: string }
+  ) => {
     setLocalValue(data.value);
     onChange(data.value);
   };
@@ -68,9 +71,9 @@ export const ColumnMaskFunctional: React.FC<IColumnMaskProps> = ({
   return (
     <div className="masked-input-container">
       <Input
-        input={{ ref: inputRef }} 
+        input={{ ref: inputRef }}
         className="masked-input"
-        type={showPlain ? "text" : "password"}    
+        type={showPlain ? "text" : "password"}
         value={localValue}
         placeholder={focused ? "" : placeholder}
         disabled={disabled}

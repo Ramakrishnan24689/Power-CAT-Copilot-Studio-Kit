@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+    <control namespace="PowerCAT" constructor="ColumnMask" version="0.0.2" display-name-key="Column Mask" description-key="Masked Field input control" control-type="virtual" >
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    <property name="Value" display-name-key="Masked Value" description-key="Bound masked input value" of-type="SingleLine.Text" usage="bound" required="true" />
+    <resources>
+      <code path="index.ts" order="1"/>
+      <platform-library name="React" version="16.14.0" />
+      <platform-library name="Fluent" version="9.46.2" />
+    </resources>
+  </control>
+</manifest>

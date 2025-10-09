@@ -57,6 +57,7 @@
     <ProjectReference Include="..\ChatBot\ChatBot.pcfproj" />
     <ProjectReference Include="..\OutputCard\OutputCard.pcfproj" />
     <ProjectReference Include="..\AgentTestRunner\TestRunner.pcfproj" />
+    <ProjectReference Include="..\ColumnMask\ColumnMask.pcfproj" />
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />

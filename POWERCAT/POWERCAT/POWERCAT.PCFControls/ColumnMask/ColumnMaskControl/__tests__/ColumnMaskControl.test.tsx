@@ -36,7 +36,8 @@ jest.mock("@fluentui/react-components", () => {
     React.createElement("button", { onClick, ...rest }, children);
   return {
     __esModule: true,
-    FluentProvider: ({ children }: any) => React.createElement("div", null, children),
+    FluentProvider: ({ children }: any) =>
+      React.createElement("div", null, children),
     webLightTheme: {},
     Input,
     Button,
@@ -67,11 +68,11 @@ jest.mock("../components/ColumnMask", () => {
 
 // Minimal PCF context helpers
 interface Inputs {
-  columnMaskedValue: ComponentFramework.PropertyTypes.StringProperty;
+  Value: ComponentFramework.PropertyTypes.StringProperty;
 }
 function createContext(value: string): ComponentFramework.Context<Inputs> {
   return {
-    parameters: { columnMaskedValue: { raw: value } as any },
+    parameters: { Value: { raw: value } as any },
     mode: {
       allocatedWidth: 300,
       allocatedHeight: 40,
@@ -82,14 +83,14 @@ function createContext(value: string): ComponentFramework.Context<Inputs> {
   } as any;
 }
 
-describe("ColumnMaskControl", () => {
+describe("ColumnMask", () => {
   beforeEach(() => {
     (global as any).__lastColumnMaskProps = undefined;
   });
 
   it("updateView renders ColumnMask with context value", () => {
-    const { ColumnMaskControl } = require("../ColumnMask");
-    const control = new ColumnMaskControl();
+    const { ColumnMask } = require("../ColumnMask");
+    const control = new ColumnMask();
     const notify = jest.fn();
     const context = createContext("init");
 
@@ -97,7 +98,9 @@ describe("ColumnMaskControl", () => {
     const element = control.updateView(context as any);
 
     const { container } = render(element as React.ReactElement);
-    const input = container.querySelector('input[data-testid="column-mask-mock"]') as HTMLInputElement;
+    const input = container.querySelector(
+      'input[data-testid="column-mask-mock"]'
+    ) as HTMLInputElement;
 
     expect(input).not.toBeNull();
     expect(input.value).toBe("init");
@@ -105,8 +108,8 @@ describe("ColumnMaskControl", () => {
   });
 
   it("getOutputs returns value after onChange", () => {
-    const { ColumnMaskControl } = require("../ColumnMask");
-    const control = new ColumnMaskControl();
+    const { ColumnMask } = require("../ColumnMask");
+    const control = new ColumnMask();
     const notify = jest.fn();
     const context = createContext("");
 
@@ -121,12 +124,12 @@ describe("ColumnMaskControl", () => {
     expect(notify).toHaveBeenCalled();
 
     const outputs = control.getOutputs() as IOutputs;
-    expect(outputs.columnMaskedValue).toBe("new");
+    expect(outputs.Value).toBe("new");
   });
 
   it("handles hosts without trackContainerResize gracefully (catch path)", () => {
-    const { ColumnMaskControl } = require("../ColumnMask");
-    const control = new ColumnMaskControl();
+    const { ColumnMask } = require("../ColumnMask");
+    const control = new ColumnMask();
     const notify = jest.fn();
     const context = createContext("x");
 
@@ -137,14 +140,14 @@ describe("ColumnMaskControl", () => {
     expect(() => control.init(context as any, notify, {} as any)).not.toThrow();
   });
 
-  it("uses empty string when columnMaskedValue.raw is undefined (covers ?? branch)", () => {
-    const { ColumnMaskControl } = require("../ColumnMask");
-    const control = new ColumnMaskControl();
+  it("uses empty string when Value.raw is undefined (covers ?? branch)", () => {
+    const { ColumnMask } = require("../ColumnMask");
+    const control = new ColumnMask();
     const notify = jest.fn();
 
     // context with raw: undefined to exercise right side of ??
     const context = {
-      parameters: { columnMaskedValue: { raw: undefined } as any },
+      parameters: { Value: { raw: undefined } as any },
       mode: {
         allocatedWidth: 300,
         allocatedHeight: 40,
@@ -164,5 +167,4 @@ describe("ColumnMaskControl", () => {
     expect(props).toBeDefined();
     expect(props.value).toBe(""); // right-hand side of ?? ""
   });
-
 });
