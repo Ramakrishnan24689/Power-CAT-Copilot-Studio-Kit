@@ -43,6 +43,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string OrchestrationType { get; set; }
             public string EndUserAuthenticationType { get; set; }
             public bool IsManaged { get; set; }
+            public string Template { get; set; }
             public bool IsTranscriptAvailable { get; set; }
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
