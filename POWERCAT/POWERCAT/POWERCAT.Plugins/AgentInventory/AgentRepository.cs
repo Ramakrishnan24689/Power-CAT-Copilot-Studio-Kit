@@ -309,7 +309,8 @@ namespace POWERCAT.Plugins.AgentInventory
                 //Details of the agent
                 entity["cat_agentid"] = agentDetails.ID.ToString();
                 entity["cat_name"] = agentDetails.Name;
-                entity["cat_type"] = "Custom";
+                entity["cat_type"] = !string.IsNullOrWhiteSpace(agentDetails.Template) && agentDetails.Template.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase) ? "Declarative" : "Custom";
+                entity["cat_template"] = agentDetails.Template;
 
                 //Environment details of the agent
                 entity["cat_environmentname"] = agentDetails.EnvironmentName;
