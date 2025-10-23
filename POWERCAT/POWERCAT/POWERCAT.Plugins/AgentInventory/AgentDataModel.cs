@@ -104,8 +104,9 @@ namespace POWERCAT.Plugins.AgentInventory
             public string AgentName { get; set; }
             public string AgentID { get; set; }
             public string Feature { get; set; }
-            public int BilledMessages { get; set; }
-            public int NonBilledMessages { get; set; }
+            public decimal BilledMessages { get; set; }
+            public decimal NonBilledMessages { get; set; }
+            public DateTime UsageDate { get; set; }
         }
     }
 }

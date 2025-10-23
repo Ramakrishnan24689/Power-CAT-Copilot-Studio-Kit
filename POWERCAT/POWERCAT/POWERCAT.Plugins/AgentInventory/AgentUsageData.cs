@@ -32,6 +32,10 @@ namespace POWERCAT.Plugins.AgentInventory
         /// Table Name
         /// </summary>
         private readonly string _tableName;
+        /// <summary>
+        /// Usage History Table Name
+        /// </summary>
+        private readonly string _usageHistoryTableName;
 
         /// <summary>
         /// Constructor to initialize Organization, Tracing services and Table name
@@ -45,19 +49,22 @@ namespace POWERCAT.Plugins.AgentInventory
 
             //Set table name of the Agent Inventory
             this._tableName = "cat_agentdetails";
+            this._usageHistoryTableName = "cat_agentusagehistory";
         }
 
         /// <summary>
-        /// Stores usage data in the Agent Details table.
+        /// Stores usage data in the Agent Usage History table with date-based records.
         /// </summary>
         /// <param name="usageData">Structured usage data to be recorded.</param>
+        /// <param name="logId">Log ID for error tracking.</param>
+        /// <param name="refreshStatus">Refresh status to track whether the record is successfully updated or created.</param>
         /// <returns>True if the data was successfully updated; otherwise, false.</returns>
-        public bool UpdateAgentUsageData(string usageData, string logId)
+        public bool UpdateAgentUsageData(string usageData, string logId, string refreshStatus)
         {
             bool result = false;
             try
             {
-                var usageDataUpdateRequests = GenerateUsageUpdateRequests(usageData);
+                var usageDataUpdateRequests = GenerateUsageUpdateRequests(usageData, refreshStatus);
 
                 // Execute in batch
                 if (usageDataUpdateRequests.Any())
@@ -113,11 +120,12 @@ namespace POWERCAT.Plugins.AgentInventory
         }
 
         /// <summary>
-        /// Processes usage data and generates update requests for the Agent Details table.
+        /// Processes usage data and generates upsert requests for daily usage records in the Agent Usage History table.
         /// </summary>
-        /// <param name="usageData">Usage metrics.</param>
-        /// <returns>A collection of update requests to apply usage data updates to agent records.</returns>
-        public OrganizationRequestCollection GenerateUsageUpdateRequests(string usageData)
+        /// <param name="usageData">Usage metrics CSV data.</param>
+        /// <param name="refreshStatus">Refresh status to track whether the record is successfully updated or created.</param>
+        /// <returns>A collection of create/update requests to apply usage data to daily history records.</returns>
+        public OrganizationRequestCollection GenerateUsageUpdateRequests(string usageData, string refreshStatus)
         {
             try
             {
@@ -144,6 +152,15 @@ namespace POWERCAT.Plugins.AgentInventory
                         // Split the line by comma, handling quoted values correctly
                         string[] fields = line.Split(',').Select(field => field.Trim('"')).ToArray();
 
+                        // Parse the date from field[8] - skip record if date is invalid
+                        if (string.IsNullOrEmpty(fields[8]) || !DateTime.TryParse(fields[8], out DateTime parsedDate))
+                        {
+                            _tracingService.Trace($"Skipping record with invalid or missing date: {fields[8]}");
+                            continue; // Skip this record if date is invalid or missing
+                        }
+
+                        parsedDate = parsedDate.Date; // Ensure time component is removed
+
                         usageRecords.Add(new AgentTenantUsageData
                         {
                             EnvironmentID = fields[0],
@@ -151,31 +168,74 @@ namespace POWERCAT.Plugins.AgentInventory
                             AgentName = fields[2],
                             AgentID = fields[3],
                             Feature = fields[5],
-                            BilledMessages = !string.IsNullOrEmpty(fields[6]) ? ConvertStringToNearestInt(fields[6]) : 0,
-                            NonBilledMessages = !string.IsNullOrEmpty(fields[7]) ? ConvertStringToNearestInt(fields[7]) : 0
+                            BilledMessages = !string.IsNullOrEmpty(fields[6]) ? ConvertStringToDecimal(fields[6]) : 0,
+                            NonBilledMessages = !string.IsNullOrEmpty(fields[7]) ? ConvertStringToDecimal(fields[7]) : 0,
+                            UsageDate = parsedDate
                         });
                     }
 
-                    var groupedByAgent = usageRecords.GroupBy(record => record.AgentID);
+                    // Group by Agent, Environment, Date, AND Feature (each feature gets its own record)
+                    var groupedByAgentDateFeature = usageRecords
+                        .GroupBy(record => new
+                        {
+                            record.AgentID,
+                            record.EnvironmentID,
+                            record.UsageDate,
+                            record.Feature
+                        });
 
-                    foreach (var agentGroup in groupedByAgent)
+                    foreach (var group in groupedByAgentDateFeature)
                     {
-                        var featureUsageList = agentGroup
-                            .GroupBy(record => record.Feature)
-                            .Select(featureGroup => new Dictionary<string, object>
-                                {
-                                    { "Feature", featureGroup.Key },
-                                    { "BilledMessages", featureGroup.Sum(x => x.BilledMessages) },
-                                    { "NonBilledMessages", featureGroup.Sum(x => x.NonBilledMessages) }
-                                }).ToList();
+                        // Sum up billed/non-billed messages for this specific agent/date/feature combination
+                        var totalBilledMessages = group.Sum(x => x.BilledMessages);
+                        var totalNonBilledMessages = group.Sum(x => x.NonBilledMessages);
 
-                        string environmentId = agentGroup.First().EnvironmentID;
-                        string agentId = agentGroup.Key;
+                        string environmentId = group.Key.EnvironmentID;
+                        string agentId = group.Key.AgentID;
+                        DateTime usageDate = group.Key.UsageDate;
+                        string featureName = group.Key.Feature;
 
-                        var usageEntity = GetUsageEntity(environmentId, agentId, featureUsageList);
+                        // Get or create usage history entity for this specific agent/date/feature
+                        var usageEntity = BuildUsageHistoryEntity(environmentId, agentId, usageDate, featureName,
+                            totalBilledMessages, totalNonBilledMessages, refreshStatus);
 
                         if (usageEntity != null)
                         {
+                            if (usageEntity.Id == Guid.Empty)
+                            {
+                                // New record - use CreateRequest
+                                updateRequests.Add(new CreateRequest { Target = usageEntity });
+                            }
+                            else
+                            {
+                                // Existing record - use UpdateRequest
+                                updateRequests.Add(new UpdateRequest { Target = usageEntity });
+                            }
+                        }
+                    }
+
+                    //For last usage data in agent details table
+                    // Group by Agent, Environment, Date, AND Feature (each feature gets its own record)
+                    var groupedByAgentLastUsage = usageRecords
+                        .GroupBy(record => new
+                        {
+                            record.AgentID
+                        })
+                        .Select(r => r.OrderByDescending(c => c.UsageDate).First());
+
+                    foreach (var group in groupedByAgentLastUsage)
+                    {
+                        string environmentId = group.EnvironmentID;
+                        string agentId = group.AgentID;
+                        DateTime usageDate = group.UsageDate;
+                        string featureName = group.Feature;
+
+                        // Get or update last usage entity for this specific agent/date/feature
+                        var usageEntity = BuildLastUsageEntity(environmentId, agentId, usageDate, featureName);
+
+                        if (usageEntity != null)
+                        {
+                            // UpdateRequest
                             updateRequests.Add(new UpdateRequest { Target = usageEntity });
                         }
                     }
@@ -189,17 +249,128 @@ namespace POWERCAT.Plugins.AgentInventory
             }
         }
         /// <summary>
-        /// Builds an entity to update usage data in the Agent Details table.
+        /// Builds or retrieves usage history entity for a specific agent, date, and feature.
         /// </summary>
         /// <param name="environmentId">The environment identifier.</param>
         /// <param name="agentId">The agent identifier.</param>
-        /// <param name="featureUsageData">A dictionary containing feature usage metrics.</param>
-        /// <returns>An Entity object with updated usage data, or null if no matching record is found.</returns>
-        public Entity GetUsageEntity(string environmentId, string agentId, List<Dictionary<string, object>> featureUsageData)
+        /// <param name="usageDate">The usage date.</param>
+        /// <param name="featureName">The feature name.</param>
+        /// <param name="billedMessages">Total billed messages for this feature.</param>
+        /// <param name="nonBilledMessages">Total non-billed messages for this feature.</param>
+        /// <param name="refreshStatus">Refresh status to track whether the record is successfully updated or created.</param>
+        /// <returns>An Entity object for usage history record.</returns>
+        private Entity BuildUsageHistoryEntity(string environmentId, string agentId, DateTime usageDate,
+            string featureName, decimal billedMessages, decimal nonBilledMessages, string refreshStatus)
         {
             try
             {
-                // Query to find the agent record to update
+                var agentDetailsId = FindAgentDetailsRecord(environmentId, agentId);
+                if (agentDetailsId == Guid.Empty)
+                {
+                    return null;
+                }
+
+                // Query to check if record already exists for this agent/date/feature combination
+                var query = new QueryExpression(_usageHistoryTableName)
+                {
+                    ColumnSet = new ColumnSet("cat_agentusagehistoryid"),
+                    TopCount = 1,
+                    Criteria =
+                    {
+                        Conditions =
+                        {
+                            new ConditionExpression("cat_agentid", ConditionOperator.Equal, agentId),
+                            new ConditionExpression("cat_environmentid", ConditionOperator.Equal, environmentId),
+                            new ConditionExpression("cat_usagedate", ConditionOperator.On, usageDate),
+                            new ConditionExpression("cat_featurename", ConditionOperator.Equal, featureName)
+                        }
+                    }
+                };
+
+                var existingRecords = _organizationService.RetrieveMultiple(query);
+                Entity entity;
+
+                if (existingRecords.Entities.Any())
+                {
+                    // Update existing record
+                    var existingRecord = existingRecords.Entities.First();
+                    entity = new Entity(_usageHistoryTableName) { Id = existingRecord.Id };
+                }
+                else
+                {
+                    // Create new record
+                    entity = new Entity(_usageHistoryTableName);
+                    entity["cat_agentid"] = agentId;
+                    entity["cat_environmentid"] = environmentId;
+                    entity["cat_usagedate"] = usageDate;
+                    entity["cat_featurename"] = featureName;
+                }
+
+                // Set lookup to parent agent details if exists
+                if (agentDetailsId != Guid.Empty)
+                {
+                    entity["cat_agent"] = new EntityReference(_tableName, agentDetailsId);
+                }
+
+                // Set the usage data in the new schema columns
+                entity["cat_billedcopilotcredits"] = billedMessages;
+                entity["cat_nonbilledcopilotcredits"] = nonBilledMessages;
+
+                // Set refresh status
+                entity["cat_refreshstatus"] = refreshStatus;
+
+                return entity;
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"An unexpected error occurred in BuildUsageHistoryEntity. Details: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Builds or retrieves last usage entity for a specific agent, date, and feature.
+        /// </summary>
+        /// <param name="environmentId">The environment identifier.</param>
+        /// <param name="agentId">The agent identifier.</param>
+        /// <param name="usageDate">The usage date.</param>
+        /// <param name="featureName">The feature name.</param>
+        /// <returns>An Entity object for usage history record.</returns>
+        private Entity BuildLastUsageEntity(string environmentId, string agentId, DateTime usageDate, string featureName)
+        {
+            try
+            {
+                var agentDetailsId = FindAgentDetailsRecord(environmentId, agentId);
+                if (agentDetailsId == Guid.Empty)
+                {
+                    return null;
+                }
+
+                Entity entity = new Entity(_tableName) { Id = agentDetailsId };
+
+                // Set the last usage data
+                entity["cat_lastusagefeature"] = featureName;
+                entity["cat_lastusagedate"] = usageDate;
+
+                return entity;
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"An unexpected error occurred in BuildLastUsageEntity. Details: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Finds the agent details record ID for lookup relationship.
+        /// </summary>
+        /// <param name="environmentId">The environment identifier.</param>
+        /// <param name="agentId">The agent identifier.</param>
+        /// <returns>The agent details record ID, or Guid.Empty if not found.</returns>
+        private Guid FindAgentDetailsRecord(string environmentId, string agentId)
+        {
+            try
+            {
                 var query = new QueryExpression(_tableName)
                 {
                     ColumnSet = new ColumnSet("cat_agentdetailsid"),
@@ -214,81 +385,36 @@ namespace POWERCAT.Plugins.AgentInventory
                     }
                 };
 
-                var agentRecords = _organizationService.RetrieveMultiple(query);
-
-                if (agentRecords.Entities.Any())
-                {
-                    // Take the first matching record (assuming unique match)
-                    var agentRecord = agentRecords.Entities.First();
-
-                    // Entity to update the record
-                    var entity = new Entity(_tableName) { Id = agentRecord.Id };
-
-
-                    // feature columns available in the agent details table
-                    var featureColumnMap = new Dictionary<string, string>
-                    {
-                        { "Agent action", "cat_usageagentaction" },
-                        { "Classic answer", "cat_usageclassicanswer" },
-                        { "Generative answer", "cat_usagegenerativeanswer" },
-                        { "Agent flow actions", "cat_usageagentflowactions" },
-                        { "Text & Gen AI Tools (Basic)", "cat_usagetextandgenaitoolsbasic" },
-                        { "Text & Gen AI Tools (Standard)", "cat_usagetextandgenaitoolsstandard" },
-                        { "Text & Gen AI Tools (Premium)", "cat_usagetextandgenaitoolspremium" }
-                    };
-
-                    foreach (var feature in featureUsageData)
-                    {
-                        if (feature.TryGetValue("Feature", out var featureNameObj) && featureNameObj is string featureName)
-                        {
-                            if (featureColumnMap.TryGetValue(featureName, out var columnName))
-                            {
-                                if (feature.TryGetValue("BilledMessages", out var billedMessages))
-                                {
-                                    entity[$"{columnName}billed"] = billedMessages;
-                                }
-                                if (feature.TryGetValue("NonBilledMessages", out var nonBilledMessages))
-                                {
-                                    entity[$"{columnName}nonbilled"] = nonBilledMessages;
-                                }
-                            }
-                        }
-                    }
-
-                    entity["cat_usagedata"] = JsonConvert.SerializeObject(featureUsageData, Formatting.Indented);
-
-                    return entity;
-                }
+                var records = _organizationService.RetrieveMultiple(query);
+                return records.Entities.Any() ? records.Entities.First().Id : Guid.Empty;
             }
-            catch (Exception ex)
+            catch
             {
-                _tracingService.Trace($"An unexpected error occurred in method get usage entity. Details: {ex.Message}");
-                throw ex;
+                return Guid.Empty;
             }
-            return null;
         }
+
         /// <summary>
-        /// Converts a string representation of a number to the nearest integer.
+        /// Converts string to decimal for precise usage values with up to 15 decimal places.
         /// </summary>
         /// <param name="stringValue">The string value to convert.</param>
-        /// <returns>Value converted as int.</returns>
-        public int ConvertStringToNearestInt(string stringValue)
+        /// <returns>Value converted as decimal.</returns>
+        public decimal ConvertStringToDecimal(string stringValue)
         {
             try
             {
                 if (string.IsNullOrEmpty(stringValue))
                 {
-                    return 0;
+                    return 0m;
                 }
-                decimal decimalValue = Convert.ToDecimal(stringValue);
-                int roundedIntValue = (int)Math.Round(decimalValue);
-                return roundedIntValue;
+                return Convert.ToDecimal(stringValue);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
+
         /// <summary>
         /// Append error details based on failed records.
         /// </summary>
