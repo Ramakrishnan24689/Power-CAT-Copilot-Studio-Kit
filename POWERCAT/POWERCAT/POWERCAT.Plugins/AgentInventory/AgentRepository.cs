@@ -323,6 +323,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_agentcreateddate"] = !string.IsNullOrEmpty(agentDetails.AgentCreatedDate) ? DateTime.Parse(agentDetails.AgentCreatedDate?.ToString()).ToUniversalTime() : (DateTime?)null;
                 entity["cat_agentmodifiedby"] = agentDetails.AgentModifiedBy;
                 entity["cat_agentmodifieddate"] = !string.IsNullOrEmpty(agentDetails.AgentModifiedDate) ? DateTime.Parse(agentDetails.AgentModifiedDate?.ToString()).ToUniversalTime() : (DateTime?)null;
+                entity["cat_agentcreatedbyadid"] = !string.IsNullOrEmpty(agentDetails.AgentCreatedByADID) ? agentDetails.AgentCreatedByADID : string.Empty;
 
                 //Agent publish details
                 entity["cat_published"] = !string.IsNullOrEmpty(agentDetails.PublishedDate) ? true : false;
