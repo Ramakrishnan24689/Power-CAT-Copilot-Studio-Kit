@@ -174,6 +174,7 @@ namespace POWERCAT.Plugins.AgentInventory
                         });
                     }
 
+                    // For usage data in agent usage history table
                     // Group by Agent, Environment, Date, AND Feature (each feature gets its own record)
                     var groupedByAgentDateFeature = usageRecords
                         .GroupBy(record => new
@@ -214,29 +215,36 @@ namespace POWERCAT.Plugins.AgentInventory
                         }
                     }
 
-                    //For last usage data in agent details table
-                    // Group by Agent, Environment, Date, AND Feature (each feature gets its own record)
-                    var groupedByAgentLastUsage = usageRecords
-                        .GroupBy(record => new
-                        {
-                            record.AgentID
-                        })
-                        .Select(r => r.OrderByDescending(c => c.UsageDate).First());
+                    // For usage data in agent details table
+                    // Group by Agent
+                    var groupedByAgent = usageRecords.GroupBy(record => record.AgentID);
 
-                    foreach (var group in groupedByAgentLastUsage)
+                    foreach (var group in groupedByAgent)
                     {
-                        string environmentId = group.EnvironmentID;
-                        string agentId = group.AgentID;
-                        DateTime usageDate = group.UsageDate;
-                        string featureName = group.Feature;
+                        string agentId = group.Key;
+                        string environmentId = group.First().EnvironmentID;
 
-                        // Get or update last usage entity for this specific agent/date/feature
-                        var usageEntity = BuildLastUsageEntity(environmentId, agentId, usageDate, featureName);
+                        // Get last usage record for this agent
+                        var lastUsageRecord = group.OrderByDescending(c => c.UsageDate).First();
 
-                        if (usageEntity != null)
+                        DateTime lastUsageDate = lastUsageRecord.UsageDate;
+                        string lastFeatureName = lastUsageRecord.Feature;
+
+                        // Feature level aggregation for the agent
+                        var featureUsageList = group
+                            .GroupBy(record => record.Feature)
+                            .Select(featureGroup => new Dictionary<string, object>
+                            {
+                                { "Feature", featureGroup.Key },
+                                { "BilledMessages", featureGroup.Sum(x => x.BilledMessages) },
+                                { "NonBilledMessages", featureGroup.Sum(x => x.NonBilledMessages) }
+                            }).ToList();
+
+                        // Usage entity for updating the usage data in the agent details table
+                        var usageEntityForAgentDetails = BuildUsageEntityForAgentDetails(environmentId, agentId, lastUsageDate, lastFeatureName, featureUsageList);
+                        if (usageEntityForAgentDetails != null)
                         {
-                            // UpdateRequest
-                            updateRequests.Add(new UpdateRequest { Target = usageEntity });
+                            updateRequests.Add(new UpdateRequest { Target = usageEntityForAgentDetails });
                         }
                     }
                 }
@@ -329,14 +337,16 @@ namespace POWERCAT.Plugins.AgentInventory
         }
 
         /// <summary>
-        /// Builds or retrieves last usage entity for a specific agent, date, and feature.
+        /// Builds or retrieves usage entity for a specific agent to update usage data in Agent Details table.
         /// </summary>
         /// <param name="environmentId">The environment identifier.</param>
         /// <param name="agentId">The agent identifier.</param>
-        /// <param name="usageDate">The usage date.</param>
-        /// <param name="featureName">The feature name.</param>
-        /// <returns>An Entity object for usage history record.</returns>
-        private Entity BuildLastUsageEntity(string environmentId, string agentId, DateTime usageDate, string featureName)
+        /// <param name="lastUsageDate">The last usage date.</param>
+        /// <param name="lastUsagefeature">The last usage feature name.</param>
+        /// <param name="featureUsageData">A dictionary containing feature usage metrics.</param>
+        /// <returns>An Entity object for usage record.</returns>
+        private Entity BuildUsageEntityForAgentDetails(string environmentId, string agentId, DateTime lastUsageDate, string lastUsagefeature,
+            List<Dictionary<string, object>> featureUsageData)
         {
             try
             {
@@ -348,9 +358,42 @@ namespace POWERCAT.Plugins.AgentInventory
 
                 Entity entity = new Entity(_tableName) { Id = agentDetailsId };
 
+                // feature columns available in the agent details table
+                var featureColumnMap = new Dictionary<string, string>
+                {
+                    { "Agent action", "cat_usageagentaction" },
+                    { "Classic answer", "cat_usageclassicanswer" },
+                    { "Generative answer", "cat_usagegenerativeanswer" },
+                    { "Agent flow actions", "cat_usageagentflowactions" },
+                    { "Text & Gen AI Tools (Basic)", "cat_usagetextandgenaitoolsbasic" },
+                    { "Text & Gen AI Tools (Standard)", "cat_usagetextandgenaitoolsstandard" },
+                    { "Text & Gen AI Tools (Premium)", "cat_usagetextandgenaitoolspremium" }
+                };
+
+                foreach (var feature in featureUsageData)
+                {
+                    if (feature.TryGetValue("Feature", out var featureNameObj) && featureNameObj is string featureName)
+                    {
+                        if (featureColumnMap.TryGetValue(featureName, out var columnName))
+                        {
+                            if (feature.TryGetValue("BilledMessages", out var billedMessages))
+                            {
+                                entity[$"{columnName}billed"] = (int)Math.Round((decimal)billedMessages);
+                            }
+                            if (feature.TryGetValue("NonBilledMessages", out var nonBilledMessages))
+                            {
+                                entity[$"{columnName}nonbilled"] = (int)Math.Round((decimal)nonBilledMessages);
+                            }
+                        }
+                    }
+                }
+
+                // Set all the usage data for the agent as a json
+                entity["cat_usagedata"] = JsonConvert.SerializeObject(featureUsageData, Formatting.Indented);
+
                 // Set the last usage data
-                entity["cat_lastusagefeature"] = featureName;
-                entity["cat_lastusagedate"] = usageDate;
+                entity["cat_lastusagefeature"] = lastUsagefeature;
+                entity["cat_lastusagedate"] = lastUsageDate;
 
                 return entity;
             }

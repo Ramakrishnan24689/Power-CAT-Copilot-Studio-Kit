@@ -77,7 +77,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 else if (context.MessageName == "cat_GenerateTenantUsageReport")
                 {
                     string logId = (string)context.InputParameters["cat_UsageLogId"];
-                    string refreshSatus = (string)context.InputParameters["cat_UsageRefreshStatus"];
+                    string refreshStatus = (string)context.InputParameters["cat_UsageRefreshStatus"];
                     string base64EncodedUsageData = (string)context.InputParameters["cat_UsageInput"];
 
                     //Decode the data
@@ -87,7 +87,7 @@ namespace POWERCAT.Plugins.AgentInventory
                     AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
 
                     //Create usage data in TenantUsageData table
-                    bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId, refreshSatus);
+                    bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId, refreshStatus);
 
                     context.OutputParameters["cat_UsageOutput"] = result;
 
