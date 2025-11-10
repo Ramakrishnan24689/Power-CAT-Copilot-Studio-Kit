@@ -154,7 +154,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 agentDetails.DefaultApplicationId = synchronizationStatus != null ? agentDataProcess.ParseJsonData(synchronizationStatus, "applicationId") : string.Empty;
 
                 //Get prompts from the data(yaml) in agent components
-                var promptsList = agentComponentDetails.Where(obj => obj.Data != null && obj.Data.Contains("InvokeAIBuilderModelAction"));
+                var promptsList = agentComponentDetails.Where(obj => obj.Data != null && (obj.Data.Contains("InvokeAIBuilderModelAction") || obj.Data.Contains("InvokeAIBuilderModelTaskAction")));
                 if (promptsList.Any())
                 {
                     var prompts = agentDataProcess.ExtractComponentsData(promptsList.ToList(), ComponentKeyEnum.InvokeAIBuilderModelAction);
@@ -324,6 +324,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_agentmodifiedby"] = agentDetails.AgentModifiedBy;
                 entity["cat_agentmodifieddate"] = !string.IsNullOrEmpty(agentDetails.AgentModifiedDate) ? DateTime.Parse(agentDetails.AgentModifiedDate?.ToString()).ToUniversalTime() : (DateTime?)null;
                 entity["cat_agentcreatedbyadid"] = !string.IsNullOrEmpty(agentDetails.AgentCreatedByADID) ? agentDetails.AgentCreatedByADID : string.Empty;
+                entity["cat_agentcreatedbyupn"] = !string.IsNullOrEmpty(agentDetails.AgentCreatedByUPN) ? agentDetails.AgentCreatedByUPN : string.Empty;
 
                 //Agent publish details
                 entity["cat_published"] = !string.IsNullOrEmpty(agentDetails.PublishedDate) ? true : false;
