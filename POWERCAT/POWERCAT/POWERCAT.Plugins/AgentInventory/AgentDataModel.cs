@@ -46,6 +46,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string Template { get; set; }
             public bool IsTranscriptAvailable { get; set; }
             public string AgentCreatedByADID { get; set; }
+            public string AgentCreatedByUPN { get; set; }
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
             public bool UsesEnhancedSearchResult { get; set; }

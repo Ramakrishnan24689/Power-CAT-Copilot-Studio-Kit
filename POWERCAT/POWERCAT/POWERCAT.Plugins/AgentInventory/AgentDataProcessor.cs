@@ -181,10 +181,22 @@ namespace POWERCAT.Plugins.AgentInventory
                             {
                                 if (aiBuilderActionMatch.Success && aiBuilderActionMatch.Groups[3].Success)
                                 {
+                                    string keyName = ComponentMetaDataEnum.TopicName.ToString();
+
+                                    if (!string.IsNullOrEmpty(component.SchemaName))
+                                    {
+                                        var schemaParts = component.SchemaName.Split('.');
+
+                                        if (schemaParts.Length > 1 && schemaParts[1].Equals("action", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            keyName = ComponentMetaDataEnum.ToolName.ToString();
+                                        }
+                                    }
+
                                     //Set prompts value(Name from current item, value from the data yaml)
                                     var componentMetadata = new Dictionary<string, string>
                                     {
-                                        { ComponentMetaDataEnum.TopicName.ToString(), component.Name},
+                                        { keyName, component.Name},
                                         { ComponentMetaDataEnum.PromptName.ToString(), string.Empty},   //value populated in agent inventory power automate grandchild flow
                                         { ComponentMetaDataEnum.Value.ToString(), aiBuilderActionMatch.Groups[3].Value}
                                     };
@@ -588,7 +600,7 @@ namespace POWERCAT.Plugins.AgentInventory
                     break;
 
                 case ComponentKeyEnum.InvokeAIBuilderModelAction:
-                    regex = @"\s*kind:\s*InvokeAIBuilderModelAction\s*id:\s*([^\s]+)\s*.*?(?:displayName:\s*\""?([^\\""\r\n]*)\""?)?\s*.*?aIModelId:\s*([^\s]+)";
+                    regex = @"\s*kind:\s*(?:InvokeAIBuilderModelAction|InvokeAIBuilderModelTaskAction)\s*(?:id:\s*([^\s]+))?\s*.*?(?:displayName:\s*\""?([^\\""\r\n]*)\""?)?\s*.*?aIModelId:\s*([^\s]+)";
                     break;
 
                 case ComponentKeyEnum.KnowledgeSources:
@@ -723,7 +735,8 @@ namespace POWERCAT.Plugins.AgentInventory
             ConnectionMode,
             Connection,
             Type,
-            Name
+            Name,
+            ToolName
         }
     }
 }
