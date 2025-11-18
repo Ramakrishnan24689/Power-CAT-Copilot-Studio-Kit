@@ -286,6 +286,10 @@ namespace POWERCAT.Plugins.AgentInventory
                                              agentDetails.UsesKnowledgeSources || agentDetails.UsesPrompts || agentDetails.UsesClassicGenerativeAnswersSources ||
                                              agentDetails.UsesMCP || agentDetails.UsesCustomizedResponse ||
                                              string.Equals(agentDetails.OrchestrationType, "Generative", StringComparison.OrdinalIgnoreCase);
+
+                // Check if web search enabled 
+                agentDetails.WebSearchEnabled = agentComponentDetails.Where(obj => obj.ComponentType == 15 && obj.ComponentTypeName == "Custom GPT" && obj.Data.Contains("gptCapabilities:\r\n") && obj.Data.Contains("webBrowsing: true")).Any();
+
             }
             catch (Exception ex)
             {
@@ -360,6 +364,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext;
                 entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
                 entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
+                entity["cat_websearchenabled"] = agentDetails.WebSearchEnabled;
 
                 //Agent Components
                 entity["cat_prompts"] = agentDetails.Prompts;
