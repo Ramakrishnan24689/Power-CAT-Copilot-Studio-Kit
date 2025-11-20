@@ -287,16 +287,13 @@ namespace POWERCAT.Plugins.AgentInventory
                                              agentDetails.UsesMCP || agentDetails.UsesCustomizedResponse ||
                                              string.Equals(agentDetails.OrchestrationType, "Generative", StringComparison.OrdinalIgnoreCase);
 
-<<<<<<< HEAD
+                // Check if web search enabled 
+                agentDetails.WebSearchEnabled = agentComponentDetails.Where(obj => obj.ComponentType == 15 && obj.ComponentTypeName == "Custom GPT" && obj.Data.Contains("gptCapabilities:\r\n") && obj.Data.Contains("webBrowsing: true")).Any();
+
                 // Returns true if test evaluation is configured for the agent. 
                 agentDetails.UsesEvaluation = agentComponentDetails.Where(
                                                         obj => obj.Data != null && obj.ComponentType == 19 &&
                                                                obj.ComponentTypeName == "Test Case").Count() > 0;
-=======
-                // Check if web search enabled 
-                agentDetails.WebSearchEnabled = agentComponentDetails.Where(obj => obj.ComponentType == 15 && obj.ComponentTypeName == "Custom GPT" && obj.Data.Contains("gptCapabilities:\r\n") && obj.Data.Contains("webBrowsing: true")).Any();
-
->>>>>>> 15d71373d2e66ac536dc3f1bfe0bf8f36d01fb48
             }
             catch (Exception ex)
             {
@@ -371,11 +368,8 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext;
                 entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
                 entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
-<<<<<<< HEAD
-                entity["cat_usesevaluation"] = agentDetails.UsesEvaluation;
-=======
                 entity["cat_websearchenabled"] = agentDetails.WebSearchEnabled;
->>>>>>> 15d71373d2e66ac536dc3f1bfe0bf8f36d01fb48
+                entity["cat_usesevaluation"] = agentDetails.UsesEvaluation;
 
                 //Agent Components
                 entity["cat_prompts"] = agentDetails.Prompts;
