@@ -73,7 +73,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string AgentTriggers { get; set; }
             public bool UsesFileInput { get; set; }
             public bool UsesDeepReasoningModels { get; set; }
-
+            public bool UsesEvaluation { get; set; }
         }
 
         /// <summary>
