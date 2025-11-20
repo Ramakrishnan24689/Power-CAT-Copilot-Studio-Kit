@@ -74,7 +74,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public bool UsesFileInput { get; set; }
             public bool UsesDeepReasoningModels { get; set; }
             public bool WebSearchEnabled { get; set; }
-
+            public bool UsesEvaluation { get; set; }
         }
 
         /// <summary>

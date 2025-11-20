@@ -290,6 +290,10 @@ namespace POWERCAT.Plugins.AgentInventory
                 // Check if web search enabled 
                 agentDetails.WebSearchEnabled = agentComponentDetails.Where(obj => obj.ComponentType == 15 && obj.ComponentTypeName == "Custom GPT" && obj.Data.Contains("gptCapabilities:\r\n") && obj.Data.Contains("webBrowsing: true")).Any();
 
+                // Returns true if test evaluation is configured for the agent. 
+                agentDetails.UsesEvaluation = agentComponentDetails.Where(
+                                                        obj => obj.Data != null && obj.ComponentType == 19 &&
+                                                               obj.ComponentTypeName == "Test Case").Count() > 0;
             }
             catch (Exception ex)
             {
@@ -365,6 +369,7 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
                 entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
                 entity["cat_websearchenabled"] = agentDetails.WebSearchEnabled;
+                entity["cat_usesevaluation"] = agentDetails.UsesEvaluation;
 
                 //Agent Components
                 entity["cat_prompts"] = agentDetails.Prompts;
