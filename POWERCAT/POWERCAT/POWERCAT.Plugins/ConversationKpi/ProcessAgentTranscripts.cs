@@ -93,12 +93,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
 
-
-                    
-
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
-
                         string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
                         string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                         string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
@@ -111,6 +107,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                         if(isParentTranscript == true)
                         {
+                            //fetchxml to get child transcripts for parent transcript
                             string agentfetchXml = @"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
                                                       <entity name='cat_agenttranscripts'>
                                                         <attribute name='cat_agenttranscriptsid' />
@@ -138,17 +135,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 duplicateAgentTranscriptIds.Add(duplicateTranscript.Id);
                             }
 
-
-
                             var serializedTranscript = JsonConvert.SerializeObject(transcriptModel);
                             // size is less than 1 MB add parent transcript
                             if (serializedTranscript.Length < 1048576)
                             {
                                 transcript = serializedTranscript;
                             }
-
-                           
-
                         }
 
                         // Add the index to each model
@@ -180,8 +172,6 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                         // Populate the dictionary from the EntityCollection
                         idDictionary[conversationTranscriptId] = agentTranscriptId;
-
-
                     }
 
                     // Upsert Conversation KPIs
