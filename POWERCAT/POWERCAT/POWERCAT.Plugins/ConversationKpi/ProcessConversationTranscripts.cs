@@ -205,7 +205,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             Conditions =
                                 {
                                     new ConditionExpression("cat_name", ConditionOperator.In, transcriptNames.ToArray()),
-                                    new ConditionExpression("cat_agenttranscriptschild", ConditionOperator.DoesNotContainValues, true)
+                                    new ConditionExpression("cat_parent", ConditionOperator.DoesNotContainValues, true)
                                 }
                         }
                     };
