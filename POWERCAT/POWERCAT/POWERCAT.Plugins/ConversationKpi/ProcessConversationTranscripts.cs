@@ -31,13 +31,10 @@ namespace POWERCAT.Plugins.ConversationKpi
                 errorLogId = context.InputParameters["cat_ErrorLogId"] as string; 
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
-
+                // group records by name
                 var groupedRecords = inputRecords
                     .GroupBy(r => r.Name)
                     .ToList();
-
-
-
 
                 var transcriptNames = inputRecords
                     .Where(r => !string.IsNullOrEmpty(r.Name))
@@ -62,21 +59,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                         {
                             var createRequest = new CreateRequest
                             {
-                                Target = new Entity("cat_agenttranscripts")
-                                {
-                                    ["cat_transcriptcontent"] = record.Content,
-                                    ["cat_conversationdate"] = record.ConversationStartTime,
-                                    ["cat_agentid"] = record.AgentId,
-                                    ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(record.AgentConfigurationId)),
-                                    ["cat_conversationid"] = record.ConversationId,
-                                    ["cat_trackedvariables"] = record.TrackedVariables,
-                                    ["cat_name"] = record.Name,
-                                    ["cat_workflowstatus"] = new OptionSetValue(1),
-                                    ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
-                                    ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
-                                    ["ttlinseconds"] = 259200,
-                                    ["cat_batchid"] = record.BatchId
-                                }
+                                Target = CreateAgentTranscriptEntity(record, null, false)
                             };
                             createRequests.Add(createRequest);
                         }
@@ -88,44 +71,14 @@ namespace POWERCAT.Plugins.ConversationKpi
                         if (!string.IsNullOrEmpty(parentRecord.Name) &&
                             !existingRecords.Contains(parentRecord.Name))
                         {
-                            var parentAgentTranscript = new Entity("cat_agenttranscripts")
-                            {
-                                ["cat_transcriptcontent"] = parentRecord.Content,
-                                ["cat_conversationdate"] = parentRecord.ConversationStartTime,
-                                ["cat_agentid"] = parentRecord.AgentId,
-                                ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(parentRecord.AgentConfigurationId)),
-                                ["cat_conversationid"] = parentRecord.ConversationId,
-                                ["cat_trackedvariables"] = parentRecord.TrackedVariables,
-                                ["cat_name"] = parentRecord.Name,
-                                ["cat_workflowstatus"] = new OptionSetValue(1),
-                                ["cat_conversationtranscriptid"] = parentRecord.ConversationTranscriptId,
-                                ["cat_iscopyfulltranscriptenabled"] = parentRecord.CopyFullTranscript,
-                                ["ttlinseconds"] = 259200,
-                                ["cat_batchid"] = parentRecord.BatchId,
-                                ["cat_isparenttranscript"] = true
-                            };
+                            var parentAgentTranscript = CreateAgentTranscriptEntity(parentRecord, null, true);
                             Guid parentId = organizationService.Create(parentAgentTranscript);
                             // Create child Agent Transcripts
                             foreach (var childRecord in orderedrecord.Skip(1))
                             {
                                 var createRequest = new CreateRequest
                                 {
-                                    Target = new Entity("cat_agenttranscripts")
-                                    {
-                                        ["cat_transcriptcontent"] = childRecord.Content,
-                                        ["cat_conversationdate"] = childRecord.ConversationStartTime,
-                                        ["cat_agentid"] = childRecord.AgentId,
-                                        ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(childRecord.AgentConfigurationId)),
-                                        ["cat_conversationid"] = childRecord.ConversationId,
-                                        ["cat_trackedvariables"] = childRecord.TrackedVariables,
-                                        ["cat_name"] = childRecord.Name,
-                                        ["cat_workflowstatus"] = new OptionSetValue(1),
-                                        ["cat_conversationtranscriptid"] = childRecord.ConversationTranscriptId,
-                                        ["cat_iscopyfulltranscriptenabled"] = childRecord.CopyFullTranscript,
-                                        ["ttlinseconds"] = 259200,
-                                        ["cat_batchid"] = childRecord.BatchId,
-                                        ["cat_agenttranscriptschild"] = new EntityReference("cat_agenttranscripts", parentId)
-                                    }
+                                    Target = CreateAgentTranscriptEntity(childRecord, parentId, false)
                                 };
                                 createRequests.Add(createRequest);
                             }
@@ -190,6 +143,44 @@ namespace POWERCAT.Plugins.ConversationKpi
             {
                 tracingService.Trace("Plugin execution finished.");
             }
+        }
+
+        /// <summary>
+        /// Creates an Agent Transcript entity from a ConversationTranscriptModel
+        /// </summary>
+        /// <param name="record">Conversation transcript record</param>
+        /// <param name="parentId">Parent transcript ID (for child records)</param>
+        /// <param name="isParent">Whether this is a parent transcript</param>
+        /// <returns>Entity configured as an agent transcript</returns>
+        private Entity CreateAgentTranscriptEntity(ConversationTranscriptModel record, Guid? parentId, bool isParent)
+        {
+            var entity = new Entity("cat_agenttranscripts")
+            {
+                ["cat_transcriptcontent"] = record.Content,
+                ["cat_conversationdate"] = record.ConversationStartTime,
+                ["cat_agentid"] = record.AgentId,
+                ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(record.AgentConfigurationId)),
+                ["cat_conversationid"] = record.ConversationId,
+                ["cat_trackedvariables"] = record.TrackedVariables,
+                ["cat_name"] = record.Name,
+                ["cat_workflowstatus"] = new OptionSetValue(1),
+                ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
+                ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
+                ["ttlinseconds"] = 259200,
+                ["cat_batchid"] = record.BatchId
+            };
+
+            if (isParent)
+            {
+                entity["cat_isparent"] = true;
+            }
+
+            if (parentId.HasValue)
+            {
+                entity["cat_parent"] = new EntityReference("cat_agenttranscripts", parentId.Value);
+            }
+
+            return entity;
         }
 
         /// <summary>

@@ -62,7 +62,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_conversationtranscriptid' />
                                         <attribute name='cat_iscopyfulltranscriptenabled' />
                                         <attribute name='cat_batchid' />
-                                        <attribute name='cat_isparenttranscript' />
+                                        <attribute name='cat_isparent' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
@@ -98,51 +98,19 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
-                       if(agentTranscript.GetAttributeValue<bool>("cat_isparenttranscript") == false) 
+
+                        string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
+                        string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
+                        string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
+                        string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
+                        TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
+
+                        Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
+                        Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
+                        bool isParentTranscript = agentTranscript.GetAttributeValue<bool>("cat_isparent");
+
+                        if(isParentTranscript == true)
                         {
-                            string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
-                            string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
-                            string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
-                            string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
-                            TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
-
-                            Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
-                            Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
-
-                            // Add the index to each model
-                            var indexedModels = transcriptModel.activities.Select((model, index) =>
-                            {
-                                model.index = index;
-                                return model;
-                            }).ToList();
-
-                            ProcessDetails processDetails = new ProcessDetails
-                            {
-                                AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
-                                AgentId = agentId,
-                                ConversationId = conversationId,
-                                ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
-                                TranscriptContent = transcript,
-                                ConversationTranscriptId = conversationTranscriptId.ToString(),
-                                CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
-                                SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
-                                ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
-                                TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
-                                UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
-                                AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
-                                TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
-                                GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
-                            };
-                            processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
-                            processDetailsList.Add(processDetails);
-
-                            // Populate the dictionary from the EntityCollection
-                            idDictionary[conversationTranscriptId] = agentTranscriptId;
-
-
-                       }
-                       else if(agentTranscript.GetAttributeValue<bool>("cat_isparenttranscript") == true)
-                       {
                             string agentfetchXml = @"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
                                                       <entity name='cat_agenttranscripts'>
                                                         <attribute name='cat_agenttranscriptsid' />
@@ -150,23 +118,14 @@ namespace POWERCAT.Plugins.ConversationKpi
                                                         <attribute name='cat_agenttranscriptsid' />
                                                         <attribute name='cat_transcriptcontent' />
                                                         <attribute name='cat_batchid' />
-                                                        <attribute name='cat_isparenttranscript' />
+                                                        <attribute name='cat_isparent' />
                                                         <filter type='and'>
-                                                          <condition attribute='cat_agenttranscriptschild' operator='eq' value='" + agentTranscript.Id + @"' />
+                                                          <condition attribute='cat_parent' operator='eq' value='" + agentTranscript.Id + @"' />
                                                         </filter>
                                                         <order attribute='cat_batchid' />
                                                       </entity>
                                                     </fetch>";
                             EntityCollection duplicateTranscripts = _organizationService.RetrieveMultiple(new FetchExpression(agentfetchXml));
-
-                            string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
-                            string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
-                            string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
-                            string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
-                            TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
-
-                            Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
-                            Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
 
                             // loop through duplicate transcripts and parse the transcripts add to parent transcriptModel
                             foreach (Entity duplicateTranscript in duplicateTranscripts.Entities)
@@ -179,6 +138,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 duplicateAgentTranscriptIds.Add(duplicateTranscript.Id);
                             }
 
+
+
                             var serializedTranscript = JsonConvert.SerializeObject(transcriptModel);
                             // size is less than 1 MB add parent transcript
                             if (serializedTranscript.Length < 1048576)
@@ -186,42 +147,39 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 transcript = serializedTranscript;
                             }
 
-                            // Add the index to each model
-                            var indexedModels = transcriptModel.activities.Select((model, index) =>
-                            {
-                                model.index = index;
-                                return model;
-                            }).ToList();
-
-                            ProcessDetails processDetails = new ProcessDetails
-                            {
-                                AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
-                                AgentId = agentId,
-                                ConversationId = conversationId,
-                                ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
-                                TranscriptContent = transcript,
-                                ConversationTranscriptId = conversationTranscriptId.ToString(),
-                                CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
-                                SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
-                                ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
-                                TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
-                                UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
-                                AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
-                                TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
-                                GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
-                            };
-
-                            processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
-                            processDetailsList.Add(processDetails);
-
-                            // Populate the dictionary from the EntityCollection
-                            idDictionary[conversationTranscriptId] = agentTranscriptId;
-
-
-
+                           
 
                         }
 
+                        // Add the index to each model
+                        var indexedModels = transcriptModel.activities.Select((model, index) =>
+                        {
+                            model.index = index;
+                            return model;
+                        }).ToList();
+
+                        ProcessDetails processDetails = new ProcessDetails
+                        {
+                            AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
+                            AgentId = agentId,
+                            ConversationId = conversationId,
+                            ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
+                            TranscriptContent = transcript,
+                            ConversationTranscriptId = conversationTranscriptId.ToString(),
+                            CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
+                            SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
+                            ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
+                            TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
+                            UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
+                            AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
+                            TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
+                            GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
+                        };
+                        processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
+                        processDetailsList.Add(processDetails);
+
+                        // Populate the dictionary from the EntityCollection
+                        idDictionary[conversationTranscriptId] = agentTranscriptId;
 
 
                     }
