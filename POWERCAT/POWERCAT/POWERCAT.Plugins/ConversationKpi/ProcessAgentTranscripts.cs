@@ -51,6 +51,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 string valuesXml = string.Join("", agentTranscriptsIdsArray.Select(id => $"<value>{id}</value>"));
                 string fetchXml = @"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
                                       <entity name='cat_agenttranscripts'>
+                                        <attribute name='cat_name' />
                                         <attribute name='cat_agenttranscriptsid' />
                                         <attribute name='cat_transcriptcontent' />
                                         <attribute name='cat_agentconfiguration' />
@@ -60,6 +61,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_trackedvariables' />
                                         <attribute name='cat_conversationtranscriptid' />
                                         <attribute name='cat_iscopyfulltranscriptenabled' />
+                                        <attribute name='cat_batchid' />
+                                        <attribute name='cat_isparent' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
@@ -75,6 +78,9 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 //Dictionary to update agent status
                 Dictionary<Guid, Guid> idDictionary = new Dictionary<Guid, Guid>();
+                
+                // Track duplicate agent transcript IDs to update them as completed
+                List<Guid> duplicateAgentTranscriptIds = new List<Guid>();
 
                 if (agentTranscriptList.Entities.Count > 0)
                 {
@@ -87,15 +93,63 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
 
+
+                    
+
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
+
                         string conversationId = agentTranscript.GetAttributeValue<string>("cat_conversationid").ToString();
                         string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                         string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
                         string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
                         TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
+
                         Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
                         Guid agentTranscriptId = ((Guid)agentTranscript["cat_agenttranscriptsid"]);
+                        bool isParentTranscript = agentTranscript.GetAttributeValue<bool>("cat_isparent");
+
+                        if(isParentTranscript == true)
+                        {
+                            string agentfetchXml = @"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false'>
+                                                      <entity name='cat_agenttranscripts'>
+                                                        <attribute name='cat_agenttranscriptsid' />
+                                                        <attribute name='cat_name' />
+                                                        <attribute name='cat_agenttranscriptsid' />
+                                                        <attribute name='cat_transcriptcontent' />
+                                                        <attribute name='cat_batchid' />
+                                                        <attribute name='cat_isparent' />
+                                                        <filter type='and'>
+                                                          <condition attribute='cat_parent' operator='eq' value='" + agentTranscript.Id + @"' />
+                                                        </filter>
+                                                        <order attribute='cat_batchid' />
+                                                      </entity>
+                                                    </fetch>";
+                            EntityCollection duplicateTranscripts = _organizationService.RetrieveMultiple(new FetchExpression(agentfetchXml));
+
+                            // loop through duplicate transcripts and parse the transcripts add to parent transcriptModel
+                            foreach (Entity duplicateTranscript in duplicateTranscripts.Entities)
+                            {
+                                string duplicateTranscriptContent = duplicateTranscript.GetAttributeValue<string>("cat_transcriptcontent");
+                                TranscriptModel duplicateTranscriptModel = JsonConvert.DeserializeObject<TranscriptModel>(duplicateTranscriptContent);
+                                // activities add to parent transcriptModel
+                                transcriptModel.activities.AddRange(duplicateTranscriptModel.activities);
+                                // track duplicate transcript ids to update status as completed
+                                duplicateAgentTranscriptIds.Add(duplicateTranscript.Id);
+                            }
+
+
+
+                            var serializedTranscript = JsonConvert.SerializeObject(transcriptModel);
+                            // size is less than 1 MB add parent transcript
+                            if (serializedTranscript.Length < 1048576)
+                            {
+                                transcript = serializedTranscript;
+                            }
+
+                           
+
+                        }
 
                         // Add the index to each model
                         var indexedModels = transcriptModel.activities.Select((model, index) =>
@@ -127,12 +181,17 @@ namespace POWERCAT.Plugins.ConversationKpi
                         // Populate the dictionary from the EntityCollection
                         idDictionary[conversationTranscriptId] = agentTranscriptId;
 
+
                     }
 
                     // Upsert Conversation KPIs
                     EntityCollection entitiesToUpsert = GetCollectionOfEntitiesToCreate(processDetailsList);
                     
-                    ExecuteBatchRequests(entitiesToUpsert, idDictionary, UpdateAgentTranScriptStatus);
+                    ExecuteBatchRequests(entitiesToUpsert, idDictionary, (response, dict) => 
+                    {
+                        UpdateAgentTranScriptStatus(response, dict);
+                        UpdateDuplicateTranscriptsAsCompleted(duplicateAgentTranscriptIds);
+                    });
                 }
             }
             catch (InvalidPluginExecutionException ex)
@@ -290,6 +349,40 @@ namespace POWERCAT.Plugins.ConversationKpi
             catch (Exception ex)
             {
                 _tracingService.Trace($"An error occurred in method ExecuteBatchRequests. Details: {ex.Message}");
+                throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Updates duplicate agent transcripts as completed
+        /// </summary>
+        /// <param name="duplicateAgentTranscriptIds">List of duplicate agent transcript IDs</param>
+        private void UpdateDuplicateTranscriptsAsCompleted(List<Guid> duplicateAgentTranscriptIds)
+        {
+            try
+            {
+                if (duplicateAgentTranscriptIds == null || duplicateAgentTranscriptIds.Count == 0)
+                {
+                    return;
+                }
+
+                EntityCollection duplicateTranscriptList = new EntityCollection();
+                foreach (Guid duplicateId in duplicateAgentTranscriptIds)
+                {
+                    Entity entity = new Entity("cat_agenttranscripts")
+                    {
+                        Id = duplicateId,
+                        ["cat_workflowstatus"] = new OptionSetValue(2) // Completed
+                    };
+                    duplicateTranscriptList.Entities.Add(entity);
+                }
+                
+                _tracingService.Trace($"Updating {duplicateAgentTranscriptIds.Count} duplicate transcripts as completed");
+                ExecuteBatchRequests(duplicateTranscriptList, null, null);
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"An error occurred in method UpdateDuplicateTranscriptsAsCompleted. Details: {ex.Message}");
                 throw ex;
             }
         }

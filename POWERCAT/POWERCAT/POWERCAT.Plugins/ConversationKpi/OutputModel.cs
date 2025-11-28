@@ -143,5 +143,6 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string TrackedVariables { get; set; }
         public string Name { get; set; }
         public bool CopyFullTranscript { get; set; }
+        public int BatchId { get; set; }
     }
 }
