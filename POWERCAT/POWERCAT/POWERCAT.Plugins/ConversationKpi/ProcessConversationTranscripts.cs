@@ -22,14 +22,20 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="tracingService">Tracing Service</param>
         public void GenerateAgentTranscripts(IPluginExecutionContext context, IOrganizationService organizationService, ITracingService tracingService)
         {
+            List<OrganizationRequest> createRequests = new List<OrganizationRequest>();
+            string errorLogId = null; 
             try
             {
                 // Get Conversation Transcripts details
                 string conversationTranscripts = context.InputParameters["cat_ConversationTranscriptsList"] as string;
-                string errorLogId = context.InputParameters["cat_ErrorLogId"] as string;
+                errorLogId = context.InputParameters["cat_ErrorLogId"] as string; 
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
-                // Extract Conversation Transcript Names from input
+                // group records by name
+                var groupedRecords = inputRecords
+                    .GroupBy(r => r.Name)
+                    .ToList();
+
                 var transcriptNames = inputRecords
                     .Where(r => !string.IsNullOrEmpty(r.Name))
                     .Select(r => r.Name)
@@ -39,33 +45,47 @@ namespace POWERCAT.Plugins.ConversationKpi
                 var existingRecords = FetchExistingAgentTranscripts(organizationService, tracingService, transcriptNames);
 
                 // Prepare ExecuteMultiple request
-                var createRequests = new List<OrganizationRequest>();
-                foreach (var record in inputRecords)
+                foreach (var group in groupedRecords)
                 {
-                    // Check if Agent Transcript record already present
-                    if (!string.IsNullOrEmpty(record.Name) &&
-                        !existingRecords.Contains(record.Name))
+                    // group is ordered by conversation start time and batch id
+                    var orderedrecord = group.OrderBy(r => r.BatchId).ThenByDescending(r => r.ConversationStartTime);
+
+                    if (orderedrecord.Count() == 1)
                     {
-                        var createRequest = new CreateRequest
+                        var record = group.First();
+                        // Check if Agent Transcript record already present
+                        if (!string.IsNullOrEmpty(record.Name) &&
+                            !existingRecords.Contains(record.Name))
                         {
-                            Target = new Entity("cat_agenttranscripts")
+                            var createRequest = new CreateRequest
                             {
-                                ["cat_transcriptcontent"] = record.Content,
-                                ["cat_conversationdate"] = record.ConversationStartTime,
-                                ["cat_agentid"] = record.AgentId,
-                                ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(record.AgentConfigurationId)),
-                                ["cat_conversationid"] = record.ConversationId,
-                                ["cat_trackedvariables"] = record.TrackedVariables,
-                                ["cat_name"] = record.Name,
-                                ["cat_workflowstatus"] = new OptionSetValue(1),
-                                ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
-                                ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
-                                ["ttlinseconds"] = 259200,
+                                Target = CreateAgentTranscriptEntity(record, null, false)
+                            };
+                            createRequests.Add(createRequest);
+                        }
+                    }
+                    if (orderedrecord.Count() > 1)
+                    {
+                        // Create parent Agent Transcript
+                        var parentRecord = orderedrecord.First();
+                        if (!string.IsNullOrEmpty(parentRecord.Name) &&
+                            !existingRecords.Contains(parentRecord.Name))
+                        {
+                            var parentAgentTranscript = CreateAgentTranscriptEntity(parentRecord, null, true);
+                            Guid parentId = organizationService.Create(parentAgentTranscript);
+                            // Create child Agent Transcripts
+                            foreach (var childRecord in orderedrecord.Skip(1))
+                            {
+                                var createRequest = new CreateRequest
+                                {
+                                    Target = CreateAgentTranscriptEntity(childRecord, parentId, false)
+                                };
+                                createRequests.Add(createRequest);
                             }
-                        };
-                        createRequests.Add(createRequest);
+                        }
                     }
                 }
+
 
                 // Execute in batch
                 if (createRequests.Any())
@@ -126,6 +146,44 @@ namespace POWERCAT.Plugins.ConversationKpi
         }
 
         /// <summary>
+        /// Creates an Agent Transcript entity from a ConversationTranscriptModel
+        /// </summary>
+        /// <param name="record">Conversation transcript record</param>
+        /// <param name="parentId">Parent transcript ID (for child records)</param>
+        /// <param name="isParent">Whether this is a parent transcript</param>
+        /// <returns>Entity configured as an agent transcript</returns>
+        private Entity CreateAgentTranscriptEntity(ConversationTranscriptModel record, Guid? parentId, bool isParent)
+        {
+            var entity = new Entity("cat_agenttranscripts")
+            {
+                ["cat_transcriptcontent"] = record.Content,
+                ["cat_conversationdate"] = record.ConversationStartTime,
+                ["cat_agentid"] = record.AgentId,
+                ["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", new Guid(record.AgentConfigurationId)),
+                ["cat_conversationid"] = record.ConversationId,
+                ["cat_trackedvariables"] = record.TrackedVariables,
+                ["cat_name"] = record.Name,
+                ["cat_workflowstatus"] = new OptionSetValue(1),
+                ["cat_conversationtranscriptid"] = record.ConversationTranscriptId,
+                ["cat_iscopyfulltranscriptenabled"] = record.CopyFullTranscript,
+                ["ttlinseconds"] = 259200,
+                ["cat_batchid"] = record.BatchId
+            };
+
+            if (isParent)
+            {
+                entity["cat_isparent"] = true;
+            }
+
+            if (parentId.HasValue)
+            {
+                entity["cat_parent"] = new EntityReference("cat_agenttranscripts", parentId.Value);
+            }
+
+            return entity;
+        }
+
+        /// <summary>
         /// Fetch exiting agent transcripts
         /// </summary>
         /// <param name="organizationService">Organization Service</param>
@@ -146,7 +204,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                         {
                             Conditions =
                                 {
-                                    new ConditionExpression("cat_name", ConditionOperator.In, transcriptNames.ToArray())
+                                    new ConditionExpression("cat_name", ConditionOperator.In, transcriptNames.ToArray()),
+                                    new ConditionExpression("cat_parent", ConditionOperator.DoesNotContainValues, true)
                                 }
                         }
                     };
@@ -169,7 +228,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
         /// <summary>
         /// Append error details based on failed records.
-        /// </summary>
+        /// /// </summary>
         /// <param name="organizationService">Organization Service</param>
         /// <param name="tracingService">Tracing Service</param>
         /// <param name="errorLogId">Error Log Id</param

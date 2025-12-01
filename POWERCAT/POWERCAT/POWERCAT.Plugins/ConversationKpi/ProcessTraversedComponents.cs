@@ -46,7 +46,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 traversedComponents.Add(new TraversedComponents
                 {
-                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     ComponentType = "Topic",
                     Trigger = GetTrigger(currentElement.valueType, currentElement.name),
                     ComponentID = GetComponentID(currentElement.valueType, currentElement.value, currentElement.name)
