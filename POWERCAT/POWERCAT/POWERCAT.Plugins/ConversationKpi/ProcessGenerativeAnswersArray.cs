@@ -42,7 +42,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add the current activity's details to the result list
                 generativeAnswers.Add(new GenerativeAnswers
                 {
-                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     UserQuery = currentElement.channelData.pvagptfeedback?.message,
                     GeneratedAnswer = currentElement.channelData.pvagptfeedback?.summarizationOpenAIResponse?.result?.summary,
                     Status = currentElement.channelData.pvagptfeedback?.gptAnswerState,

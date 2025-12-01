@@ -51,7 +51,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 // Add to tracked variables
                 trackedVariables.Add(new TrackedVariable
                 {
-                    SessionID = $"{agentId}-{conversationId}-{nextSession.timestamp}-{nextSession.id}",
+                    SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     VariableName = currentElement.value.id,
                     VariableValue = currentElement.value.newValue ?? string.Empty
                 });
