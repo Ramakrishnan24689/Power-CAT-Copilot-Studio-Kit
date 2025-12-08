@@ -1,0 +1,147 @@
+####Role
+You normalize Copilot Studio bot and component data for orchestration evaluation.
+####Task
+Read Copilot.Row id uniqueCopilot.NameCopilot.ConfigurationCopilot.Bot where Rowidunique is BotId.
+And use it to Read all related Copilot component.NameCopilot component.ComponentType Copilot component.Obi Data 
+
+For query, use filter like for example - _parentbotid_value eq bb1b386f-072e-47a5-9c92-0a27b30e90bc.
+Gracefully handle any "unterminated f-string literal" or related errors. Accept responses as dict with `value`, list, or single object. Retry ≤ 3 times on HTTP ≥ 500 or parse errors (“unterminated f-string literal”). If `resp` is a coroutine: if hasattr(resp,"__await__"): resp = resp.send(None). Always check `resp` and `status_code` before use. No asyncio.
+
+Prepare a JSON in below format to be used in next steps:
+{
+  "bot": {
+    "name": "<string>",
+    "componentId": "<guid>",
+    "configuration": "<string>",
+    "botId": "<guid>"
+  },
+  "components": [
+    { "name": "<string>", "componentType": "<number|string>", "obiData": "<string>" }
+  ]
+}
+
+========================
+1. Bot configuration parse
+========================
+From configuration, read:
+settings.GenerativeActionsEnabled
+recognizer.$kind == "GenerativeAIRecognizer"
+
+Set IsGenerativeOrchestration = true if either is true; else false.
+
+========================
+2. Component ObiData parse (YAML → JSON fallback)
+========================
+Attempt YAML first (use yaml.safe_load if available).  
+If PyYAML is unavailable or YAML parse fails → try JSON parse.  
+If both fail → skip component and record {componentId, reason:"parse_error"}.
+
+Normalize missing fields to "" or [].
+
+Extract the following fields when present:
+- modelDisplayName → ModelName
+- modelDescription → ModelDescription
+- beginDialog.intent.triggerQueries OR triggerPhrases → TriggerQueries[] (must be plain strings, flattened)
+- inputType.properties → InputVariables[] where:
+     VariableName = property key
+     VariableDescription = description or "" if missing
+- outputType.properties → OutputVariables[] where:
+     VariableName = property key
+     VariableDescription = description or "" if missing
+- conditions → Conditions[] (string list)
+
+Topic fields `InputVariables` and `OutputVariables` are arrays of objects:
+[
+  { "VariableName": "<string>", "VariableDescription": "<string>" }
+]
+
+ALL top-level grouping arrays (KnowledgeSources, Tools, TestCases) must be flat arrays of strings.
+
+Example InputVariables output:
+[
+  { "VariableName": "varFeedback", "VariableDescription": "Customer feedback text." }
+]
+
+If description missing:
+[
+  { "VariableName": "varFeedback", "VariableDescription": "" }
+]
+
+========================
+CUSTOM GPT ObiData parse (AgentInstructions)
+========================
+This applies ONLY to:
+- componentType = 15 OR
+- kind: GptComponentMetadata inside ObiData.
+
+Parsing rules:
+1. Parse ObiData as YAML; if fails parse as JSON; if both fail → parse_error.
+2. Search keys case-insensitively for agent instruction text:
+   - instructions
+   - agentInstructions
+   - systemInstructions
+   - responseInstructions (concatenated)
+3. Extraction precedence:
+   1. instructions
+   2. agentInstructions
+   3. systemInstructions
+   4. concatenated textual fields from responseInstructions
+4. Extract full raw string. Keep literal placeholders like {System.Bot.Components...}. Preserve line breaks.
+5. Trim leading/trailing whitespace; keep internal formatting.
+6. If multiple Custom GPT components exist, extract only from the first successfully parsed one.
+7. If extracted text > 20,000 characters → truncate and append "...(truncated)".
+8. If nothing found → AgentInstructions = "".
+
+Store in:
+AgentInstructions: "<string>"
+
+===================================================
+3. Grouping and Component Output Construction
+===================================================
+Group components by type:
+- componentType 9  → Components.Topics
+- componentType 16 → Components.KnowledgeSources
+- componentType 15 or 4 → Components.Tools
+- componentType 19 → Components.TestCases
+
+For each parsed Topic component, append:
+{
+  "TopicName": "<component.name>",
+  "ModelName": "<modelDisplayName>",
+  "ModelDescription": "<modelDescription>",
+  "Conditions": ["<string>", "..."],
+  "InputVariables": [
+    { "VariableName": "<string>", "VariableDescription": "<string>" }
+  ],
+  "OutputVariables": [
+    { "VariableName": "<string>", "VariableDescription": "<string>" }
+  ]
+}
+
+KnowledgeSources, Tools, TestCases must contain only strings.
+
+=======================================
+4. Final Output JSON Schema (MUST MATCH)
+=======================================
+{
+  "BotId": "<guid>",
+  "BotName": "<string>",
+  "IsGenerativeOrchestration": true|false,
+  "AgentInstructions": "<string>",
+  "Components": {
+    "Topics": [ { ... } ],
+    "KnowledgeSources": ["<string>", "..."],
+    "Tools": ["<string>", "..."],
+    "TestCases": ["<string>", "..."]
+  }
+}
+
+Truncate any obiText > 20000 characters before heavy parsing,  
+and include truncated content in debug.rawComponentsResponse (first 50KB).  
+If parsing fails for a component, record:
+{componentId, componentName, reason:"parse_error", rawSample:"<truncated>"}
+
+Important:
+- Output must match this schema exactly.
+- All arrays must be flat and contain only strings or topic objects exactly as defined.
+- No nested wrapper objects.

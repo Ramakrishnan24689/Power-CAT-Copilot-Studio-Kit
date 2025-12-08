@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "properties": {
+    "debug": {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "Patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Topics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "item"
+              ]
+            }
+          },
+          "PatternName": {
+            "type": "string"
+          },
+          "Status": {
+            "type": "boolean"
+          },
+          "Recommendation": {
+            "type": "string"
+          },
+          "PatternDescription": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Topics",
+          "PatternName",
+          "Status",
+          "Recommendation",
+          "PatternDescription"
+        ]
+      }
+    }
+  }
+}

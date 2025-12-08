@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "properties": {
+    "IsGenerativeOrchestration": {
+      "type": "boolean"
+    },
+    "BotId": {
+      "type": "string"
+    },
+    "BotName": {
+      "type": "string"
+    },
+    "AgentInstructions": {
+      "type": "string"
+    },
+    "Components": {
+      "type": "object",
+      "properties": {
+        "Topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Conditions": {
+                "type": "array"
+              },
+              "TopicName": {
+                "type": "string"
+              },
+              "InputVariables": {
+                "type": "array"
+              },
+              "ModelName": {
+                "type": "string"
+              },
+              "ModelDescription": {
+                "type": "string"
+              },
+              "OutputVariables": {
+                "type": "array"
+              }
+            },
+            "required": [
+              "Conditions",
+              "TopicName",
+              "InputVariables",
+              "ModelName",
+              "ModelDescription",
+              "OutputVariables"
+            ]
+          }
+        },
+        "Tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "item"
+            ]
+          }
+        },
+        "KnowledgeSources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "item"
+            ]
+          }
+        },
+        "TestCases": {
+          "type": "array"
+        }
+      }
+    }
+  }
+}

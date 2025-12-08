@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "properties": {
+    "Patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "PatternName": {
+            "type": "string"
+          },
+          "PatternDescription": {
+            "type": "string"
+          },
+          "Status": {
+            "type": "boolean"
+          },
+          "Topics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "type": "string"
+                },
+                "current": {
+                  "type": "string"
+                },
+                "suggested": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "item",
+                "current",
+                "suggested"
+              ]
+            }
+          },
+          "Recommendation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "PatternName",
+          "PatternDescription",
+          "Status",
+          "Topics",
+          "Recommendation"
+        ]
+      }
+    }
+  }
+}

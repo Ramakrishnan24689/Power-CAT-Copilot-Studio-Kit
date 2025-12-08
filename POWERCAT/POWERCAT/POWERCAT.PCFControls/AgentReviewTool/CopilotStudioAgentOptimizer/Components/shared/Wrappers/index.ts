@@ -1,0 +1,1 @@
+export { GradientBorderWrapper } from './GradientBorderWrapper';

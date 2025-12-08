@@ -1,0 +1,33 @@
+# Prettier ignore file
+# Ignore build outputs and generated files
+
+# Build outputs
+out/
+obj/
+coverage/
+*.js.map
+
+# Generated files
+generated/
+ManifestTypes.d.ts
+
+# Dependencies
+node_modules/
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Test fixtures that should preserve formatting
+__tests__/fixtures/*.yml
+__tests__/fixtures/*.yaml
+__tests__/fixtures/*.json
