@@ -4,10 +4,288 @@ import type { BotDetail, BotConfiguration } from '../../types';
 import { BotFields, buildQuery, OrderDirection } from '../../config';
 import { useServiceContext } from '../context';
 
-// Lazy-load sample data only when needed
-const getSampleData = async () => {
-    const { sampleBotDetails } = await import('../../__tests__/fixtures/sampleBotResponse');
-    return { sampleBotDetails };
+// Mock data for development/fallback scenarios
+const getMockData = () => {
+    return {
+        sampleBotDetails: {
+            '@odata.context': 'https://sample.crm.dynamics.com/api/data/v9.1/$metadata#bots',
+            value: [
+                {
+                    '@odata.etag': 'W/"123456789"',
+                    overriddencreatedon: null,
+                    modifiedon: '2024-12-01T14:30:00Z',
+                    supportedlanguages: null,
+                    solutionid: 'fd140aaf-4df4-11dd-bd17-0019b9312238',
+                    importsequencenumber: null,
+                    _owningteam_value: null,
+                    ismanaged: false,
+                    _ownerid_value: 'user1-guid',
+                    _modifiedby_value: 'user1-guid',
+                    applicationmanifestinformation: null,
+                    authenticationtrigger: 0,
+                    _publishedby_value: null,
+                    componentstate: 0,
+                    utcconversiontimezonecode: null,
+                    iconbase64: null,
+                    configuration: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.TurnContext',
+                        settings: {
+                            GenerativeActionsEnabled: true
+                        },
+                        gPTSettings: {
+                            $kind: 'Microsoft.Composer.WebChat.GPTSettings',
+                            defaultSchemaName: 'conversation'
+                        },
+                        aISettings: {
+                            $kind: 'Microsoft.Composer.WebChat.AISettings',
+                            useModelKnowledge: true,
+                            isSemanticSearchEnabled: true,
+                            optInUseLatestModels: true
+                        },
+                        recognizer: {
+                            $kind: 'Microsoft.Composer.WebChat.Recognizer'
+                        }
+                    }),
+                    language: 1033,
+                    publishedon: '2024-11-15T10:00:00Z',
+                    synchronizationstatus: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.SynchronizationStatus',
+                        contentVersion: 1,
+                        lastFinishedPublishOperation: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishOperation',
+                            operationStart: '2024-11-15T09:55:00Z',
+                            operationEnd: '2024-11-15T10:00:00Z',
+                            status: 'Completed'
+                        },
+                        lastPublishedDetails: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishedDetails',
+                            authenticationMode: 'None'
+                        },
+                        currentSynchronizationState: {
+                            $kind: 'Microsoft.Composer.WebChat.SynchronizationState',
+                            botRegistration: {
+                                $kind: 'Microsoft.Composer.WebChat.BotRegistration',
+                                botRegistrationIdConsumptionTime: '2024-11-15T10:00:00Z',
+                                applicationId: 'app-guid-1',
+                                isAppAvailableInTenant: true
+                            },
+                            provisioningStatus: 'Completed'
+                        }
+                    }),
+                    statecode: 0,
+                    botid: 'bot-001',
+                    overwritetime: '2024-11-15T10:00:00Z',
+                    _createdonbehalfby_value: null,
+                    _modifiedonbehalfby_value: null,
+                    versionnumber: 123456,
+                    origin: null,
+                    _owningbusinessunit_value: 'bu-guid',
+                    authenticationconfiguration: null,
+                    statuscode: 1,
+                    schemaname: 'CustomerSupportAgent',
+                    authenticationmode: 0,
+                    createdon: '2024-11-15T10:00:00Z',
+                    timezoneruleversionnumber: 4,
+                    name: 'Customer Support Agent',
+                    runtimeprovider: 0,
+                    _providerconnectionreferenceid_value: null,
+                    accesscontrolpolicy: 0,
+                    template: 'PowerVirtualAgents',
+                    _createdby_value: 'user1-guid',
+                    authorizedsecuritygroupids: null,
+                    componentidunique: 'component-guid-1',
+                    _owninguser_value: 'user1-guid',
+                    iscustomizable: {
+                        Value: true,
+                        CanBeChanged: true,
+                        ManagedPropertyLogicalName: 'iscustomizable'
+                    }
+                },
+                {
+                    '@odata.etag': 'W/"123456790"',
+                    overriddencreatedon: null,
+                    modifiedon: '2024-11-28T16:45:00Z',
+                    supportedlanguages: null,
+                    solutionid: 'fd140aaf-4df4-11dd-bd17-0019b9312238',
+                    importsequencenumber: null,
+                    _owningteam_value: null,
+                    ismanaged: false,
+                    _ownerid_value: 'user2-guid',
+                    _modifiedby_value: 'user2-guid',
+                    applicationmanifestinformation: null,
+                    authenticationtrigger: 0,
+                    _publishedby_value: null,
+                    componentstate: 0,
+                    utcconversiontimezonecode: null,
+                    iconbase64: null,
+                    configuration: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.TurnContext',
+                        settings: {
+                            GenerativeActionsEnabled: true
+                        },
+                        gPTSettings: {
+                            $kind: 'Microsoft.Composer.WebChat.GPTSettings',
+                            defaultSchemaName: 'conversation'
+                        },
+                        aISettings: {
+                            $kind: 'Microsoft.Composer.WebChat.AISettings',
+                            useModelKnowledge: false,
+                            isSemanticSearchEnabled: true,
+                            optInUseLatestModels: false
+                        },
+                        recognizer: {
+                            $kind: 'Microsoft.Composer.WebChat.Recognizer'
+                        }
+                    }),
+                    language: 1033,
+                    publishedon: '2024-11-20T09:15:00Z',
+                    synchronizationstatus: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.SynchronizationStatus',
+                        contentVersion: 1,
+                        lastFinishedPublishOperation: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishOperation',
+                            operationStart: '2024-11-20T09:10:00Z',
+                            operationEnd: '2024-11-20T09:15:00Z',
+                            status: 'Completed'
+                        },
+                        lastPublishedDetails: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishedDetails',
+                            authenticationMode: 'None'
+                        },
+                        currentSynchronizationState: {
+                            $kind: 'Microsoft.Composer.WebChat.SynchronizationState',
+                            botRegistration: {
+                                $kind: 'Microsoft.Composer.WebChat.BotRegistration',
+                                botRegistrationIdConsumptionTime: '2024-11-20T09:15:00Z',
+                                applicationId: 'app-guid-2',
+                                isAppAvailableInTenant: true
+                            },
+                            provisioningStatus: 'Completed'
+                        }
+                    }),
+                    statecode: 0,
+                    botid: 'bot-002',
+                    overwritetime: '2024-11-20T09:15:00Z',
+                    _createdonbehalfby_value: null,
+                    _modifiedonbehalfby_value: null,
+                    versionnumber: 123457,
+                    origin: null,
+                    _owningbusinessunit_value: 'bu-guid',
+                    authenticationconfiguration: null,
+                    statuscode: 1,
+                    schemaname: 'SalesAssistant',
+                    authenticationmode: 0,
+                    createdon: '2024-11-20T09:15:00Z',
+                    timezoneruleversionnumber: 4,
+                    name: 'Sales Assistant Bot',
+                    runtimeprovider: 0,
+                    _providerconnectionreferenceid_value: null,
+                    accesscontrolpolicy: 0,
+                    template: 'PowerVirtualAgents',
+                    _createdby_value: 'user2-guid',
+                    authorizedsecuritygroupids: null,
+                    componentidunique: 'component-guid-2',
+                    _owninguser_value: 'user2-guid',
+                    iscustomizable: {
+                        Value: true,
+                        CanBeChanged: true,
+                        ManagedPropertyLogicalName: 'iscustomizable'
+                    }
+                },
+                {
+                    '@odata.etag': 'W/"123456791"',
+                    overriddencreatedon: null,
+                    modifiedon: '2024-11-25T13:10:00Z',
+                    supportedlanguages: null,
+                    solutionid: 'fd140aaf-4df4-11dd-bd17-0019b9312238',
+                    importsequencenumber: null,
+                    _owningteam_value: null,
+                    ismanaged: false,
+                    _ownerid_value: 'user3-guid',
+                    _modifiedby_value: 'user3-guid',
+                    applicationmanifestinformation: null,
+                    authenticationtrigger: 0,
+                    _publishedby_value: null,
+                    componentstate: 0,
+                    utcconversiontimezonecode: null,
+                    iconbase64: null,
+                    configuration: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.TurnContext',
+                        settings: {
+                            GenerativeActionsEnabled: true
+                        },
+                        gPTSettings: {
+                            $kind: 'Microsoft.Composer.WebChat.GPTSettings',
+                            defaultSchemaName: 'conversation'
+                        },
+                        aISettings: {
+                            $kind: 'Microsoft.Composer.WebChat.AISettings',
+                            useModelKnowledge: true,
+                            isSemanticSearchEnabled: false,
+                            optInUseLatestModels: true
+                        },
+                        recognizer: {
+                            $kind: 'Microsoft.Composer.WebChat.Recognizer'
+                        }
+                    }),
+                    language: 1033,
+                    publishedon: '2024-10-30T11:20:00Z',
+                    synchronizationstatus: JSON.stringify({
+                        $kind: 'Microsoft.Composer.WebChat.SynchronizationStatus',
+                        contentVersion: 1,
+                        lastFinishedPublishOperation: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishOperation',
+                            operationStart: '2024-10-30T11:15:00Z',
+                            operationEnd: '2024-10-30T11:20:00Z',
+                            status: 'Completed'
+                        },
+                        lastPublishedDetails: {
+                            $kind: 'Microsoft.Composer.WebChat.PublishedDetails',
+                            authenticationMode: 'None'
+                        },
+                        currentSynchronizationState: {
+                            $kind: 'Microsoft.Composer.WebChat.SynchronizationState',
+                            botRegistration: {
+                                $kind: 'Microsoft.Composer.WebChat.BotRegistration',
+                                botRegistrationIdConsumptionTime: '2024-10-30T11:20:00Z',
+                                applicationId: 'app-guid-3',
+                                isAppAvailableInTenant: true
+                            },
+                            provisioningStatus: 'Completed'
+                        }
+                    }),
+                    statecode: 0,
+                    botid: 'bot-003',
+                    overwritetime: '2024-10-30T11:20:00Z',
+                    _createdonbehalfby_value: null,
+                    _modifiedonbehalfby_value: null,
+                    versionnumber: 123458,
+                    origin: null,
+                    _owningbusinessunit_value: 'bu-guid',
+                    authenticationconfiguration: null,
+                    statuscode: 1,
+                    schemaname: 'HRVirtualAssistant',
+                    authenticationmode: 0,
+                    createdon: '2024-10-30T11:20:00Z',
+                    timezoneruleversionnumber: 4,
+                    name: 'HR Onboarding Helper',
+                    runtimeprovider: 0,
+                    _providerconnectionreferenceid_value: null,
+                    accesscontrolpolicy: 0,
+                    template: 'PowerVirtualAgents',
+                    _createdby_value: 'user3-guid',
+                    authorizedsecuritygroupids: null,
+                    componentidunique: 'component-guid-3',
+                    _owninguser_value: 'user3-guid',
+                    iscustomizable: {
+                        Value: true,
+                        CanBeChanged: true,
+                        ManagedPropertyLogicalName: 'iscustomizable'
+                    }
+                }
+            ]
+        }
+    };
 };
 
 // Filter helper - check if bot has GenerativeActionsEnabled
@@ -43,7 +321,7 @@ export function useBotData({ useTestHarness }: UseBotDataOptions) {
         
         if (useTestHarness) {
             // In test harness mode, load sample data
-            const { sampleBotDetails } = await getSampleData();
+            const { sampleBotDetails } = getMockData();
             const filtered = sampleBotDetails.value.filter(isGenerativeActionsEnabled);
             setAllBots(filtered);
             setFilteredBots(filtered);
@@ -192,12 +470,10 @@ export function useBotData({ useTestHarness }: UseBotDataOptions) {
     // Initial load - test harness specific effect
     React.useEffect(() => {
         if (useTestHarness) {
-            void (async () => {
-                const { sampleBotDetails } = await getSampleData();
-                const filtered = sampleBotDetails.value.filter(isGenerativeActionsEnabled);
-                setAllBots(filtered);
-                setFilteredBots(filtered);
-            })();
+            const { sampleBotDetails } = getMockData();
+            const filtered = sampleBotDetails.value.filter(isGenerativeActionsEnabled);
+            setAllBots(filtered);
+            setFilteredBots(filtered);
         }
     }, [useTestHarness]);
 

@@ -24,6 +24,7 @@ function cleanTextForPdf(text: string): string {
         .replace(/[\u00A0]/g, ' ') // Non-breaking space
         .replace(/[\u00AD]/g, '') // Soft hyphen
         // Remove control characters but keep most Unicode
+        // eslint-disable-next-line no-control-regex
         .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Control characters
         .replace(/[\uFEFF]/g, '') // Byte order mark
         .replace(/[\uFFF0-\uFFFF]/g, '') // Specials block

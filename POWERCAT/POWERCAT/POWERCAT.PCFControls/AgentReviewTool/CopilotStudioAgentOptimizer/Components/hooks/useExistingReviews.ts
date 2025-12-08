@@ -4,10 +4,53 @@ import type { BotDetail, AgentReviewRecord } from '../../types';
 import { ReviewStatus } from '../../config';
 import { useServiceContext } from '../context';
 
-// Lazy-load sample data only when needed
-const getSampleData = async () => {
-    const { sampleAgentReviews } = await import('../../__tests__/fixtures/sampleAgentReviews');
-    return { sampleAgentReviews };
+// Mock data for development/fallback scenarios
+const getMockData = () => {
+    return {
+        sampleAgentReviews: {
+            '@odata.context': 'https://sample.crm.dynamics.com/api/data/v9.1/$metadata#cat_agentreviews',
+            value: [
+                {
+                    cat_agentreviewsid: 'review-001',
+                    cat_name: 'Customer Support Agent Review',
+                    cat_botid: 'bot-001',
+                    cat_botname: 'Customer Support Agent',
+                    cat_componentidunique: 'comp-001',
+                    cat_overallscore: 87,
+                    cat_patternscore: 85,
+                    cat_instructionscore: 89,
+                    cat_totalpatterns: 12,
+                    cat_passedpatterns: 10,
+                    cat_failedpatterns: 2,
+                    cat_totalissues: 3,
+                    cat_highseverityissues: 1,
+                    cat_reviewdate: '2024-12-01T14:30:00Z',
+                    cat_reviewstatus: 335350000, // Completed
+                    cat_reviewpdfreport: 'JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzNAo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFNhbXBsZSBSZXBvcnQpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjI0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMzE4CiUlRU9GCg==',
+                    cat_reviewpdfreport_name: 'customer-support-review.pdf',
+                    _ownerid_value: 'user-001'
+                },
+                {
+                    cat_agentreviewsid: 'review-002',
+                    cat_name: 'Sales Assistant Review',
+                    cat_botid: 'bot-002',
+                    cat_botname: 'Sales Assistant Bot',
+                    cat_componentidunique: 'comp-002',
+                    cat_overallscore: 72,
+                    cat_patternscore: 68,
+                    cat_instructionscore: 76,
+                    cat_totalpatterns: 15,
+                    cat_passedpatterns: 11,
+                    cat_failedpatterns: 4,
+                    cat_totalissues: 8,
+                    cat_highseverityissues: 2,
+                    cat_reviewdate: '2024-11-28T16:45:00Z',
+                    cat_reviewstatus: 335350001, // Draft
+                    _ownerid_value: 'user-002'
+                }
+            ]
+        }
+    };
 };
 
 interface UseExistingReviewsOptions {
@@ -41,7 +84,7 @@ export function useExistingReviews({ useTestHarness }: UseExistingReviewsOptions
 
             if (useTestHarness) {
                 console.log('[useExistingReviews] Using sample agent reviews');
-                const { sampleAgentReviews } = await getSampleData();
+                const { sampleAgentReviews } = getMockData();
                 reviews = sampleAgentReviews.value;
             } else {
                 console.log('[useExistingReviews] Fetching from Dataverse - cat_agentreviewses table');

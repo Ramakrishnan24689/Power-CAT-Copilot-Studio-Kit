@@ -558,8 +558,8 @@ export class ReviewService extends DataverseService {
             
             // Convert bytes to binary string
             let binaryString = '';
-            for (let i = 0; i < utf8Bytes.length; i++) {
-                binaryString += String.fromCharCode(utf8Bytes[i]);
+            for (const byte of utf8Bytes) {
+                binaryString += String.fromCharCode(byte);
             }
             
             // Encode binary string to base64

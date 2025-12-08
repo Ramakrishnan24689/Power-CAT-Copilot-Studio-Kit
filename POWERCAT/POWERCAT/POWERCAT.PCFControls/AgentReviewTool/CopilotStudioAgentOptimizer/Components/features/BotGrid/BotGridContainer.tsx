@@ -37,13 +37,111 @@ import type { ReviewResult, PatternEvaluation, InstructionEvaluation, Compliance
 import { calculateOverallScore, getPatternSeverity } from '../../utils/scoreCalculator';
 
 // Lazy-load sample data only when needed (tree-shaking optimization)
-const getSampleData = async () => {
-    const { sampleBotDetails } = await import('../../../__tests__/fixtures/sampleBotResponse');
-    const { sampleStageAResponse } = await import('../../../__tests__/fixtures/sampleStageAResponse');
-    const { sampleStageBResponse } = await import('../../../__tests__/fixtures/sampleStageBResponse');
-    const { sampleAgentInstructionEvalResponse } = await import('../../../__tests__/fixtures/sampleAgentInstructionEval');
-    const { sampleAgentReviews } = await import('../../../__tests__/fixtures/sampleAgentReviews');
-    return { sampleBotDetails, sampleStageAResponse, sampleStageBResponse, sampleAgentInstructionEvalResponse, sampleAgentReviews };
+// Mock data for development/fallback scenarios
+const getMockData = () => {
+    return {
+        sampleBotDetails: {
+            '@odata.context': 'https://sample.crm.dynamics.com/api/data/v9.1/$metadata#bots',
+            value: [
+                {
+                    botid: 'bot-001',
+                    name: 'Customer Support Agent',
+                    displayname: 'Customer Support Agent',
+                    description: 'AI-powered customer support agent for handling common inquiries',
+                    configuration: JSON.stringify({
+                        settings: {
+                            GenerativeActionsEnabled: true,
+                            MaxTokens: 2000,
+                            Temperature: 0.7
+                        }
+                    }),
+                    createdon: '2024-11-15T10:00:00Z',
+                    modifiedon: '2024-12-01T14:30:00Z',
+                    statuscode: 1
+                }
+            ]
+        },
+        sampleStageAResponse: {
+            PatternScore: 85,
+            Summary: 'Agent configuration shows good architectural patterns with room for improvement.',
+            Patterns: [
+                {
+                    PatternName: 'Variable Naming Convention',
+                    PatternDescription: 'Variables should follow clear naming conventions',
+                    Status: true,
+                    Topics: [],
+                    Recommendation: 'Good variable naming practices observed'
+                },
+                {
+                    PatternName: 'Test Coverage',
+                    PatternDescription: 'Agent should have comprehensive test scenarios',
+                    Status: false,
+                    Topics: [
+                        {
+                            TopicName: 'Missing Test Cases',
+                            Issues: ['No edge case testing', 'Missing negative scenarios']
+                        }
+                    ],
+                    Recommendation: 'Add comprehensive test coverage for all conversation paths'
+                }
+            ]
+        },
+        sampleStageBResponse: {
+            PatternScore: 78,
+            Summary: 'Technical patterns analysis reveals several optimization opportunities.',
+            Patterns: [
+                {
+                    PatternName: 'Tool Configuration',
+                    PatternDescription: 'Optimal number of tools and actions configured',
+                    Status: false,
+                    Topics: [
+                        {
+                            TopicName: 'Excessive Tools',
+                            Issues: ['Too many configured tools (>25)', 'Duplicate functionality detected']
+                        }
+                    ],
+                    Recommendation: 'Reduce tool count to improve performance'
+                }
+            ]
+        },
+        sampleAgentInstructionEvalResponse: {
+            compliance: false,
+            compliancePercentage: 73,
+            issues: [
+                {
+                    id: 'SAFETY-001',
+                    severity: 'high' as const,
+                    description: 'Missing privacy guidelines for handling sensitive information',
+                    guidelineReference: 'Safety Guidelines 2.1',
+                    recommendation: 'Add explicit instructions for handling PII and sensitive data'
+                },
+                {
+                    id: 'SCOPE-002',
+                    severity: 'medium' as const,
+                    description: 'Unclear scope definition for out-of-domain requests',
+                    guidelineReference: 'Scope Guidelines 1.3',
+                    recommendation: 'Define clear boundaries for agent capabilities'
+                }
+            ],
+            summary: 'Agent instructions need improvement in safety and scope areas. Focus on privacy guidelines and scope definition.'
+        },
+        sampleAgentReviews: {
+            '@odata.context': 'https://sample.crm.dynamics.com/api/data/v9.1/$metadata#cat_agentreviews',
+            value: [
+                {
+                    cat_agentreviewsid: 'review-001',
+                    cat_name: 'Customer Support Agent Review',
+                    cat_botid: 'bot-001',
+                    cat_botname: 'Customer Support Agent',
+                    cat_overallscore: 79,
+                    cat_patternscore: 85,
+                    cat_instructionscore: 73,
+                    cat_reviewdate: '2024-12-01T14:30:00Z',
+                    cat_reviewstatus: 335350000
+                }
+            ]
+        }
+    };
 };
 
 export interface BotsDataGridProps {
@@ -391,7 +489,23 @@ export const BotGridContainer: React.FC<BotsDataGridProps> = ({ stageAModelId, s
             updateProgress("Analyzing agent configuration and components...", 15, bot.name);
             if (useTestHarness) {
                 // Use sample data for testing - now includes local parsing test
-                const { sampleBotComponents } = await import('../../../__tests__/fixtures/sampleBotComponents');
+                // Use sample bot components for test harness
+                const sampleBotComponents: { value: unknown[] } = {
+                    value: [
+                        {
+                            componentId: 'comp-001',
+                            name: 'Main Topic Handler',
+                            type: 'topic',
+                            description: 'Primary conversation flow handler'
+                        },
+                        {
+                            componentId: 'comp-002', 
+                            name: 'Escalation Handler',
+                            type: 'topic',
+                            description: 'Handles escalation to human agent'
+                        }
+                    ]
+                };
                 
                 // Create a mock webAPI that returns sample components in proper Dataverse response structure
                 const mockWebAPI = {
@@ -637,7 +751,7 @@ export const BotGridContainer: React.FC<BotsDataGridProps> = ({ stageAModelId, s
                     (async () => {
                         if (useTestHarness) {
                             console.log('🎆 [STAGE C AI] Using sample instruction evaluation response');
-                            const { sampleAgentInstructionEvalResponse } = await getSampleData();
+                            const { sampleAgentInstructionEvalResponse } = getMockData();
                             return {
                                 responsev2: {
                                     predictionOutput: {
@@ -890,7 +1004,16 @@ export const BotGridContainer: React.FC<BotsDataGridProps> = ({ stageAModelId, s
                     let stageDResult: RetrievePromptResponseOutput;
 
                     if (useTestHarness) {
-                        const { stageDResponse } = await import('../../../__tests__/fixtures/stageDResponse');
+                        // Use sample stage D response data
+                        const stageDResponse: { files?: {base64_content: string; content_type: string; file_name: string}[] } = {
+                            files: [
+                                {
+                                    base64_content: 'JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNCAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL0xlbmd0aCAzNAo+PgpzdHJlYW0KQlQKL0YxIDEyIFRmCjEwMCA3MDAgVGQKKFNhbXBsZSBSZXBvcnQpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAowMDAwMDAwMjI0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMzE4CiUlRU9GCg==',
+                                    content_type: 'application/pdf',
+                                    file_name: 'agent-review-report.pdf'
+                                }
+                            ]
+                        };
                         stageDResult = {
                             responsev2: {
                                 predictionOutput: {
