@@ -48,7 +48,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 foreach (var group in groupedRecords)
                 {
                     // group is ordered by conversation start time and batch id
-                    var orderedrecord = group.OrderBy(r => r.BatchId).ThenByDescending(r => r.ConversationStartTime);
+                    var orderedrecord = group.OrderBy(r => r.BatchId).ThenBy(r => r.ConversationStartTime);
 
                     if (orderedrecord.Count() == 1)
                     {

@@ -122,7 +122,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                                         <filter type='and'>
                                                           <condition attribute='cat_parent' operator='eq' value='" + agentTranscript.Id + @"' />
                                                         </filter>
-                                                        <order attribute='cat_batchid' />
+                                                        <order attribute='cat_conversationdate' descending='false'/>
                                                       </entity>
                                                     </fetch>";
                                 EntityCollection duplicateTranscripts = _organizationService.RetrieveMultiple(new FetchExpression(agentfetchXml));
