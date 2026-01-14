@@ -106,74 +106,70 @@ namespace POWERCAT.Plugins.ApplicationInsightsApi
         /// <returns>The query response.</returns>
         private async Task<string> ExecuteAppInsightsQueryWithConfigAsync(string copilotConfigId, string query, IOrganizationService service, ITracingService tracingService)
         {
-            try
+            // Step 1: Get agent configuration details
+            tracingService.Trace("Step 1: Retrieving agent configuration...");
+            ColumnSet columns = new ColumnSet(
+                "cat_azureappinsightsapplicationid",
+                "cat_azureappinsightsclientid",
+                "cat_azureappinsightstenantid",
+                "cat_azureappinsightssecretlocationcode",
+                "cat_azureappinsightssecret",
+                "cat_azureappinsightsenvironmentvariable"
+            );
+
+            Entity agentConfigRecord = service.Retrieve("cat_copilotconfiguration", new Guid(copilotConfigId), columns);
+
+            if (agentConfigRecord == null)
             {
-                // Step 1: Get agent configuration details
-                tracingService.Trace("Step 1: Retrieving agent configuration...");
-                ColumnSet columns = new ColumnSet(
-                    "cat_azureappinsightsapplicationid",
-                    "cat_azureappinsightsclientid",
-                    "cat_azureappinsightstenantid",
-                    "cat_azureappinsightssecretlocationcode",
-                    "cat_azureappinsightssecret",
-                    "cat_azureappinsightsenvironmentvariable",
-                    "cat_agentname"
-                );
-
-                Entity agentConfigRecord = service.Retrieve("cat_copilotconfiguration", new Guid(copilotConfigId), columns);
-
-                if (agentConfigRecord == null)
-                {
-                    return "Error: Failed to retrieve Agent configuration record.";
-                }
-
-                string applicationId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightsapplicationid");
-                string clientId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightsclientid");
-                string tenantId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightstenantid");
-
-                if (string.IsNullOrEmpty(applicationId) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(tenantId))
-                {
-                    return "Error: Missing required Azure Application Insights configuration (ApplicationId, ClientId, or TenantId).";
-                }
-
-                // Step 2: Get secret based on location (Dataverse or KeyVault via Environment Variable)
-                tracingService.Trace("Step 2: Resolving client secret...");
-                string clientSecret = GetAppInsightsClientSecret(agentConfigRecord, service, tracingService);
-
-                if (string.IsNullOrEmpty(clientSecret))
-                {
-                    return "Error: Failed to retrieve Azure Application Insights client secret.";
-                }
-
-                // Step 3: Generate access token
-                tracingService.Trace("Step 3: Generating access token...");
-                string tokenResponse = await GenerateAppInsightsAccessTokenAsync(tenantId, clientId, clientSecret);
-
-                if (tokenResponse.StartsWith("Error:"))
-                {
-                    return $"Token generation failed: {tokenResponse}";
-                }
-
-                // Step 4: Parse the token response to extract access_token
-                tracingService.Trace("Step 4: Parsing token response...");
-                AppInsightsTokenResponse tokenData = JsonConvert.DeserializeObject<AppInsightsTokenResponse>(tokenResponse);
-
-                if (tokenData == null || string.IsNullOrEmpty(tokenData.access_token))
-                {
-                    return "Error: Failed to parse access token from response.";
-                }
-
-                // Step 5: Execute the Application Insights query
-                tracingService.Trace("Step 5: Executing Application Insights query...");
-                string queryResponse = await ExecuteAppInsightsQueryAsync(applicationId, tokenData.access_token, query);
-
-                return queryResponse;
+                throw new InvalidPluginExecutionException("Failed to retrieve Agent configuration record.");
             }
-            catch (Exception ex)
+
+            string applicationId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightsapplicationid");
+            string clientId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightsclientid");
+            string tenantId = agentConfigRecord.GetAttributeValue<string>("cat_azureappinsightstenantid");
+
+            if (string.IsNullOrEmpty(applicationId) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(tenantId))
             {
-                tracingService.Trace($"Error in ExecuteAppInsightsQueryWithConfigAsync: {ex.Message}");
-                return $"Error: {ex.Message}";
+                throw new InvalidPluginExecutionException("Missing required Azure Application Insights configuration (ApplicationId, ClientId, or TenantId).");
             }
+
+            // Step 2: Get secret based on location (Dataverse or KeyVault via Environment Variable)
+            tracingService.Trace("Step 2: Resolving client secret...");
+            string clientSecret = GetAppInsightsClientSecret(agentConfigRecord, service, tracingService);
+
+            if (string.IsNullOrEmpty(clientSecret))
+            {
+                throw new InvalidPluginExecutionException("Failed to retrieve Azure Application Insights client secret.");
+            }
+
+            // Step 3: Generate access token
+            tracingService.Trace("Step 3: Generating access token...");
+            string tokenResponse = await GenerateAppInsightsAccessTokenAsync(tenantId, clientId, clientSecret);
+
+            if (tokenResponse.StartsWith("Error:"))
+            {
+                throw new InvalidPluginExecutionException($"Token generation failed: {tokenResponse}");
+            }
+
+            // Step 4: Parse the token response to extract access_token
+            tracingService.Trace("Step 4: Parsing token response...");
+            AppInsightsTokenResponse tokenData = JsonConvert.DeserializeObject<AppInsightsTokenResponse>(tokenResponse);
+
+            if (tokenData == null || string.IsNullOrEmpty(tokenData.access_token))
+            {
+                throw new InvalidPluginExecutionException("Failed to parse access token from response.");
+            }
+
+            // Step 5: Execute the Application Insights query
+            tracingService.Trace("Step 5: Executing Application Insights query...");
+            string queryResponse = await ExecuteAppInsightsQueryAsync(applicationId, tokenData.access_token, query);
+
+            if (queryResponse.StartsWith("Error:"))
+            {
+                throw new InvalidPluginExecutionException($"Application Insights query failed: {queryResponse}");
+            }
+
+            return queryResponse;
         }
 
         /// <summary>
@@ -212,6 +208,7 @@ namespace POWERCAT.Plugins.ApplicationInsightsApi
                     catch (Exception ex)
                     {
                         tracingService.Trace($"Error retrieving secret from Environment Variable: {ex.Message}");
+                        throw new InvalidPluginExecutionException("Error retrieving secret from Environment Variable: " + ex.Message);
                     }
                 }
             }
