@@ -3,12 +3,10 @@
 
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization.Json;
-using System.Text;
 
 namespace POWERCAT.Plugins.TranscriptMetrics
 {
@@ -67,16 +65,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     return;
                 }
 
-                // 4. Extract conversationDate from first element
-                string conversationDateStr = conversations[0].ConversationDate;
-                if (string.IsNullOrWhiteSpace(conversationDateStr) ||
-                    !DateTime.TryParse(conversationDateStr, out DateTime conversationDate))
-                {
-                    SetErrorResponse(context, "ConversationDate is missing or invalid in the first conversation.");
-                    throw new InvalidPluginExecutionException("ConversationDate is missing or invalid in the first conversation.");
-                }
-
-                _tracingService.Trace($"Processing {conversations.Count} conversations for date {conversationDateStr}");
+                _tracingService.Trace($"Processing {conversations.Count} conversations");
 
                 // 5. Group and aggregate KPIs
                 List<KpiGroup> kpiGroups = AggregateKpis(conversations);
@@ -84,7 +73,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 _tracingService.Trace($"Aggregated into {kpiGroups.Count} groups");
 
                 // 6. Batch upsert using ExecuteMultipleRequest
-                UpsertKpiRecords(context, kpiGroups, conversationDate, agentId);
+                UpsertKpiRecords(context, kpiGroups, agentId);
 
                 _tracingService.Trace("AggregateAgentKPIs completed successfully");
             }
@@ -119,11 +108,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         {
             try
             {
-                var serializer = new DataContractJsonSerializer(typeof(List<ConversationRecord>));
-                using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
-                {
-                    return (List<ConversationRecord>)serializer.ReadObject(stream);
-                }
+                return JsonConvert.DeserializeObject<List<ConversationRecord>>(json);
             }
             catch (Exception ex)
             {
@@ -132,16 +117,19 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         }
 
         /// <summary>
-        /// Aggregates KPIs by grouping conversations by channelId and isDesignMode.
+        /// Aggregates KPIs by grouping conversations by conversationDate, channelId, and isDesignMode.
         /// </summary>
         private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations)
         {
             var groups = conversations
-                .GroupBy(c => new { c.ChannelId, c.IsDesignMode })
+                .Where(c => !string.IsNullOrWhiteSpace(c.ConversationDate) && DateTime.TryParse(c.ConversationDate, out _))
+                .GroupBy(c => new { c.ConversationDate, c.ChannelId, c.IsDesignMode })
                 .Select(g =>
                 {
+                    DateTime.TryParse(g.Key.ConversationDate, out DateTime parsedDate);
                     var kpi = new KpiGroup
                     {
+                        ConversationDate = parsedDate,
                         ChannelId = g.Key.ChannelId ?? string.Empty,
                         IsDesignMode = g.Key.IsDesignMode,
                         TotalConversations = g.Count()
@@ -203,7 +191,6 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         private void UpsertKpiRecords(
             IPluginExecutionContext context,
             List<KpiGroup> kpiGroups,
-            DateTime conversationDate,
             string agentId)
         {
             var requestWithResults = new ExecuteMultipleRequest
@@ -222,17 +209,17 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 var entity = new Entity(TableLogicalName);
 
                 // Set alternate key attributes for matching existing records
-                entity.KeyAttributes["cat_conversationdate"] = conversationDate;
+                entity.KeyAttributes["cat_conversationdate"] = kpi.ConversationDate;
                 entity.KeyAttributes["cat_agentid"] = agentId;
                 entity.KeyAttributes["cat_channelid"] = kpi.ChannelId;
                 entity.KeyAttributes["cat_isdesignmodecode"] = new OptionSetValue(kpi.IsDesignMode ? 1 : 0);
 
                 // Primary name
                 string designModeStr = kpi.IsDesignMode.ToString().ToLowerInvariant();
-                entity["cat_transcriptmetricname"] = $"{conversationDate:yyyy-MM-dd}-{agentId}-{kpi.ChannelId}-{designModeStr}";
+                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate:yyyy-MM-dd}-{agentId}-{kpi.ChannelId}-{designModeStr}";
 
                 // Key columns (also set as regular attributes for create scenarios)
-                entity["cat_conversationdate"] = conversationDate;
+                entity["cat_conversationdate"] = kpi.ConversationDate;
                 entity["cat_agentid"] = agentId;
                 entity["cat_channelid"] = kpi.ChannelId;
                 entity["cat_isdesignmodecode"] = new OptionSetValue(kpi.IsDesignMode ? 1 : 0);

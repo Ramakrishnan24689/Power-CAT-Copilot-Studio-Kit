@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using Newtonsoft.Json;
 
 namespace POWERCAT.Plugins.TranscriptMetrics
 {
@@ -109,6 +110,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     public class FeedbackActionValue
     {
         [DataMember(Name = "feedback")]
+        [JsonConverter(typeof(FeedbackDetailConverter))]
         public FeedbackDetail Feedback { get; set; }
 
         [DataMember(Name = "reaction")]
@@ -123,10 +125,59 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     }
 
     /// <summary>
-    /// Aggregated KPI data for a (channelId, isDesignMode) group.
+    /// Custom JSON converter for FeedbackDetail that handles both object and string (escaped JSON) formats.
+    /// </summary>
+    public class FeedbackDetailConverter : JsonConverter<FeedbackDetail>
+    {
+        public override FeedbackDetail ReadJson(JsonReader reader, Type objectType, FeedbackDetail existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            if (reader.TokenType == JsonToken.Null)
+            {
+                return null;
+            }
+
+            // If the JSON is a string, it might be escaped JSON - try to parse it
+            if (reader.TokenType == JsonToken.String)
+            {
+                string stringValue = (string)reader.Value;
+                if (string.IsNullOrEmpty(stringValue))
+                {
+                    return null;
+                }
+
+                try
+                {
+                    // Try to deserialize the string as JSON
+                    return JsonConvert.DeserializeObject<FeedbackDetail>(stringValue);
+                }
+                catch
+                {
+                    // If it's not valid JSON, treat it as raw feedback text
+                    return new FeedbackDetail { FeedbackText = stringValue };
+                }
+            }
+
+            // Otherwise, let Newtonsoft deserialize the object normally
+            if (reader.TokenType == JsonToken.StartObject)
+            {
+                return serializer.Deserialize<FeedbackDetail>(reader);
+            }
+
+            return null;
+        }
+
+        public override void WriteJson(JsonWriter writer, FeedbackDetail value, JsonSerializer serializer)
+        {
+            serializer.Serialize(writer, value);
+        }
+    }
+
+    /// <summary>
+    /// Aggregated KPI data for a (conversationDate, channelId, isDesignMode) group.
     /// </summary>
     public class KpiGroup
     {
+        public DateTime ConversationDate { get; set; }
         public string ChannelId { get; set; }
         public bool IsDesignMode { get; set; }
         public int TotalConversations { get; set; }
