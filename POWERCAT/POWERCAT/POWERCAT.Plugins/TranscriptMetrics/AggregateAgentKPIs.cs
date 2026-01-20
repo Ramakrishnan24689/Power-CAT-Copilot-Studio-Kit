@@ -6,6 +6,7 @@ using Microsoft.Xrm.Sdk.Messages;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 
 namespace POWERCAT.Plugins.TranscriptMetrics
@@ -41,6 +42,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             {
                 // 1. Extract input parameters
                 string agentId = GetInputParameter<string>(context, "agentId");
+                string agentMetadataJson = GetInputParameter<string>(context, "agentMetadata");
                 string resultJson = GetInputParameter<string>(context, "resultJson");
 
                 // 2. Validate inputs
@@ -55,8 +57,23 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     SetErrorResponse(context, "resultJson is required.");
                     throw new InvalidPluginExecutionException("resultJson is required.");
                 }
-
-                // 3. Parse JSON
+                if (string.IsNullOrWhiteSpace(agentMetadataJson))
+                {
+                    SetErrorResponse(context, "agentMetadata is required.");
+                    throw new InvalidPluginExecutionException("agentMetadata is required.");
+                }
+                // 3. Parse agent metadata
+                AgentMetadata agentMetadata = null;
+                try
+                {
+                    agentMetadata = JsonConvert.DeserializeObject<AgentMetadata>(agentMetadataJson);
+                }
+                catch (Exception ex)
+                {
+                    SetErrorResponse(context, $"Failed to parse agentMetadata: {ex.Message}");
+                    throw new InvalidPluginExecutionException($"Failed to parse agentMetadata: {ex.Message}", ex);
+                }
+                // 4. Parse JSON
                 List<ConversationRecord> conversations = ParseJson(resultJson);
 
                 if (conversations == null || conversations.Count == 0)
@@ -68,12 +85,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 _tracingService.Trace($"Processing {conversations.Count} conversations");
 
                 // 5. Group and aggregate KPIs
-                List<KpiGroup> kpiGroups = AggregateKpis(conversations);
+                List<KpiGroup> kpiGroups = AggregateKpis(conversations, agentMetadata);
 
                 _tracingService.Trace($"Aggregated into {kpiGroups.Count} groups");
 
                 // 6. Batch upsert using ExecuteMultipleRequest
-                UpsertKpiRecords(context, kpiGroups, agentId);
+                UpsertKpiRecords(context, kpiGroups, agentId,agentMetadata);
 
                 _tracingService.Trace("AggregateAgentKPIs completed successfully");
             }
@@ -119,7 +136,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// <summary>
         /// Aggregates KPIs by grouping conversations by conversationDate, channelId, and dataSourceCode.
         /// </summary>
-        private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations)
+        private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations, AgentMetadata agentMetadata)
         {
             // First, build BotMessages dictionary for each conversation
             foreach (var conversation in conversations)
@@ -169,6 +186,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                                 var sessionValue = sessionInfo?.Value;
                                 if (sessionValue != null)
                                 {
+                                    // Increment session count
+                                    kpi.SessionCount++;
+
                                     // Session type counts
                                     if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
                                         kpi.EngagedCount++;
@@ -248,7 +268,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         private void UpsertKpiRecords(
             IPluginExecutionContext context,
             List<KpiGroup> kpiGroups,
-            string agentId)
+            string agentId,
+            AgentMetadata agentMetadata)
         {
             var requestWithResults = new ExecuteMultipleRequest
             {
@@ -275,12 +296,23 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 string dataSourceName = kpi.DataSourceCode == 2 ? "TestData" : "Production";
 
                 // Primary name
-                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate:yyyy-MM-dd}-{agentId}-{kpi.ChannelId}-{dataSourceName}";
+                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate:yyyy-MM-dd}-{agentMetadata.AgentConfigurationName}-{kpi.ChannelId}-{dataSourceName}";
+                entity["cat_agentconfigurationname"] = agentMetadata.AgentConfigurationName;
 
                 entity["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
+                // agentMetadata.AgentConfigurationId is a GUID string and not null/empty here
+                if (Guid.TryParse(agentMetadata.AgentConfigurationId, out Guid configId))
+                {
+                    entity["cat_agentconfigurationid"] = new EntityReference("cat_copilotconfiguration", configId);
+                }
+                else
+                {
+                    _tracingService.Trace($"Invalid AgentConfigurationId GUID format: {agentMetadata.AgentConfigurationId}. Skipping configuration reference.");
+                }
 
                 // KPI columns
                 entity["cat_totalconversations"] = kpi.TotalConversations;
+                entity["cat_sessioncount"] = kpi.SessionCount;
                 entity["cat_engagedcount"] = kpi.EngagedCount;
                 entity["cat_unengagedcount"] = kpi.UnengagedCount;
                 entity["cat_resolvedcount"] = kpi.ResolvedCount;

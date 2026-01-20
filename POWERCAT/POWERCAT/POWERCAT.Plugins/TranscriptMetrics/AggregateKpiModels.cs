@@ -43,6 +43,20 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public Dictionary<string, string> BotMessages { get; set; }
     }
 
+    /// <summary>
+    /// Agent metadata containing configuration information.
+    /// This class is extensible - additional properties can be added as needed.
+    /// </summary>
+    [DataContract]
+    public class AgentMetadata
+    {
+        [DataMember(Name = "agentConfigurationName")]
+        public string AgentConfigurationName { get; set; }
+
+        [DataMember(Name = "agentConfigurationId")]
+        public string AgentConfigurationId { get; set; }
+    }
+
     [DataContract]
     public class Activity
     {
@@ -226,6 +240,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public string ChannelId { get; set; }
         public int DataSourceCode { get; set; }
         public int TotalConversations { get; set; }
+        public int SessionCount { get; set; }
         public int EngagedCount { get; set; }
         public int UnengagedCount { get; set; }
         public int ResolvedCount { get; set; }
