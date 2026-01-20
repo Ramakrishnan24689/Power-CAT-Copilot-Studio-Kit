@@ -11,11 +11,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     [DataContract]
     public class ConversationRecord
     {
+        [DataMember(Name = "AgentName")]
+        public string AgentName { get; set; }
+
         [DataMember(Name = "ConversationId")]
         public string ConversationId { get; set; }
-
-        [DataMember(Name = "ConversationStartTime")]
-        public DateTime? ConversationStartTime { get; set; }
 
         [DataMember(Name = "ConversationDate")]
         public string ConversationDate { get; set; }
@@ -31,6 +31,45 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [DataMember(Name = "feedback")]
         public List<FeedbackItem> Feedback { get; set; }
+
+        [DataMember(Name = "botmessages")]
+        public List<Activity> BotMessagesActivities { get; set; }
+
+        /// <summary>
+        /// Dictionary of bot messages keyed by activity ID for quick lookup.
+        /// Populated during processing.
+        /// </summary>
+        [JsonIgnore]
+        public Dictionary<string, string> BotMessages { get; set; }
+    }
+
+    [DataContract]
+    public class Activity
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+
+        [DataMember(Name = "type")]
+        public string Type { get; set; }
+
+        [DataMember(Name = "text")]
+        public string Text { get; set; }
+
+        [DataMember(Name = "from")]
+        public ActivityFrom From { get; set; }
+
+        [DataMember(Name = "replyToId")]
+        public string ReplyToId { get; set; }
+    }
+
+    [DataContract]
+    public class ActivityFrom
+    {
+        [DataMember(Name = "id")]
+        public string Id { get; set; }
+
+        [DataMember(Name = "role")]
+        public int Role { get; set; }
     }
 
     [DataContract]
@@ -70,6 +109,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         [DataMember(Name = "turnCount")]
         public int TurnCount { get; set; }
 
+        [DataMember(Name = "csatScore")]
+        public int? CsatScore { get; set; }
+
         [DataMember(Name = "impliedSuccess")]
         public bool ImpliedSuccess { get; set; }
 
@@ -91,6 +133,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [DataMember(Name = "timestamp")]
         public long Timestamp { get; set; }
+
+        [DataMember(Name = "replyToId")]
+        public string ReplyToId { get; set; }
 
         [DataMember(Name = "value")]
         public FeedbackValue Value { get; set; }
@@ -173,21 +218,45 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     }
 
     /// <summary>
-    /// Aggregated KPI data for a (conversationDate, channelId, isDesignMode) group.
+    /// Aggregated KPI data for a (conversationDate, channelId, dataSourceCode) group.
     /// </summary>
     public class KpiGroup
     {
         public DateTime ConversationDate { get; set; }
         public string ChannelId { get; set; }
-        public bool IsDesignMode { get; set; }
+        public int DataSourceCode { get; set; }
         public int TotalConversations { get; set; }
         public int EngagedCount { get; set; }
         public int UnengagedCount { get; set; }
         public int ResolvedCount { get; set; }
         public int AbandonedCount { get; set; }
+        public int EscalatedCount { get; set; }
         public int TotalTurns { get; set; }
         public int FeedbackLikeCount { get; set; }
         public int FeedbackDislikeCount { get; set; }
-        public int FeedbackTextCount { get; set; }
+        public int CsatScore { get; set; }
+        public int CsatCount { get; set; }
+        public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
+    }
+
+    /// <summary>
+    /// Detailed feedback record correlating user feedback with the agent's message.
+    /// </summary>
+    public class FeedbackDetailRecord
+    {
+        [JsonProperty("Agent Name")]
+        public string AgentName { get; set; }
+
+        [JsonProperty("Conversation Id")]
+        public string ConversationId { get; set; }
+
+        [JsonProperty("Agent Message")]
+        public string AgentMessage { get; set; }
+
+        [JsonProperty("Feedback Text")]
+        public string FeedbackText { get; set; }
+
+        [JsonProperty("Feedback Reaction")]
+        public string FeedbackReaction { get; set; }
     }
 }

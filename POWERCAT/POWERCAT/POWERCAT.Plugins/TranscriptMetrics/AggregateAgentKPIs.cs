@@ -117,48 +117,86 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         }
 
         /// <summary>
-        /// Aggregates KPIs by grouping conversations by conversationDate, channelId, and isDesignMode.
+        /// Aggregates KPIs by grouping conversations by conversationDate, channelId, and dataSourceCode.
         /// </summary>
         private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations)
         {
+            // First, build BotMessages dictionary for each conversation
+            foreach (var conversation in conversations)
+            {
+                conversation.BotMessages = new Dictionary<string, string>();
+                if (conversation.BotMessagesActivities != null)
+                {
+                    foreach (var activity in conversation.BotMessagesActivities)
+                    {
+                        // Bot messages have type "message" and from.role == 0
+                        if (string.Equals(activity.Type, "message", StringComparison.OrdinalIgnoreCase) &&
+                            activity.From?.Role == 0 &&
+                            !string.IsNullOrEmpty(activity.Id) &&
+                            !string.IsNullOrEmpty(activity.Text))
+                        {
+                            conversation.BotMessages[activity.Id] = activity.Text;
+                        }
+                    }
+                }
+            }
+
             var groups = conversations
                 .Where(c => !string.IsNullOrWhiteSpace(c.ConversationDate) && DateTime.TryParse(c.ConversationDate, out _))
-                .GroupBy(c => new { c.ConversationDate, c.ChannelId, c.IsDesignMode })
+                .GroupBy(c => new {  c.ChannelId, c.IsDesignMode })
                 .Select(g =>
                 {
-                    DateTime.TryParse(g.Key.ConversationDate, out DateTime parsedDate);
+                    // Get ConversationDate from first conversation in group (all should have same date)
+                    var firstConversation = g.First();
+                    DateTime.TryParse(firstConversation.ConversationDate, out DateTime parsedDate);
+                    // Derive DataSourceCode from IsDesignMode: Production (1) if false, TestData (2) if true
+                    int dataSourceCode = g.Key.IsDesignMode ? 2 : 1;
                     var kpi = new KpiGroup
                     {
                         ConversationDate = parsedDate,
                         ChannelId = g.Key.ChannelId ?? string.Empty,
-                        IsDesignMode = g.Key.IsDesignMode,
+                        DataSourceCode = dataSourceCode,
                         TotalConversations = g.Count()
                     };
 
                     foreach (var conversation in g)
                     {
-                        // Use SessionInfo[0].value if available
-                        var sessionValue = conversation.SessionInfo?.FirstOrDefault()?.Value;
-
-                        if (sessionValue != null)
+                        // Process all SessionInfo items
+                        if (conversation.SessionInfo != null)
                         {
-                            // Session type counts
-                            if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
-                                kpi.EngagedCount++;
-                            else if (string.Equals(sessionValue.Type, "Unengaged", StringComparison.OrdinalIgnoreCase))
-                                kpi.UnengagedCount++;
+                            foreach (var sessionInfo in conversation.SessionInfo)
+                            {
+                                var sessionValue = sessionInfo?.Value;
+                                if (sessionValue != null)
+                                {
+                                    // Session type counts
+                                    if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
+                                        kpi.EngagedCount++;
+                                    else if (string.Equals(sessionValue.Type, "Unengaged", StringComparison.OrdinalIgnoreCase))
+                                        kpi.UnengagedCount++;
 
-                            // Outcome counts
-                            if (string.Equals(sessionValue.Outcome, "Resolved", StringComparison.OrdinalIgnoreCase))
-                                kpi.ResolvedCount++;
-                            else if (string.Equals(sessionValue.Outcome, "Abandoned", StringComparison.OrdinalIgnoreCase))
-                                kpi.AbandonedCount++;
+                                    // Outcome counts
+                                    if (string.Equals(sessionValue.Outcome, "Resolved", StringComparison.OrdinalIgnoreCase))
+                                        kpi.ResolvedCount++;
+                                    else if (string.Equals(sessionValue.Outcome, "Abandoned", StringComparison.OrdinalIgnoreCase))
+                                        kpi.AbandonedCount++;
+                                    else if (string.Equals(sessionValue.Outcome, "HandOff", StringComparison.OrdinalIgnoreCase))
+                                        kpi.EscalatedCount++;
 
-                            // Turn count
-                            kpi.TotalTurns += sessionValue.TurnCount;
+                                    // Turn count
+                                    kpi.TotalTurns += sessionValue.TurnCount;
+
+                                    // CSAT score
+                                    if (sessionValue.CsatScore.HasValue && sessionValue.CsatScore.Value > 0)
+                                    {
+                                        kpi.CsatScore += sessionValue.CsatScore.Value;
+                                        kpi.CsatCount++;
+                                    }
+                                }
+                            }
                         }
 
-                        // Feedback counts
+                        // Feedback counts and details
                         if (conversation.Feedback != null)
                         {
                             foreach (var feedback in conversation.Feedback)
@@ -171,8 +209,27 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                                 else if (string.Equals(reaction, "dislike", StringComparison.OrdinalIgnoreCase))
                                     kpi.FeedbackDislikeCount++;
 
-                                if (!string.IsNullOrEmpty(feedbackText))
-                                    kpi.FeedbackTextCount++;
+                                // Build detailed feedback record with agent message correlation
+                                string agentMessage = null;
+                                if (!string.IsNullOrEmpty(feedback.ReplyToId) &&
+                                    conversation.BotMessages != null &&
+                                    conversation.BotMessages.TryGetValue(feedback.ReplyToId, out string message))
+                                {
+                                    agentMessage = message;
+                                }
+
+                                // Only add to details if there's a reaction or feedback text
+                                if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
+                                {
+                                    kpi.FeedbackDetails.Add(new FeedbackDetailRecord
+                                    {
+                                        AgentName = conversation.AgentName,
+                                        ConversationId = conversation.ConversationId,
+                                        AgentMessage = agentMessage,
+                                        FeedbackText = feedbackText,
+                                        FeedbackReaction = reaction
+                                    });
+                                }
                             }
                         }
                     }
@@ -212,17 +269,15 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity.KeyAttributes["cat_conversationdate"] = kpi.ConversationDate;
                 entity.KeyAttributes["cat_agentid"] = agentId;
                 entity.KeyAttributes["cat_channelid"] = kpi.ChannelId;
-                entity.KeyAttributes["cat_isdesignmodecode"] = new OptionSetValue(kpi.IsDesignMode ? 1 : 0);
+                entity.KeyAttributes["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
+
+                // Determine data source name for primary name field
+                string dataSourceName = kpi.DataSourceCode == 2 ? "TestData" : "Production";
 
                 // Primary name
-                string designModeStr = kpi.IsDesignMode.ToString().ToLowerInvariant();
-                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate:yyyy-MM-dd}-{agentId}-{kpi.ChannelId}-{designModeStr}";
+                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate:yyyy-MM-dd}-{agentId}-{kpi.ChannelId}-{dataSourceName}";
 
-                // Key columns (also set as regular attributes for create scenarios)
-                entity["cat_conversationdate"] = kpi.ConversationDate;
-                entity["cat_agentid"] = agentId;
-                entity["cat_channelid"] = kpi.ChannelId;
-                entity["cat_isdesignmodecode"] = new OptionSetValue(kpi.IsDesignMode ? 1 : 0);
+                entity["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
 
                 // KPI columns
                 entity["cat_totalconversations"] = kpi.TotalConversations;
@@ -230,10 +285,18 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity["cat_unengagedcount"] = kpi.UnengagedCount;
                 entity["cat_resolvedcount"] = kpi.ResolvedCount;
                 entity["cat_abandonedcount"] = kpi.AbandonedCount;
+                entity["cat_escalatedcount"] = kpi.EscalatedCount;
                 entity["cat_totalturns"] = kpi.TotalTurns;
                 entity["cat_feedbacklikecount"] = kpi.FeedbackLikeCount;
                 entity["cat_feedbackdislikecount"] = kpi.FeedbackDislikeCount;
-                entity["cat_feedbacktextcount"] = kpi.FeedbackTextCount;
+                entity["cat_csatscore"] = kpi.CsatScore;
+                entity["cat_csatcount"] = kpi.CsatCount;
+
+                // Feedback details JSON
+                if (kpi.FeedbackDetails != null && kpi.FeedbackDetails.Count > 0)
+                {
+                    entity["cat_feedbackdetails"] = JsonConvert.SerializeObject(kpi.FeedbackDetails);
+                }
 
                 // UpsertRequest: creates if not exists, updates if exists (based on alternate key)
                 UpsertRequest request = new UpsertRequest() { Target = entity };
