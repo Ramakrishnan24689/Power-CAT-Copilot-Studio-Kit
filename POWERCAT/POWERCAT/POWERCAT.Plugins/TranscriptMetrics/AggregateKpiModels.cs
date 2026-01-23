@@ -11,6 +11,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     [DataContract]
     public class ConversationRecord
     {
+        /// <summary>
+        /// Entity ID from Dataverse table (used for marking as processed).
+        /// </summary>
+        [JsonIgnore]
+        public Guid EntityId { get; set; }
+
         [DataMember(Name = "AgentName")]
         public string AgentName { get; set; }
 
@@ -252,6 +258,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public int CsatScore { get; set; }
         public int CsatCount { get; set; }
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
+
+        /// <summary>
+        /// Source conversation entity IDs that contributed to this KPI group.
+        /// </summary>
+        public List<Guid> SourceConversationIds { get; set; } = new List<Guid>();
     }
 
     /// <summary>

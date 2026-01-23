@@ -7,7 +7,7 @@ using System;
 namespace POWERCAT.Plugins.TranscriptMetrics
 {
     /// <summary>
-    /// Plugin class to aggregate Transcript Metrics
+    /// Plugin class to handle Transcript Metrics operations
     /// </summary>
     public class TranscriptMetricsMain : IPlugin
     {
@@ -25,10 +25,22 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             tracingService.Trace("Plugin Execution Started..");
 
             // Check the stage - Main operation
-            if ((context.Stage.Equals(20) || context.Stage.Equals(30) || context.Stage.Equals(40)) && context.MessageName == "cat_AggregateAgentKPIs")
+            if (context.Stage.Equals(30))
             {
-                AggregateAgentKPIs aggregateAgentKPIs = new AggregateAgentKPIs(organizationService, tracingService);
-                aggregateAgentKPIs.Execute(context);
+                switch (context.MessageName)
+                {
+                    case "cat_AggregateAgentKPIs":
+                        var aggregateAgentKPIs = new AggregateAgentKPIs(organizationService, tracingService);
+                        aggregateAgentKPIs.Execute(context);
+                        break;
+                    case "cat_ProcessConversationTranscriptsBatch":
+                        var processTranscripts = new ProcessConversationTranscriptsBatch(organizationService, tracingService);
+                        processTranscripts.Execute(context);
+                        break;
+                    default:
+                        tracingService.Trace($"Unknown message: {context.MessageName}");
+                        break;
+                }
             }
         }
     }
