@@ -19,9 +19,10 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="conversationId">Conversation Id</param>
         /// <param name="agentId">Agent Id</param>
         /// <returns>Session Details List.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no session details are found.</exception>
         public List<SessionDetail> ProcessTranscript(List<Activity> model, string conversationId, string agentId)
         {
-            return model
+            var sessionDetails = model
                 .Where(activity => activity.valueType == "SessionInfo" && activity.value != null)
                 .Select(activity => new SessionDetail
                 {
@@ -38,6 +39,13 @@ namespace POWERCAT.Plugins.ConversationKpi
                     OutcomeReason = activity.value.outcomeReason
                 })
                 .ToList();
+
+            if (sessionDetails == null || !sessionDetails.Any())
+            {
+                throw new InvalidOperationException("No session details found in the transcript.");
+            }
+
+            return sessionDetails;
         }
 
         /// <summary>
