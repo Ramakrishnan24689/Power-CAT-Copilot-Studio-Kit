@@ -224,11 +224,20 @@ namespace POWERCAT.Plugins.AgentInventory
                         string agentId = group.Key;
                         string environmentId = group.First().EnvironmentID;
 
-                        // Get last usage record for this agent
-                        var lastUsageRecord = group.OrderByDescending(c => c.UsageDate).First();
+                        // Sort usage records by date
+                        var usageSortedRecords = group.OrderBy(r => r.UsageDate);
 
-                        DateTime lastUsageDate = lastUsageRecord.UsageDate;
-                        string lastFeatureName = lastUsageRecord.Feature;
+                        // First and last usage entries
+                        var firstRecord = usageSortedRecords.First();
+                        var lastRecord = usageSortedRecords.Last();
+
+                        // Extract first usage details
+                        DateTime firstUsageDate = firstRecord.UsageDate;
+                        string firstFeatureName = firstRecord.Feature;
+
+                        // Extract last usage details
+                        DateTime lastUsageDate = lastRecord.UsageDate;
+                        string lastFeatureName = lastRecord.Feature;
 
                         // Feature level aggregation for the agent
                         var featureUsageList = group
@@ -241,7 +250,7 @@ namespace POWERCAT.Plugins.AgentInventory
                             }).ToList();
 
                         // Usage entity for updating the usage data in the agent details table
-                        var usageEntityForAgentDetails = BuildUsageEntityForAgentDetails(environmentId, agentId, lastUsageDate, lastFeatureName, featureUsageList);
+                        var usageEntityForAgentDetails = BuildUsageEntityForAgentDetails(environmentId, agentId, lastUsageDate, lastFeatureName, featureUsageList, firstUsageDate, firstFeatureName);
                         if (usageEntityForAgentDetails != null)
                         {
                             updateRequests.Add(new UpdateRequest { Target = usageEntityForAgentDetails });
@@ -346,7 +355,7 @@ namespace POWERCAT.Plugins.AgentInventory
         /// <param name="featureUsageData">A dictionary containing feature usage metrics.</param>
         /// <returns>An Entity object for usage record.</returns>
         private Entity BuildUsageEntityForAgentDetails(string environmentId, string agentId, DateTime lastUsageDate, string lastUsagefeature,
-            List<Dictionary<string, object>> featureUsageData)
+            List<Dictionary<string, object>> featureUsageData, DateTime firstUsageDate, string firstUsagefeature)
         {
             try
             {
@@ -394,6 +403,10 @@ namespace POWERCAT.Plugins.AgentInventory
                 // Set the last usage data
                 entity["cat_lastusagefeature"] = lastUsagefeature;
                 entity["cat_lastusagedate"] = lastUsageDate;
+
+                // Set the first usage data
+                entity["cat_firstusagefeature"] = firstUsagefeature;
+                entity["cat_firstusagedate"] = firstUsageDate;
 
                 return entity;
             }
