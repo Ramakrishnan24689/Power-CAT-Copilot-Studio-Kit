@@ -8,10 +8,10 @@ function setExampleTypeVisibility(formContext, showExampleType) {
     "use strict";
     const exampleTypeControl = formContext.getControl("cat_exampletypecode");
     const exampleTypeControl1 = formContext.getControl("cat_exampletypecode1");
-
+    
     if (exampleTypeControl) exampleTypeControl.setVisible(showExampleType);
     if (exampleTypeControl1) exampleTypeControl1.setVisible(showExampleType);
-
+    
     // Clear the value when hiding
     if (!showExampleType) {
         const exampleTypeAttr = formContext.getAttribute("cat_exampletypecode");
@@ -22,11 +22,34 @@ function setExampleTypeVisibility(formContext, showExampleType) {
 /**
  * @function setMultiTurnResultsGridVisibility 
  * @description Configures visibility of MultiTurn Results Grid, Rubric Result section, and Example Type control
+ *              Also registers the OnPostSave handler to re-apply visibility after save
  * @param {object} executionContext - The execution context
  */
 function setMultiTurnResultsGridVisibility(executionContext) {
     "use strict";
     const formContext = executionContext.getFormContext();
+    
+    // Apply visibility logic on load
+    applyVisibilityLogic(formContext);
+    
+    // Register OnPostSave handler ONCE during form load to re-apply visibility after save
+    if (formContext && formContext.data && formContext.data.entity) {
+        formContext.data.entity.addOnPostSave(function() {
+            // Use setTimeout to wait for form UI to finish refreshing
+            setTimeout(function() {
+                applyVisibilityLogic(formContext);
+            }, 500);
+        });
+    }
+}
+
+/**
+ * @function applyVisibilityLogic
+ * @description Core visibility logic - applies all visibility rules based on field values
+ * @param {object} formContext - The form context
+ */
+function applyVisibilityLogic(formContext) {
+    "use strict";
 
     // Helper function to safely set section visibility
     const setSectionVisible = (section, visible) => {
@@ -45,13 +68,13 @@ function setMultiTurnResultsGridVisibility(executionContext) {
     const markedAsExample = getAttributeValue("cat_markedasexample");
 
     // Check if rubric has data (handle lookup array)
-    const hasRubricValue = rubricValue !== null &&
+    const hasRubricValue = rubricValue !== null && 
         (Array.isArray(rubricValue) ? rubricValue.length > 0 : true);
 
     // Get tabs
     const tabGeneral = formContext.ui.tabs.get("tab_general");
     if (!tabGeneral) return;
-
+    
     const tabRubricRefinement = formContext.ui.tabs.get("tab_rubric_refinement_full");
 
     // Get sections from General tab
@@ -75,7 +98,6 @@ function setMultiTurnResultsGridVisibility(executionContext) {
 
     // Configure section visibility based on rubric data
     if (hasRubricValue) {
-        // Hide all sections except result & rubrics_result
         setSectionVisible(sections.performance, false);
         setSectionVisible(sections.response, false);
         setSectionVisible(sections.actualCompleteResponse, false);
@@ -87,16 +109,43 @@ function setMultiTurnResultsGridVisibility(executionContext) {
         setSectionVisible(sections.result, true);
         setSectionVisible(sections.rubricResult, true);
     } else {
-        // No rubric - use test type based logic
         const isMultiTurn = testTypeCode === 5;
-
+        
         setSectionVisible(sections.multiturn, isMultiTurn);
         setSectionVisible(sections.enrichResults, !isMultiTurn);
-        setSectionVisible(sections.rubricResult, false); // Always hide when no rubric
+        setSectionVisible(sections.rubricResult, false);
     }
 
     // Show/hide Example Type control based on Marked as Example
     setExampleTypeVisibility(formContext, markedAsExample === true);
+
+    // Hide specific fields when TestType = 4 and rubric has data
+    // Note: Only hide when condition is true; don't explicitly show to avoid overriding Business Rules
+    const hideRubricTestFields = testTypeCode === 4 && hasRubricValue;
+    
+    if (hideRubricTestFields) {
+        const rubricTestFields = [
+            "cat_adaptivecardpayload",
+            "cat_operationtypecode",
+            "cat_comparisonoperator",
+            "cat_expectedattachmentsjson",
+            "cat_generativeansweroutcomecode",
+            "cat_expectedresponse",
+            "cat_expectedtools",
+            "cat_expectedtopicname",
+            "cat_externalvariablesjson",
+            "cat_passthreshold",
+            "cat_isstartconversationeventsent",
+            "cat_resultreason"
+        ];
+
+        rubricTestFields.forEach((fieldName) => {
+            const control = formContext.getControl(fieldName);
+            if (control) {
+                control.setVisible(false);
+            }
+        });
+    }
 }
 
 /**
@@ -112,4 +161,16 @@ function onMarkedAsExampleChange(executionContext) {
     const showExampleType = markedAsExampleAttr ? markedAsExampleAttr.getValue() === true : false;
 
     setExampleTypeVisibility(formContext, showExampleType);
+}
+
+/**
+ * @function onTestTypeOrRubricChange
+ * @description Handles onChange event for cat_testtypecode or cat_rubricid fields
+ *              to update field visibility based on TestType = 4 and rubric data
+ * @param {object} executionContext - The execution context
+ */
+function onTestTypeOrRubricChange(executionContext) {
+    "use strict";
+    const formContext = executionContext.getFormContext();
+    applyVisibilityLogic(formContext);
 }
