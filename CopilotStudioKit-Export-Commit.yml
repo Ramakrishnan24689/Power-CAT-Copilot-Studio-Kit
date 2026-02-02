@@ -39,21 +39,11 @@ steps:
   displayName: 'Export Unmanaged Solution'
   inputs:
     authenticationType: 'PowerPlatformSPN'
-    PowerPlatformSPN: 'https://copilotstudiokit-dev.crm.dynamics.com/'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
     Environment: '$(varSourceEnvironmentURL)'
     SolutionName: '$(varSolutionName)'
     SolutionOutputFile: '$(SolutionOutputFolder)/$(varSolutionName).zip'
     Managed: false
-    ExportAutoNumberingSettings: true
-    ExportCalendarSettings: true
-    ExportCustomizationSettings: true
-    ExportEmailTrackingSettings: true
-    ExportGeneralSettings: true
-    ExportMarketingSettings: true
-    ExportOutlookSynchronizationSettings: true
-    ExportRelationshipRoles: true
-    ExportIsvConfig: true
-    ExportSales: true
 
 # ============================================================================
 # Step 4: Export Managed Solution
@@ -62,21 +52,11 @@ steps:
   displayName: 'Export Managed Solution'
   inputs:
     authenticationType: 'PowerPlatformSPN'
-    PowerPlatformSPN: 'https://copilotstudiokit-dev.crm.dynamics.com/'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
     Environment: '$(varSourceEnvironmentURL)'
     SolutionName: '$(varSolutionName)'
     SolutionOutputFile: '$(SolutionOutputFolder)/$(varSolutionName)_managed.zip'
     Managed: true
-    ExportAutoNumberingSettings: true
-    ExportCalendarSettings: true
-    ExportCustomizationSettings: true
-    ExportEmailTrackingSettings: true
-    ExportGeneralSettings: true
-    ExportMarketingSettings: true
-    ExportOutlookSynchronizationSettings: true
-    ExportRelationshipRoles: true
-    ExportIsvConfig: true
-    ExportSales: true
 
 # ============================================================================
 # Step 5: Unpack Unmanaged Solution to Source Control
@@ -90,18 +70,7 @@ steps:
     ProcessCanvasApps: true
 
 # ============================================================================
-# Step 6: Unpack Managed Solution to Source Control
-# ============================================================================
-- task: PowerPlatformUnpackSolution@2
-  displayName: 'Unpack Managed Solution'
-  inputs:
-    SolutionInputFile: '$(SolutionOutputFolder)/$(varSolutionName)_managed.zip'
-    SolutionTargetFolder: '$(UnpackedSolutionFolder)/SolutionPackage_managed'
-    SolutionType: 'Both'
-    ProcessCanvasApps: true
-
-# ============================================================================
-# Step 7: Publish Pipeline Artifacts
+# Step 6: Publish Pipeline Artifacts
 # ============================================================================
 - task: PublishPipelineArtifact@1
   displayName: 'Publish Solution Artifacts'
@@ -111,15 +80,15 @@ steps:
     publishLocation: 'pipeline'
 
 # ============================================================================
-# Step 8: Configure Git for Commit
+# Step 7: Configure Git for Commit
 # ============================================================================
 - script: |
-    git config --global user.email "pipeline@azure.com"
-    git config --global user.name "Azure DevOps Pipeline"
+    git config --global user.email "$(Build.RequestedForEmail)"
+    git config --global user.name "$(Build.RequestedFor)"
   displayName: 'Configure Git Credentials'
 
 # ============================================================================
-# Step 9: Commit and Push Changes to Repository
+# Step 8: Commit and Push Changes to Repository
 # ============================================================================
 - script: |
     git add --all
