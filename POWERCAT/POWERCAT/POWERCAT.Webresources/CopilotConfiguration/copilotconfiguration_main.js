@@ -167,11 +167,11 @@ function setFieldVisibilityForEachSections(executionContext) {
         if (directLineSection) {
             directLineSection.setVisible(false);
             clearAndHideFields(formContext, [
-                "cat_isdirectlinechannelsecurityenabled",
                 "cat_directlinechannelsecretlocationcode",
                 "cat_directlinechannelsecuritysecret",
                 "cat_directlinechannelsecurityenvironmentvariable",
-                "cat_tokenendpoint"
+                "cat_tokenendpoint",
+                ...(formContext.getAttribute("cat_isdirectlinechannelsecurityenabled")?.getValue() !== null ? ["cat_isdirectlinechannelsecurityenabled"] : [])
             ]);
         }
     }
