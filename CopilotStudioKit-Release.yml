@@ -1,0 +1,189 @@
+# ============================================================================
+# Pipeline: CopilotStudioKit-Release
+# Description: Create GitHub draft release with deployed solution artifacts
+# ============================================================================
+
+trigger: none  # Manual trigger only
+
+pool:
+  vmImage: windows-latest
+
+# ============================================================================
+# Pipeline Resource: Reference the Export-Commit pipeline
+# ============================================================================
+resources:
+  pipelines:
+    - pipeline: ExportPipeline
+      source: CopilotStudioKit-Export-Commit
+      trigger: none  # Manual release creation
+
+variables:
+  # Pipeline variables (set in Azure DevOps pipeline UI):
+  # - varGitHubConnection: GitHub service connection name (e.g., powercat-alm)
+  # - varGitHubRepo: GitHub repository in format 'owner/repo' (e.g., microsoft/Power-CAT-Copilot-Studio-Kit)
+  # - varSolutionName: Solution name for file reference (e.g., CopilotStudioKit)
+  # - varReleaseName: Release name prefix (e.g., CopilotStudioAccelerator)
+  # - varReleaseMonth: Month name (e.g., January)
+  # - varReleaseYear: Year (e.g., 2026)
+  
+  # Internal variables
+  DownloadPath: $(Pipeline.Workspace)/ExportPipeline/drop
+
+stages:
+- stage: Release
+  displayName: 'Create GitHub Draft Release'
+  jobs:
+  - job: ReleaseJob
+    displayName: 'GitHub Release'
+    steps:
+    
+    # ============================================================================
+    # Step 1: Validate Required Variables
+    # ============================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "VALIDATING PIPELINE VARIABLES"
+        Write-Host "============================================"
+        
+        $errors = @()
+        
+        # Check required variables
+        $requiredVars = @{
+            'varGitHubConnection' = '$(varGitHubConnection)'
+            'varGitHubRepo' = '$(varGitHubRepo)'
+            'varSolutionName' = '$(varSolutionName)'
+            'varReleaseName' = '$(varReleaseName)'
+            'varReleaseMonth' = '$(varReleaseMonth)'
+            'varReleaseYear' = '$(varReleaseYear)'
+        }
+        
+        foreach ($var in $requiredVars.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace($var.Value) -or $var.Value -eq "`$($($var.Key))") {
+                $errors += "Missing or empty variable: $($var.Key)"
+                Write-Host "##vso[task.logissue type=error]Missing variable: $($var.Key)"
+            } else {
+                Write-Host "✓ $($var.Key): $($var.Value)"
+            }
+        }
+        
+        # Validate GitHub repo format (owner/repo)
+        $repoFormat = '$(varGitHubRepo)'
+        if ($repoFormat -notmatch '^[\w-]+/[\w-]+$') {
+            $errors += "varGitHubRepo must be in format 'owner/repo' (e.g., microsoft/Power-CAT-Copilot-Studio-Kit)"
+            Write-Host "##vso[task.logissue type=error]Invalid GitHub repo format: $repoFormat"
+        }
+        
+        Write-Host "============================================"
+        
+        if ($errors.Count -gt 0) {
+            Write-Host "##vso[task.logissue type=error]Validation failed with $($errors.Count) error(s)"
+            exit 1
+        }
+        
+        Write-Host "✓ All required variables validated successfully"
+        Write-Host "============================================"
+      displayName: 'Validate Required Variables'
+    
+    # ============================================================================
+    # Step 2: Download Solution Artifacts from Export-Commit Pipeline
+    # ============================================================================
+    - download: ExportPipeline
+      artifact: drop
+      displayName: 'Download Solution Artifacts'
+    
+    # ============================================================================
+    # Step 3: Generate Release Tag and Validate Artifacts
+    # ============================================================================
+    - powershell: |
+        $releaseName = "$(varReleaseName)"
+        $releaseMonth = "$(varReleaseMonth)"
+        $releaseYear = "$(varReleaseYear)"
+        $solutionName = "$(varSolutionName)"
+        
+        # Generate release tag: e.g., "CopilotStudioAccelerator-January2026"
+        $releaseTag = "${releaseName}-${releaseMonth}${releaseYear}"
+        
+        Write-Host "##[section]Generated Release Tag: $releaseTag"
+        Write-Host "##vso[task.setvariable variable=ReleaseTag]$releaseTag"
+        
+        # Validate solution files exist
+        $unmanagedFile = "$(DownloadPath)/${solutionName}.zip"
+        $managedFile = "$(DownloadPath)/${solutionName}_managed.zip"
+        
+        Write-Host ""
+        Write-Host "Validating solution artifacts..."
+        
+        if (-not (Test-Path $unmanagedFile)) {
+            Write-Host "##vso[task.logissue type=error]Unmanaged solution not found: $unmanagedFile"
+            exit 1
+        }
+        Write-Host "✓ Unmanaged solution found: $unmanagedFile"
+        
+        if (-not (Test-Path $managedFile)) {
+            Write-Host "##vso[task.logissue type=error]Managed solution not found: $managedFile"
+            exit 1
+        }
+        Write-Host "✓ Managed solution found: $managedFile"
+        
+        Write-Host ""
+        Write-Host "============================================"
+        Write-Host "RELEASE INFORMATION"
+        Write-Host "============================================"
+        Write-Host "Release Tag: $releaseTag"
+        Write-Host "Solution Name: $solutionName"
+        Write-Host "GitHub Repo: $(varGitHubRepo)"
+        Write-Host "============================================"
+      displayName: 'Generate Release Tag and Validate Artifacts'
+    
+    # ============================================================================
+    # Step 4: Create GitHub Draft Release
+    # ============================================================================
+    - task: GitHubRelease@1
+      displayName: 'Create GitHub Draft Release'
+      inputs:
+        gitHubConnection: '$(varGitHubConnection)'
+        repositoryName: '$(varGitHubRepo)'
+        action: 'create'
+        target: '$(Build.SourceVersion)'
+        tagSource: 'userSpecifiedTag'
+        tag: '$(ReleaseTag)'
+        title: '$(ReleaseTag)'
+        releaseNotesSource: 'inline'
+        releaseNotesInline: |
+          ## Release $(ReleaseTag)
+          
+          **Solution Name**: $(varSolutionName)
+          **Release Date**: $(Build.BuildNumber)
+          
+          ### Included Assets
+          - Managed Solution: $(varSolutionName)_managed.zip
+          - Unmanaged Solution: $(varSolutionName).zip
+          
+          ---
+          *Release notes will be updated manually.*
+        assets: |
+          $(DownloadPath)/$(varSolutionName).zip
+          $(DownloadPath)/$(varSolutionName)_managed.zip
+        isDraft: true
+        isPreRelease: false
+        addChangeLog: false
+    
+    # ============================================================================
+    # Step 5: Release Summary
+    # ============================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "GITHUB RELEASE CREATED SUCCESSFULLY"
+        Write-Host "============================================"
+        Write-Host "Release Tag: $(ReleaseTag)"
+        Write-Host "Repository: https://github.com/$(varGitHubRepo)"
+        Write-Host "Release URL: https://github.com/$(varGitHubRepo)/releases/tag/$(ReleaseTag)"
+        Write-Host "Status: DRAFT"
+        Write-Host "============================================"
+        Write-Host ""
+        Write-Host "NEXT STEPS:"
+        Write-Host "1. Visit the GitHub release page"
+        Write-Host "2. Update release notes manually"
+        Write-Host "3. Publish the release when ready"
+        Write-Host "============================================"
+      displayName: 'Release Summary'
