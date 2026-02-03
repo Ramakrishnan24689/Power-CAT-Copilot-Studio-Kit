@@ -14,7 +14,7 @@ pool:
 resources:
   pipelines:
     - pipeline: ExportPipeline
-      source: CopilotStudioKit-Export-Commit
+      source: Copilot-Studio-Kit-Export-Commit
       trigger: none  # Manual release creation
 
 variables:
