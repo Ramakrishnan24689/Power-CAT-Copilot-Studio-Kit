@@ -1,0 +1,515 @@
+# ============================================================================
+# Pipeline: CopilotStudioKit-Master
+# Description: Orchestrates Export, Deploy, and Release workflows
+# ============================================================================
+
+trigger: none  # Manual trigger only
+
+pool:
+  vmImage: windows-latest
+
+resources:
+  repositories:
+    - repository: GitHubRepo
+      type: github
+      endpoint: powercat-alm
+      name: microsoft/Power-CAT-Copilot-Studio-Kit
+
+variables:
+  # ==================== Export Variables ====================
+  # - varSourceEnvironmentURL: Source Power Platform environment URL
+  # - varSolutionName: Internal solution name in Power Platform (e.g., CopilotStudioKit)
+  # - varOutputSolutionName: Display name for output files (e.g., CopilotStudioAccelerator)
+  
+  # ==================== Deploy Variables ====================
+  # - varTargetEnvironmentURL: Target Power Platform environment URL
+  # - varTargetServiceConnection: Service connection for target environment
+  # - varSolutionType: 'managed' or 'unmanaged'
+  
+  # ==================== Release Variables ====================
+  # - varGitHubConnection: GitHub service connection name
+  # - varGitHubRepo: GitHub repository (format: owner/repo)
+  # - varReleaseName: Release name prefix (e.g., CopilotStudioAccelerator)
+  # - varReleaseMonth: Month name (e.g., January)
+  # - varReleaseYear: Year (e.g., 2026)
+  
+  # Internal variables
+  SolutionOutputFolder: $(Build.ArtifactStagingDirectory)/solutions
+  UnpackedSolutionFolder: $(Build.SourcesDirectory)/src/$(varSolutionName)
+
+stages:
+# ============================================================================
+# STAGE 1: EXPORT & COMMIT
+# ============================================================================
+- stage: Export
+  displayName: 'Export & Commit Solution'
+  jobs:
+  - job: ExportJob
+    displayName: 'Export Solution'
+    steps:
+    
+    # ========================================================================
+    # Checkout repository with credentials
+    # ========================================================================
+    - checkout: self
+      persistCredentials: true
+      clean: true
+      displayName: 'Checkout Repository'
+    
+    # ========================================================================
+    # Install Power Platform Build Tools
+    # ========================================================================
+    - task: PowerPlatformToolInstaller@2
+      displayName: 'Install Power Platform Build Tools'
+    
+    # ========================================================================
+    # Export Unmanaged Solution
+    # ========================================================================
+    - task: PowerPlatformExportSolution@2
+      displayName: 'Export Unmanaged Solution'
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+        Environment: '$(varSourceEnvironmentURL)'
+        SolutionName: '$(varSolutionName)'
+        SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
+        Managed: false
+    
+    # ========================================================================
+    # Export Managed Solution
+    # ========================================================================
+    - task: PowerPlatformExportSolution@2
+      displayName: 'Export Managed Solution'
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+        Environment: '$(varSourceEnvironmentURL)'
+        SolutionName: '$(varSolutionName)'
+        SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName)_managed.zip'
+        Managed: true
+    
+    # ========================================================================
+    # Unpack Unmanaged Solution
+    # ========================================================================
+    - task: PowerPlatformUnpackSolution@2
+      displayName: 'Unpack Unmanaged Solution'
+      inputs:
+        SolutionInputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
+        SolutionTargetFolder: '$(UnpackedSolutionFolder)/SolutionPackage'
+        SolutionType: 'Both'
+        ProcessCanvasApps: false
+    
+    # ========================================================================
+    # Extract Version and Rename Managed Solution
+    # ========================================================================
+    - powershell: |
+        $solutionXmlPath = "$(UnpackedSolutionFolder)/SolutionPackage/Other/Solution.xml"
+        $outputSolutionName = "$(varOutputSolutionName)"
+        
+        Write-Host "Reading solution version from: $solutionXmlPath"
+        
+        if (-not (Test-Path $solutionXmlPath)) {
+            Write-Host "##vso[task.logissue type=error]Solution.xml not found at: $solutionXmlPath"
+            exit 1
+        }
+        
+        [xml]$solutionXml = Get-Content $solutionXmlPath
+        $fullVersion = $solutionXml.ImportExportXml.SolutionManifest.Version
+        
+        if ([string]::IsNullOrWhiteSpace($fullVersion)) {
+            Write-Host "##vso[task.logissue type=error]Unable to extract version from Solution.xml"
+            exit 1
+        }
+        
+        Write-Host "Full solution version: $fullVersion"
+        
+        $majorVersion = $fullVersion.Split('.')[0]
+        Write-Host "Major version (for filename): $majorVersion"
+        
+        $originalManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_managed.zip"
+        $newManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_${majorVersion}_managed.zip"
+        
+        if (Test-Path $originalManagedFile) {
+            Rename-Item -Path $originalManagedFile -NewName (Split-Path $newManagedFile -Leaf)
+            Write-Host "##[section]Renamed managed solution:"
+            Write-Host "  From: ${outputSolutionName}_managed.zip"
+            Write-Host "  To:   ${outputSolutionName}_${majorVersion}_managed.zip"
+        } else {
+            Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalManagedFile"
+            exit 1
+        }
+        
+        Write-Host "##vso[task.setvariable variable=SolutionVersion]$majorVersion"
+        Write-Host ""
+        Write-Host "Solution version: $majorVersion"
+      displayName: 'Extract Version and Rename Managed Solution'
+    
+    # ========================================================================
+    # Publish Pipeline Artifacts
+    # ========================================================================
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Solution Artifacts'
+      inputs:
+        targetPath: '$(SolutionOutputFolder)'
+        artifact: 'drop'
+        publishLocation: 'pipeline'
+    
+    # ========================================================================
+    # Configure Git
+    # ========================================================================
+    - script: |
+        git config --global user.email "$(Build.RequestedForEmail)"
+        git config --global user.name "$(Build.RequestedFor)"
+      displayName: 'Configure Git Credentials'
+    
+    # ========================================================================
+    # Commit and Push
+    # ========================================================================
+    - script: |
+        git add --all
+        git diff --cached --quiet || git commit -m "Exported $(varSolutionName) from $(varSourceEnvironmentURL) [skip ci]"
+        git push origin HEAD:main
+      displayName: 'Commit and Push Solution to Main'
+      workingDirectory: $(Build.SourcesDirectory)
+
+# ============================================================================
+# STAGE 2: DEPLOY
+# ============================================================================
+- stage: Deploy
+  displayName: 'Deploy Solution'
+  dependsOn: Export
+  condition: succeeded()
+  jobs:
+  - job: DeployJob
+    displayName: 'Deploy to Target'
+    steps:
+    
+    # ========================================================================
+    # Download artifacts from Export stage
+    # ========================================================================
+    - download: current
+      artifact: drop
+      displayName: 'Download Solution Artifacts'
+    
+    # ========================================================================
+    # Install Power Platform Build Tools
+    # ========================================================================
+    - task: PowerPlatformToolInstaller@2
+      displayName: 'Install Power Platform Build Tools'
+    
+    # ========================================================================
+    # Determine Solution File Path
+    # ========================================================================
+    - powershell: |
+        $solutionType = "$(varSolutionType)".ToLower()
+        $outputSolutionName = "$(varOutputSolutionName)"
+        $downloadPath = "$(Pipeline.Workspace)/drop"
+        
+        if ($solutionType -eq "managed") {
+            $pattern = "${outputSolutionName}_*_managed.zip"
+            $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
+            
+            if ($managedFiles.Count -eq 0) {
+                Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $pattern"
+                Write-Host "Available files in download path:"
+                Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $_" }
+                exit 1
+            }
+            
+            if ($managedFiles.Count -gt 1) {
+                Write-Host "##vso[task.logissue type=warning]Multiple managed solutions found. Using first match."
+                $managedFiles | ForEach-Object { Write-Host "  $_" }
+            }
+            
+            $solutionFile = $managedFiles[0].FullName
+            Write-Host "##[section]Deploying MANAGED solution: $($managedFiles[0].Name)"
+        }
+        elseif ($solutionType -eq "unmanaged") {
+            $solutionFile = "${downloadPath}/${outputSolutionName}.zip"
+            Write-Host "##[section]Deploying UNMANAGED solution: ${outputSolutionName}.zip"
+        }
+        else {
+            Write-Host "##vso[task.logissue type=error]Invalid varSolutionType. Must be 'managed' or 'unmanaged'"
+            exit 1
+        }
+        
+        if (-not (Test-Path $solutionFile)) {
+            Write-Host "##vso[task.logissue type=error]Solution file not found: $solutionFile"
+            Write-Host "Available files in download path:"
+            Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $_" }
+            exit 1
+        }
+        
+        Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
+        Write-Host "Solution file validated: $solutionFile"
+      displayName: 'Determine Solution File Path'
+    
+    # ========================================================================
+    # Import Solution
+    # ========================================================================
+    - task: PowerPlatformImportSolution@2
+      displayName: 'Import Solution ($(varSolutionType))'
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varTargetServiceConnection)'
+        Environment: '$(varTargetEnvironmentURL)'
+        SolutionInputFile: '$(SolutionFilePath)'
+        AsyncOperation: true
+        MaxAsyncWaitTime: 60
+        UseDeploymentSettingsFile: false
+        OverwriteUnmanagedCustomizations: false
+        SkipProductUpdateDependencies: false
+        ConvertToManaged: false
+        HoldingSolution: false
+    
+    # ========================================================================
+    # Publish Customizations (Unmanaged Only)
+    # ========================================================================
+    - task: PowerPlatformPublishCustomizations@2
+      displayName: 'Publish Customizations'
+      condition: eq(variables['varSolutionType'], 'unmanaged')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varTargetServiceConnection)'
+        Environment: '$(varTargetEnvironmentURL)'
+    
+    # ========================================================================
+    # Deployment Summary
+    # ========================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY"
+        Write-Host "============================================"
+        Write-Host "Solution Name: $(varSolutionName)"
+        Write-Host "Solution Type: $(varSolutionType)"
+        Write-Host "Target Environment: $(varTargetEnvironmentURL)"
+        Write-Host "Service Connection: $(varTargetServiceConnection)"
+        Write-Host "============================================"
+        Write-Host ""
+        Write-Host "NEXT STEPS:"
+        Write-Host "1. Configure Connection References manually in the target environment"
+        Write-Host "2. Set Environment Variables values as needed"
+        Write-Host "3. Validate solution functionality"
+        Write-Host "============================================"
+      displayName: 'Deployment Summary'
+
+# ============================================================================
+# STAGE 3: RELEASE
+# ============================================================================
+- stage: Release
+  displayName: 'GitHub Release'
+  dependsOn: Export
+  condition: succeeded()
+  jobs:
+  - job: ReleaseJob
+    displayName: 'Create Release'
+    steps:
+    
+    # ========================================================================
+    # Checkout Azure DevOps Repository
+    # ========================================================================
+    - checkout: self
+      displayName: 'Checkout Azure DevOps Repository'
+    
+    # ========================================================================
+    # Checkout GitHub Repository (for artifacts)
+    # ========================================================================
+    - checkout: GitHubRepo
+      displayName: 'Checkout GitHub Repository for Assets'
+    
+    # ========================================================================
+    # Validate Required Variables
+    # ========================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "VALIDATING PIPELINE VARIABLES"
+        Write-Host "============================================"
+        
+        $errors = @()
+        
+        $requiredVars = @{
+            'varGitHubConnection' = '$(varGitHubConnection)'
+            'varGitHubRepo' = '$(varGitHubRepo)'
+            'varOutputSolutionName' = '$(varOutputSolutionName)'
+            'varReleaseName' = '$(varReleaseName)'
+            'varReleaseMonth' = '$(varReleaseMonth)'
+            'varReleaseYear' = '$(varReleaseYear)'
+        }
+        
+        foreach ($var in $requiredVars.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace($var.Value) -or $var.Value -eq "`$($($var.Key))") {
+                $errors += "Missing or empty variable: $($var.Key)"
+                Write-Host "##vso[task.logissue type=error]Missing variable: $($var.Key)"
+            } else {
+                Write-Host "✓ $($var.Key): $($var.Value)"
+            }
+        }
+        
+        $repoFormat = '$(varGitHubRepo)'
+        if ($repoFormat -notmatch '^[\w-]+/[\w-]+$') {
+            $errors += "varGitHubRepo must be in format 'owner/repo'"
+            Write-Host "##vso[task.logissue type=error]Invalid GitHub repo format: $repoFormat"
+        }
+        
+        Write-Host "============================================"
+        
+        if ($errors.Count -gt 0) {
+            Write-Host "##vso[task.logissue type=error]Validation failed with $($errors.Count) error(s)"
+            exit 1
+        }
+        
+        Write-Host "✓ All required variables validated successfully"
+        Write-Host "============================================"
+      displayName: 'Validate Required Variables'
+    
+    # ========================================================================
+    # Download artifacts from Export stage
+    # ========================================================================
+    - download: current
+      artifact: drop
+      displayName: 'Download Solution Artifacts'
+    
+    # ========================================================================
+    # Generate Release Tag and Collect All Assets
+    # ========================================================================
+    - powershell: |
+        $releaseName = "$(varReleaseName)"
+        $releaseMonth = "$(varReleaseMonth)"
+        $releaseYear = "$(varReleaseYear)"
+        $outputSolutionName = "$(varOutputSolutionName)"
+        $downloadPath = "$(Pipeline.Workspace)/drop"
+        $repoPath = "$(Build.SourcesDirectory)/Power-CAT-Copilot-Studio-Kit"
+        $artefactsFolder = "${repoPath}/CopilotstudioAcceleratorResources/Release/Artefacts"
+        
+        $releaseTag = "${releaseName}-${releaseMonth}${releaseYear}"
+        
+        Write-Host "##[section]Generated Release Tag: $releaseTag"
+        Write-Host "##vso[task.setvariable variable=ReleaseTag]$releaseTag"
+        
+        # Find unmanaged solution
+        $unmanagedFile = "${downloadPath}/${outputSolutionName}.zip"
+        
+        # Find managed solution (with version pattern)
+        $managedPattern = "${outputSolutionName}_*_managed.zip"
+        $managedFiles = Get-ChildItem -Path $downloadPath -Filter $managedPattern
+        
+        Write-Host ""
+        Write-Host "Validating solution artifacts..."
+        
+        if (-not (Test-Path $unmanagedFile)) {
+            Write-Host "##vso[task.logissue type=error]Unmanaged solution not found: $unmanagedFile"
+            exit 1
+        }
+        Write-Host "✓ Unmanaged solution found: $(Split-Path $unmanagedFile -Leaf)"
+        
+        if ($managedFiles.Count -eq 0) {
+            Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $managedPattern"
+            exit 1
+        }
+        $managedFile = $managedFiles[0].FullName
+        Write-Host "✓ Managed solution found: $($managedFiles[0].Name)"
+        
+        # Collect all assets
+        $allAssets = @()
+        $allAssets += $unmanagedFile
+        $allAssets += $managedFile
+        
+        # Add files from GitHub repository folder
+        Write-Host ""
+        Write-Host "Collecting additional assets from GitHub repository..."
+        
+        if (Test-Path $artefactsFolder) {
+            $repoFiles = Get-ChildItem -Path $artefactsFolder -File
+            if ($repoFiles.Count -gt 0) {
+                Write-Host "✓ Found $($repoFiles.Count) additional file(s) in CopilotstudioAcceleratorResources/Release/Artefacts:"
+                foreach ($file in $repoFiles) {
+                    Write-Host "  - $($file.Name)"
+                    $allAssets += $file.FullName
+                }
+            } else {
+                Write-Host "⚠ No files found in CopilotstudioAcceleratorResources/Release/Artefacts folder"
+            }
+        } else {
+            Write-Host "##vso[task.logissue type=warning]Folder not found: $artefactsFolder"
+        }
+        
+        # Copy all files to a single staging directory for GitHub Release
+        $stagingFolder = "${downloadPath}/ReleaseAssets"
+        if (Test-Path $stagingFolder) {
+            Remove-Item -Path $stagingFolder -Recurse -Force
+        }
+        New-Item -Path $stagingFolder -ItemType Directory | Out-Null
+        
+        Write-Host ""
+        Write-Host "Copying all assets to staging folder..."
+        foreach ($asset in $allAssets) {
+            $fileName = Split-Path $asset -Leaf
+            $destination = Join-Path $stagingFolder $fileName
+            Copy-Item -Path $asset -Destination $destination -Force
+            Write-Host "  ✓ Copied: $fileName"
+        }
+        
+        # Set staging folder path for GitHub Release task
+        Write-Host "##vso[task.setvariable variable=StagingFolder]$stagingFolder"
+        
+        Write-Host ""
+        Write-Host "============================================"
+        Write-Host "RELEASE INFORMATION"
+        Write-Host "============================================"
+        Write-Host "Release Tag: $releaseTag"
+        Write-Host "Solution Name: $outputSolutionName"
+        Write-Host "GitHub Repo: $(varGitHubRepo)"
+        Write-Host "Total Assets: $($allAssets.Count)"
+        Write-Host "============================================"
+      displayName: 'Generate Release Tag and Collect All Assets'
+    
+    # ========================================================================
+    # Create GitHub Draft Release
+    # ========================================================================
+    - task: GitHubRelease@1
+      displayName: 'Create GitHub Draft Release'
+      inputs:
+        gitHubConnection: '$(varGitHubConnection)'
+        repositoryName: '$(varGitHubRepo)'
+        action: 'create'
+        target: 'main'
+        tagSource: 'userSpecifiedTag'
+        tag: '$(ReleaseTag)'
+        title: '$(ReleaseTag)'
+        releaseNotesSource: 'inline'
+        releaseNotesInline: |
+          ## Release $(ReleaseTag)
+          
+          **Solution Name**: $(varOutputSolutionName)
+          **Release Date**: $(Build.BuildNumber)
+          
+          ### Included Assets
+          - Managed Solution (with version)
+          - Unmanaged Solution
+          
+          ---
+          *Release notes will be updated manually.*
+        assets: '$(StagingFolder)/*'
+        isDraft: true
+        isPreRelease: false
+        addChangeLog: false
+    
+    # ========================================================================
+    # Release Summary
+    # ========================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "GITHUB RELEASE CREATED SUCCESSFULLY"
+        Write-Host "============================================"
+        Write-Host "Release Tag: $(ReleaseTag)"
+        Write-Host "Repository: https://github.com/$(varGitHubRepo)"
+        Write-Host "Release URL: https://github.com/$(varGitHubRepo)/releases/tag/$(ReleaseTag)"
+        Write-Host "Status: DRAFT"
+        Write-Host "============================================"
+        Write-Host ""
+        Write-Host "NEXT STEPS:"
+        Write-Host "1. Visit the GitHub release page"
+        Write-Host "2. Update release notes manually"
+        Write-Host "3. Publish the release when ready"
+        Write-Host "============================================"
+      displayName: 'Release Summary'
