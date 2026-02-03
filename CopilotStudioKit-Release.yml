@@ -342,6 +342,21 @@ stages:
         GITHUB_PAT: $(GitHubPAT)
     
     # ============================================================================
+    # Step 6.5: Debug Milestone Variable
+    # ============================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "MILESTONE VARIABLE DEBUG"
+        Write-Host "============================================"
+        $milestoneVar = "$(MilestoneIssues)"
+        Write-Host "Variable length: $($milestoneVar.Length)"
+        Write-Host "Variable content:"
+        Write-Host $milestoneVar
+        Write-Host "============================================"
+      displayName: 'Debug Milestone Variable'
+      condition: and(succeeded(), ne(variables['varMileStone'], ''))
+    
+    # ============================================================================
     # Step 7: Create GitHub Draft Release
     # ============================================================================
     - task: GitHubRelease@1
