@@ -213,7 +213,40 @@ stages:
       displayName: 'Generate Release Tag and Collect All Assets'
     
     # ============================================================================
-    # Step 5: Fetch GitHub Milestone Issues (Optional)
+    # Step 5: Debug Variable Group Access
+    # ============================================================================
+    - powershell: |
+        Write-Host "============================================"
+        Write-Host "VARIABLE GROUP DEBUG INFORMATION"
+        Write-Host "============================================"
+        
+        # Check if GitHubPAT is available
+        $githubPAT = "$(GitHubPAT)"
+        
+        if ([string]::IsNullOrWhiteSpace($githubPAT) -or $githubPAT -eq '$(GitHubPAT)') {
+            Write-Host "❌ GitHubPAT: NOT FOUND or NOT ACCESSIBLE"
+            Write-Host ""
+            Write-Host "Possible causes:"
+            Write-Host "  1. Variable group 'alm-accelerator-variable-group' not linked properly"
+            Write-Host "  2. Variable name in group is different (case-sensitive)"
+            Write-Host "  3. Pipeline doesn't have permission (check Pipeline permissions tab)"
+            Write-Host "  4. Variable group needs to be saved after adding pipeline access"
+            Write-Host ""
+            Write-Host "Available environment variables containing 'git' or 'hub':"
+            Get-ChildItem env: | Where-Object { $_.Name -match 'git|hub' -or $_.Value -match 'git|hub' } | ForEach-Object {
+                Write-Host "  $($_.Name)"
+            }
+        } else {
+            Write-Host "✓ GitHubPAT: FOUND (length: $($githubPAT.Length) characters)"
+            Write-Host "✓ First 4 characters: $($githubPAT.Substring(0, [Math]::Min(4, $githubPAT.Length)))****"
+        }
+        
+        Write-Host "============================================"
+      displayName: 'Debug Variable Group Access'
+      condition: and(succeeded(), ne(variables['varMileStone'], ''))
+    
+    # ============================================================================
+    # Step 6: Fetch GitHub Milestone Issues (Optional)
     # ============================================================================
     - powershell: |
         $milestoneName = "$(varMileStone)".Trim()
@@ -306,7 +339,7 @@ stages:
       displayName: 'Fetch GitHub Milestone Issues (Optional)'
     
     # ============================================================================
-    # Step 6: Create GitHub Draft Release
+    # Step 7: Create GitHub Draft Release
     # ============================================================================
     - task: GitHubRelease@1
       displayName: 'Create GitHub Draft Release'
@@ -337,7 +370,7 @@ stages:
         addChangeLog: false
     
     # ============================================================================
-    # Step 7: Release Summary
+    # Step 8: Release Summary
     # ============================================================================
     - powershell: |
         Write-Host "============================================"
