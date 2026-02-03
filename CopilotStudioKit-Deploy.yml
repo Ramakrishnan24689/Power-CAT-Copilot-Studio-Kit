@@ -10,12 +10,13 @@ pool:
 
 # ============================================================================
 # Pipeline Resource: Reference the Export-Commit pipeline
+# Note: Update 'source' to match the exact pipeline name in Azure DevOps
 # ============================================================================
 resources:
   pipelines:
     - pipeline: ExportPipeline
-      source: CopilotStudioKit-Export-Commit
-      trigger: none  # Manual deployment
+      source: Copilot-Studio-Kit-Export-Commit
+      trigger: none
 
 variables:
   # Pipeline variables (set in Azure DevOps pipeline UI):
@@ -54,14 +55,33 @@ stages:
     - powershell: |
         $solutionType = "$(varSolutionType)".ToLower()
         $solutionName = "$(varSolutionName)"
+        $downloadPath = "$(DownloadPath)"
         
         if ($solutionType -eq "managed") {
-            $solutionFile = "$(DownloadPath)/${solutionName}_managed.zip"
-            Write-Host "##[section]Deploying MANAGED solution: $solutionFile"
+            # Managed solution has version in filename: SolutionName_VERSION_managed.zip
+            # Use pattern matching to find the file
+            $pattern = "${solutionName}_*_managed.zip"
+            $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
+            
+            if ($managedFiles.Count -eq 0) {
+                Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $pattern"
+                Write-Host "Available files in download path:"
+                Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $_" }
+                exit 1
+            }
+            
+            if ($managedFiles.Count -gt 1) {
+                Write-Host "##vso[task.logissue type=warning]Multiple managed solutions found. Using first match."
+                $managedFiles | ForEach-Object { Write-Host "  $_" }
+            }
+            
+            $solutionFile = $managedFiles[0].FullName
+            Write-Host "##[section]Deploying MANAGED solution: $($managedFiles[0].Name)"
         }
         elseif ($solutionType -eq "unmanaged") {
-            $solutionFile = "$(DownloadPath)/${solutionName}.zip"
-            Write-Host "##[section]Deploying UNMANAGED solution: $solutionFile"
+            # Unmanaged solution has no version in filename
+            $solutionFile = "${downloadPath}/${solutionName}.zip"
+            Write-Host "##[section]Deploying UNMANAGED solution: ${solutionName}.zip"
         }
         else {
             Write-Host "##vso[task.logissue type=error]Invalid varSolutionType. Must be 'managed' or 'unmanaged'"
@@ -71,6 +91,8 @@ stages:
         # Verify file exists
         if (-not (Test-Path $solutionFile)) {
             Write-Host "##vso[task.logissue type=error]Solution file not found: $solutionFile"
+            Write-Host "Available files in download path:"
+            Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $_" }
             exit 1
         }
         
