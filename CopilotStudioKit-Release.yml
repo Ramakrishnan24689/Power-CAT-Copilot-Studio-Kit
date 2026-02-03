@@ -22,14 +22,6 @@ resources:
       endpoint: powercat-alm
       name: microsoft/Power-CAT-Copilot-Studio-Kit
 
-variables:
-  # Variable group with GitHubPAT (Required if using varMileStone)
-  - group: alm-accelerator-variable-group
-  
-  # Internal variables
-  - name: DownloadPath
-    value: $(Pipeline.Workspace)/ExportPipeline/drop
-
 # Pipeline variables (set in Azure DevOps pipeline UI):
 # - varGitHubConnection: GitHub service connection name (e.g., powercat-alm)
 # - varGitHubRepo: GitHub repository in format 'owner/repo' (e.g., microsoft/Power-CAT-Copilot-Studio-Kit)
@@ -42,6 +34,13 @@ variables:
 stages:
 - stage: Release
   displayName: 'Create GitHub Draft Release'
+  variables:
+    # Variable group with GitHubPAT (Required if using varMileStone)
+    - group: alm-accelerator-variable-group
+    
+    # Internal variables
+    - name: DownloadPath
+      value: $(Pipeline.Workspace)/ExportPipeline/drop
   jobs:
   - job: ReleaseJob
     displayName: 'GitHub Release'
