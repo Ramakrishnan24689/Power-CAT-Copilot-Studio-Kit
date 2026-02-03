@@ -11,7 +11,8 @@ pool:
 variables:
   # Pipeline variables (set in Azure DevOps pipeline UI):
   # - varSourceEnvironmentURL: The source environment URL (e.g., https://org.crm.dynamics.com/)
-  # - varSolutionName: The unique name of the solution to export
+  # - varSolutionName: The unique name of the solution to export from Power Platform
+  # - varOutputSolutionName: The display name for output solution files (e.g., CopilotStudioAccelerator)
   
   # Internal variables
   SolutionOutputFolder: $(Build.ArtifactStagingDirectory)/solutions
@@ -42,7 +43,7 @@ steps:
     PowerPlatformSPN: '$(varSourceEnvironmentURL)'
     Environment: '$(varSourceEnvironmentURL)'
     SolutionName: '$(varSolutionName)'
-    SolutionOutputFile: '$(SolutionOutputFolder)/$(varSolutionName).zip'
+    SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
     Managed: false
 
 # ============================================================================
@@ -55,7 +56,7 @@ steps:
     PowerPlatformSPN: '$(varSourceEnvironmentURL)'
     Environment: '$(varSourceEnvironmentURL)'
     SolutionName: '$(varSolutionName)'
-    SolutionOutputFile: '$(SolutionOutputFolder)/$(varSolutionName)_managed.zip'
+    SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName)_managed.zip'
     Managed: true
 
 # ============================================================================
@@ -64,7 +65,7 @@ steps:
 - task: PowerPlatformUnpackSolution@2
   displayName: 'Unpack Unmanaged Solution'
   inputs:
-    SolutionInputFile: '$(SolutionOutputFolder)/$(varSolutionName).zip'
+    SolutionInputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
     SolutionTargetFolder: '$(UnpackedSolutionFolder)/SolutionPackage'
     SolutionType: 'Both'
     ProcessCanvasApps: false
@@ -74,6 +75,7 @@ steps:
 # ============================================================================
 - powershell: |
     $solutionXmlPath = "$(UnpackedSolutionFolder)/SolutionPackage/Other/Solution.xml"
+    $outputSolutionName = "$(varOutputSolutionName)"
     
     Write-Host "Reading solution version from: $solutionXmlPath"
     
@@ -98,14 +100,14 @@ steps:
     Write-Host "Major version (for filename): $majorVersion"
     
     # Rename managed solution file
-    $originalManagedFile = "$(SolutionOutputFolder)/$(varSolutionName)_managed.zip"
-    $newManagedFile = "$(SolutionOutputFolder)/$(varSolutionName)_${majorVersion}_managed.zip"
+    $originalManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_managed.zip"
+    $newManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_${majorVersion}_managed.zip"
     
     if (Test-Path $originalManagedFile) {
         Rename-Item -Path $originalManagedFile -NewName (Split-Path $newManagedFile -Leaf)
         Write-Host "##[section]Renamed managed solution:"
-        Write-Host "  From: $(varSolutionName)_managed.zip"
-        Write-Host "  To:   $(varSolutionName)_${majorVersion}_managed.zip"
+        Write-Host "  From: ${outputSolutionName}_managed.zip"
+        Write-Host "  To:   ${outputSolutionName}_${majorVersion}_managed.zip"
     } else {
         Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalManagedFile"
         exit 1
