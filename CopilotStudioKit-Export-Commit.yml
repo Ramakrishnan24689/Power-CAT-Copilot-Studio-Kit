@@ -70,7 +70,55 @@ steps:
     ProcessCanvasApps: false
 
 # ============================================================================
-# Step 6: Publish Pipeline Artifacts
+# Step 6: Extract Solution Version and Rename Managed Solution
+# ============================================================================
+- powershell: |
+    $solutionXmlPath = "$(UnpackedSolutionFolder)/SolutionPackage/Other/Solution.xml"
+    
+    Write-Host "Reading solution version from: $solutionXmlPath"
+    
+    if (-not (Test-Path $solutionXmlPath)) {
+        Write-Host "##vso[task.logissue type=error]Solution.xml not found at: $solutionXmlPath"
+        exit 1
+    }
+    
+    # Read and parse Solution.xml
+    [xml]$solutionXml = Get-Content $solutionXmlPath
+    $fullVersion = $solutionXml.ImportExportXml.SolutionManifest.Version
+    
+    if ([string]::IsNullOrWhiteSpace($fullVersion)) {
+        Write-Host "##vso[task.logissue type=error]Unable to extract version from Solution.xml"
+        exit 1
+    }
+    
+    Write-Host "Full solution version: $fullVersion"
+    
+    # Extract major version (first part before first dot) - e.g., "20260202.2" -> "20260202"
+    $majorVersion = $fullVersion.Split('.')[0]
+    Write-Host "Major version (for filename): $majorVersion"
+    
+    # Rename managed solution file
+    $originalManagedFile = "$(SolutionOutputFolder)/$(varSolutionName)_managed.zip"
+    $newManagedFile = "$(SolutionOutputFolder)/$(varSolutionName)_${majorVersion}_managed.zip"
+    
+    if (Test-Path $originalManagedFile) {
+        Rename-Item -Path $originalManagedFile -NewName (Split-Path $newManagedFile -Leaf)
+        Write-Host "##[section]Renamed managed solution:"
+        Write-Host "  From: $(varSolutionName)_managed.zip"
+        Write-Host "  To:   $(varSolutionName)_${majorVersion}_managed.zip"
+    } else {
+        Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalManagedFile"
+        exit 1
+    }
+    
+    # Set variable for later use
+    Write-Host "##vso[task.setvariable variable=SolutionVersion]$majorVersion"
+    Write-Host ""
+    Write-Host "Solution version: $majorVersion"
+  displayName: 'Extract Version and Rename Managed Solution'
+
+# ============================================================================
+# Step 7: Publish Pipeline Artifacts
 # ============================================================================
 - task: PublishPipelineArtifact@1
   displayName: 'Publish Solution Artifacts'
@@ -80,7 +128,7 @@ steps:
     publishLocation: 'pipeline'
 
 # ============================================================================
-# Step 7: Configure Git for Commit
+# Step 8: Configure Git for Commit
 # ============================================================================
 - script: |
     git config --global user.email "$(Build.RequestedForEmail)"
@@ -88,7 +136,7 @@ steps:
   displayName: 'Configure Git Credentials'
 
 # ============================================================================
-# Step 8: Commit and Push Changes to Repository
+# Step 9: Commit and Push Changes to Repository
 # ============================================================================
 - script: |
     git add --all
