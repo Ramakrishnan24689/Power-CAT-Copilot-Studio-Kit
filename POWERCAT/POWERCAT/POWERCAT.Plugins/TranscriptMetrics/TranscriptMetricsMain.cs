@@ -29,13 +29,18 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             {
                 switch (context.MessageName)
                 {
-                    case "cat_AggregateAgentKPIs":
-                        var aggregateAgentKPIs = new AggregateAgentKPIs(organizationService, tracingService);
-                        aggregateAgentKPIs.Execute(context);
-                        break;
                     case "cat_ProcessConversationTranscriptsBatch":
                         var processTranscripts = new ProcessConversationTranscriptsBatch(organizationService, tracingService);
                         processTranscripts.Execute(context);
+                        break;
+                    //comments on each
+                    case "cat_CalculateAggregateAgentKPIs":
+                        var aggregateAgentKPIs = new AggregateAgentKPIs(organizationService, tracingService);
+                        aggregateAgentKPIs.Execute(context);
+                        break;
+                    case "cat_UpdateWorkflowStatusBatch":
+                        var updateWorkflowStatus = new UpdateWorkflowStatusBatch(organizationService, tracingService);
+                        updateWorkflowStatus.Execute(context);
                         break;
                     default:
                         tracingService.Trace($"Unknown message: {context.MessageName}");

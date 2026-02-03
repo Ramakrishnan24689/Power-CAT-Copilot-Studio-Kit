@@ -16,8 +16,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
     /// </summary>
     public class AggregateAgentKPIs
     {
-        private const string TranscriptTableLogicalName = "cat_agentconversation";
-        private const string MetricsTableLogicalName = "cat_transcriptmetrics";
+        private const string _transcriptTableLogicalName = "cat_agentinsightstranscriptstaging";
+        private const string _metricsTableLogicalName = "cat_transcriptmetrics";
 
         private readonly IOrganizationService _organizationService;
         private readonly ITracingService _tracingService;
@@ -25,8 +25,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// <summary>
         /// Initializes a new instance of the <see cref="AggregateAgentKPIs"/> class.
         /// </summary>
-        /// <param name="organizationService">The organization service.</param>
-        /// <param name="tracingService">The tracing service.</param>
+        /// <param name="organizationService">The organization service for Dataverse operations.</param>
+        /// <param name="tracingService">The tracing service for logging.</param>
+        /// <exception cref="ArgumentNullException">Thrown when organizationService or tracingService is null.</exception>
         public AggregateAgentKPIs(IOrganizationService organizationService, ITracingService tracingService)
         {
             _organizationService = organizationService ?? throw new ArgumentNullException(nameof(organizationService));
@@ -39,44 +40,51 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// <param name="context">The plugin execution context.</param>
         public void Execute(IPluginExecutionContext context)
         {
+            const string methodName = nameof(Execute);
             try
             {
                 // 1. Extract input parameters
                 string agentId = GetInputParameter<string>(context, "agentId");
-                string agentMetadataJson = GetInputParameter<string>(context, "agentMetadata");
+                string agentConfigurationDetailsJson = GetInputParameter<string>(context, "agentConfigurationDetails");
                 DateTime conversationDate = GetInputParameter<DateTime>(context, "conversationDate");
 
                 // 2. Validate inputs
                 if (string.IsNullOrWhiteSpace(agentId))
                 {
-                    SetErrorResponse(context, "agentId is required.");
-                    throw new InvalidPluginExecutionException("agentId is required.");
+                    SetErrorResponse(context, $"{methodName}: agentId is required.");
+                    throw new InvalidPluginExecutionException($"{methodName}: agentId is required.");
                 }
 
-                if (string.IsNullOrWhiteSpace(agentMetadataJson))
+                if (string.IsNullOrWhiteSpace(agentConfigurationDetailsJson))
                 {
-                    SetErrorResponse(context, "agentMetadata is required.");
-                    throw new InvalidPluginExecutionException("agentMetadata is required.");
+                    SetErrorResponse(context, $"{methodName}: agentConfigurationDetails is required.");
+                    throw new InvalidPluginExecutionException($"{methodName}: agentConfigurationDetails is required.");
                 }
 
-                // 3. Parse agent metadata
-                AgentMetadata agentMetadata = null;
+                // 3. Parse agent configuration details
+                AgentConfigurationDetails agentConfigurationDetails = null;
                 try
                 {
-                    agentMetadata = JsonConvert.DeserializeObject<AgentMetadata>(agentMetadataJson);
+                    agentConfigurationDetails = JsonConvert.DeserializeObject<AgentConfigurationDetails>(agentConfigurationDetailsJson);
                 }
                 catch (Exception ex)
                 {
-                    SetErrorResponse(context, $"Failed to parse agentMetadata: {ex.Message}");
-                    throw new InvalidPluginExecutionException($"Failed to parse agentMetadata: {ex.Message}", ex);
+                    SetErrorResponse(context, $"{methodName}: Failed to parse agentConfigurationDetails: {ex.Message}");
+                    throw new InvalidPluginExecutionException($"{methodName}: Failed to parse agentConfigurationDetails: {ex.Message}", ex);
+                }
+
+                // 4. Conversation Date validation
+                if (conversationDate == default(DateTime))
+                {
+                    throw new ArgumentException($"{methodName}: Conversation date is required.", nameof(conversationDate));
                 }
 
                 // 4. Fetch conversation records from Dataverse table
-                List<ConversationRecord> conversations = FetchConversationRecords(agentId, agentMetadata, conversationDate);
+                List<ConversationRecord> conversations = FetchConversationRecords(agentId, agentConfigurationDetails, conversationDate);
 
                 if (conversations == null || conversations.Count == 0)
                 {
-                    _tracingService.Trace("No unprocessed conversation records found.");
+                    _tracingService.Trace($"{methodName}: No unprocessed conversation records found.");
                     context.OutputParameters["IsSuccess"] = true;
                     context.OutputParameters["SuccessCount"] = 0;
                     context.OutputParameters["FailureCount"] = 0;
@@ -84,20 +92,28 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     return;
                 }
 
-                _tracingService.Trace($"Processing {conversations.Count} conversations");
+                _tracingService.Trace($"{methodName}: Processing {conversations.Count} conversations");
 
                 // 5. Group and aggregate KPIs
-                List<KpiGroup> kpiGroups = AggregateKpis(conversations, agentMetadata);
+                List<KpiGroup> kpiGroups = AggregateKpis(conversations, agentConfigurationDetails);
 
-                _tracingService.Trace($"Aggregated into {kpiGroups.Count} groups");
+                _tracingService.Trace($"{methodName}: Aggregated into {kpiGroups.Count} groups");
 
                 // 6. Batch upsert using ExecuteMultipleRequest
-                Dictionary<int, bool> groupResults = UpsertKpiRecords(context, kpiGroups, agentId, agentMetadata);
+                Dictionary<int, bool> groupResults = UpsertKpiRecords(context, kpiGroups, agentId, agentConfigurationDetails);
 
-                // 7. Update workflow status on conversation records based on upsert results
-                UpdateConversationWorkflowStatus(kpiGroups, groupResults);
+                // 7. Get conversation IDs by status for reporting
+                GetConversationIdsByStatus(kpiGroups, groupResults, out List<Guid> successConversationGuids, out List<Guid> failedConversationGuids);
 
-                _tracingService.Trace("AggregateAgentKPIs completed successfully");
+                context.OutputParameters["FailedConversationGuids"] = failedConversationGuids.Count > 0
+                    ? failedConversationGuids.Select(g => g.ToString()).ToArray()
+                    : Array.Empty<string>();
+
+                context.OutputParameters["SuccessConversationGuids"] = successConversationGuids.Count > 0
+                    ? successConversationGuids.Select(g => g.ToString()).ToArray()
+                    : Array.Empty<string>();
+
+                _tracingService.Trace($"{methodName}: AggregateAgentKPIs completed successfully");
             }
             catch (InvalidPluginExecutionException)
             {
@@ -105,7 +121,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             }
             catch (Exception ex)
             {
-                string errorMsg = $"An error occurred: {ex.Message}";
+                string errorMsg = $"{methodName}: An error occurred: {ex.Message}";
                 SetErrorResponse(context, errorMsg);
                 throw new InvalidPluginExecutionException(errorMsg, ex);
             }
@@ -114,6 +130,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// <summary>
         /// Gets an input parameter from the context.
         /// </summary>
+        /// <typeparam name="T">The type of the parameter value.</typeparam>
+        /// <param name="context">The plugin execution context.</param>
+        /// <param name="parameterName">The name of the input parameter to retrieve.</param>
+        /// <returns>The parameter value if found; otherwise, the default value of type T.</returns>
         private T GetInputParameter<T>(IPluginExecutionContext context, string parameterName)
         {
             if (context.InputParameters.Contains(parameterName))
@@ -124,23 +144,28 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         }
 
         /// <summary>
-        /// Fetches unprocessed conversation records from the cat_agentconversation table.
+        /// Fetches unprocessed conversation records from the cat_agentinsightstranscriptstaging table.
         /// Handles paging to retrieve all matching records.
         /// </summary>
-        private List<ConversationRecord> FetchConversationRecords(string agentId, AgentMetadata agentMetadata, DateTime conversationDate)
+        /// <param name="agentId">The agent identifier to filter conversations.</param>
+        /// <param name="agentConfigurationDetails">The agent configuration details containing filter criteria.</param>
+        /// <param name="conversationDate">The date to filter conversations by.</param>
+        /// <returns>A list of conversation records matching the filter criteria.</returns>
+        private List<ConversationRecord> FetchConversationRecords(string agentId, AgentConfigurationDetails agentConfigurationDetails, DateTime conversationDate)
         {
-            var query = new QueryExpression(TranscriptTableLogicalName)
+            const string methodName = nameof(FetchConversationRecords);
+            var query = new QueryExpression(_transcriptTableLogicalName)
             {
                 ColumnSet = new ColumnSet(
-                    "cat_agentconversationid",
+                    "cat_name",
+                    "cat_agentconversation",
                     "cat_agentname",
                     "cat_conversationid",
                     "cat_conversationdate",
-                    "cat_isdesignmode",
+                    "cat_datasourcecode",
                     "cat_channelid",
                     "cat_sessioninfo",
-                    "cat_feedback",
-                    "cat_botmessages"
+                    "cat_feedbackdetails"
                 ),
                 PageInfo = new PagingInfo
                 {
@@ -151,49 +176,29 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             };
 
             // Filter by agent configuration
-            if (!string.IsNullOrEmpty(agentMetadata?.AgentConfigurationId) &&
-                Guid.TryParse(agentMetadata.AgentConfigurationId, out Guid configId))
+            if (!string.IsNullOrEmpty(agentConfigurationDetails?.AgentConfigurationId) &&
+                Guid.TryParse(agentConfigurationDetails.AgentConfigurationId, out Guid configId))
             {
-                query.Criteria.AddCondition("cat_agentconfigurationid", ConditionOperator.Equal, configId);
+                query.Criteria.AddCondition("cat_agentconfiguration", ConditionOperator.Equal, configId);
             }
-            // Check if mandatory field is empty
-            if (conversationDate == default(DateTime))
-            {
-                throw new ArgumentException("Conversation date is required.", nameof(conversationDate));
-            }
-
-            // Apply filter - use Date only (without time) to avoid timezone shifting issues
-            // The On operator compares dates, so we only need the date portion
-            var dateOnly = conversationDate.Date;
-            query.Criteria.AddCondition("cat_conversationdate", ConditionOperator.On, dateOnly);
-
+            query.Criteria.AddCondition("cat_conversationdate", ConditionOperator.On, conversationDate.Date);
             var conversations = new List<ConversationRecord>();
 
             // Paging loop to retrieve all records
             while (true)
             {
                 var results = _organizationService.RetrieveMultiple(query);
-
                 foreach (var entity in results.Entities)
                 {
                     var dateValue = entity.GetAttributeValue<DateTime?>("cat_conversationdate");
-                    if (!dateValue.HasValue)
-                    {
-                        _tracingService.Trace($"Skipping record {entity.Id} - ConversationDate is null");
-                        continue;
-                    }
-
-                    
-
-                    
-
                     var record = new ConversationRecord
                     {
                         EntityId = entity.Id,
+                        Name = entity.GetAttributeValue<string>("cat_name"),
                         AgentName = entity.GetAttributeValue<string>("cat_agentname"),
                         ConversationId = entity.GetAttributeValue<string>("cat_conversationid"),
-                        ConversationDate = entity.GetAttributeValue<DateTime?>("cat_conversationdate")?.ToString("yyyy-MM-dd"),
-                        IsDesignMode = entity.GetAttributeValue<bool>("cat_isdesignmode"),
+                        ConversationDate = dateValue.Value.Date.ToString("yyyy-MM-dd"),
+                        DataSourceCode = entity.GetAttributeValue<OptionSetValue>("cat_datasourcecode")?.Value ?? 1,
                         ChannelId = entity.GetAttributeValue<string>("cat_channelid")
                     };
 
@@ -207,33 +212,20 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         }
                         catch (Exception ex)
                         {
-                            _tracingService.Trace($"Failed to parse SessionInfo for {record.ConversationId}: {ex.Message}");
+                            _tracingService.Trace($"{methodName}: Failed to parse SessionInfo for {record.ConversationId}: {ex.Message}");
                         }
                     }
 
-                    string feedbackJson = entity.GetAttributeValue<string>("cat_feedback");
-                    if (!string.IsNullOrEmpty(feedbackJson))
+                    string feedbackDetailsJson = entity.GetAttributeValue<string>("cat_feedbackdetails");
+                    if (!string.IsNullOrEmpty(feedbackDetailsJson))
                     {
                         try
                         {
-                            record.Feedback = JsonConvert.DeserializeObject<List<FeedbackItem>>(feedbackJson);
+                            record.FeedbackDetails = JsonConvert.DeserializeObject<List<FeedbackDetailRecord>>(feedbackDetailsJson);
                         }
                         catch (Exception ex)
                         {
-                            _tracingService.Trace($"Failed to parse Feedback for {record.ConversationId}: {ex.Message}");
-                        }
-                    }
-
-                    string botMessagesJson = entity.GetAttributeValue<string>("cat_botmessages");
-                    if (!string.IsNullOrEmpty(botMessagesJson))
-                    {
-                        try
-                        {
-                            record.BotMessagesActivities = JsonConvert.DeserializeObject<List<Activity>>(botMessagesJson);
-                        }
-                        catch (Exception ex)
-                        {
-                            _tracingService.Trace($"Failed to parse BotMessages for {record.ConversationId}: {ex.Message}");
+                            _tracingService.Trace($"{methodName}: Failed to parse FeedbackDetails for {record.ConversationId}: {ex.Message}");
                         }
                     }
 
@@ -252,37 +244,21 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
             }
 
-            _tracingService.Trace($"Retrieved {conversations.Count} total conversation records");
+            _tracingService.Trace($"{methodName}: Retrieved {conversations.Count} total conversation records");
             return conversations;
         }
 
         /// <summary>
         /// Aggregates KPIs by grouping conversations by conversationDate, channelId, and dataSourceCode.
         /// </summary>
-        private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations, AgentMetadata agentMetadata)
+        /// <param name="conversations">The list of conversation records to aggregate.</param>
+        /// <param name="agentConfigurationDetails">The agent configuration details.</param>
+        /// <returns>A list of KPI groups with aggregated metrics.</returns>
+        private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations, AgentConfigurationDetails agentConfigurationDetails)
         {
-            // First, build BotMessages dictionary for each conversation
-            foreach (var conversation in conversations)
-            {
-                conversation.BotMessages = new Dictionary<string, string>();
-                if (conversation.BotMessagesActivities != null)
-                {
-                    foreach (var activity in conversation.BotMessagesActivities)
-                    {
-                        // Bot messages have type "message" and from.role == 0
-                        if (string.Equals(activity.Type, "message", StringComparison.OrdinalIgnoreCase) &&
-                            activity.From?.Role == 0 &&
-                            !string.IsNullOrEmpty(activity.Id) &&
-                            !string.IsNullOrEmpty(activity.Text))
-                        {
-                            conversation.BotMessages[activity.Id] = activity.Text;
-                        }
-                    }
-                }
-            }
-
+            const string methodName = nameof(AggregateKpis);
             var groups = conversations
-                .GroupBy(c => new { c.ChannelId, c.IsDesignMode })
+                .GroupBy(c => new { c.ChannelId, c.DataSourceCode })
                 .Select(g =>
                 {
                     // Get ConversationDate from first conversation in group (all should have same date)
@@ -291,93 +267,34 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     DateTime conversationDate;
                     if (!DateTime.TryParse(firstConversation.ConversationDate, out conversationDate))
                     {
-                        throw new InvalidPluginExecutionException($"Invalid or empty ConversationDate for conversation {firstConversation.ConversationId}.");
+                        throw new InvalidPluginExecutionException($"{methodName}: Invalid or empty ConversationDate for conversation {firstConversation.ConversationId}.");
                     }
-                    // Derive DataSourceCode from IsDesignMode: Production (1) if false, TestData (2) if true
-                    int dataSourceCode = g.Key.IsDesignMode ? 2 : 1;
+                    // Use DataSourceCode directly from the grouped key
+                    int dataSourceCode = g.Key.DataSourceCode;
                     var kpi = new KpiGroup
                     {
                         ConversationDate = conversationDate,
-                        ChannelId = g.Key.ChannelId ?? string.Empty,
+                        ChannelId = g.Key.ChannelId ?? "Unknown",
                         DataSourceCode = dataSourceCode,
-                        TotalConversations = g.Count(),
+                        TotalConversations = g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
                         SourceConversationIds = g.Select(c => c.EntityId).ToList()
                     };
 
                     foreach (var conversation in g)
                     {
                         // Process all SessionInfo items
-                        if (conversation.SessionInfo != null)
+                        ProcessSessionInfoItems(conversation.SessionInfo, kpi);
+                        // Aggregate pre-processed feedback details
+                        if (conversation.FeedbackDetails != null)
                         {
-                            foreach (var sessionInfo in conversation.SessionInfo)
+                            foreach (var feedbackDetail in conversation.FeedbackDetails)
                             {
-                                var sessionValue = sessionInfo?.Value;
-                                if (sessionValue != null)
-                                {
-                                    // Increment session count
-                                    kpi.SessionCount++;
-
-                                    // Session type counts
-                                    if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
-                                        kpi.EngagedCount++;
-                                    else if (string.Equals(sessionValue.Type, "Unengaged", StringComparison.OrdinalIgnoreCase))
-                                        kpi.UnengagedCount++;
-
-                                    // Outcome counts
-                                    if (string.Equals(sessionValue.Outcome, "Resolved", StringComparison.OrdinalIgnoreCase))
-                                        kpi.ResolvedCount++;
-                                    else if (string.Equals(sessionValue.Outcome, "Abandoned", StringComparison.OrdinalIgnoreCase))
-                                        kpi.AbandonedCount++;
-                                    else if (string.Equals(sessionValue.Outcome, "HandOff", StringComparison.OrdinalIgnoreCase))
-                                        kpi.EscalatedCount++;
-
-                                    // Turn count
-                                    kpi.TotalTurns += sessionValue.TurnCount;
-
-                                    // CSAT score
-                                    if (sessionValue.CsatScore.HasValue && sessionValue.CsatScore.Value > 0)
-                                    {
-                                        kpi.CsatScore += sessionValue.CsatScore.Value;
-                                        kpi.CsatCount++;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Feedback counts and details
-                        if (conversation.Feedback != null)
-                        {
-                            foreach (var feedback in conversation.Feedback)
-                            {
-                                var reaction = feedback.Value?.ActionValue?.Reaction;
-                                var feedbackText = feedback.Value?.ActionValue?.Feedback?.FeedbackText;
-
-                                if (string.Equals(reaction, "like", StringComparison.OrdinalIgnoreCase))
+                                if (string.Equals(feedbackDetail.FeedbackReaction, "like", StringComparison.OrdinalIgnoreCase))
                                     kpi.FeedbackLikeCount++;
-                                else if (string.Equals(reaction, "dislike", StringComparison.OrdinalIgnoreCase))
+                                else if (string.Equals(feedbackDetail.FeedbackReaction, "dislike", StringComparison.OrdinalIgnoreCase))
                                     kpi.FeedbackDislikeCount++;
-
-                                // Build detailed feedback record with agent message correlation
-                                string agentMessage = null;
-                                if (!string.IsNullOrEmpty(feedback.ReplyToId) &&
-                                    conversation.BotMessages != null &&
-                                    conversation.BotMessages.TryGetValue(feedback.ReplyToId, out string message))
-                                {
-                                    agentMessage = message;
-                                }
-
-                                // Only add to details if there's a reaction or feedback text
-                                if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
-                                {
-                                    kpi.FeedbackDetails.Add(new FeedbackDetailRecord
-                                    {
-                                        AgentName = conversation.AgentName,
-                                        ConversationId = conversation.ConversationId,
-                                        AgentMessage = agentMessage,
-                                        FeedbackText = feedbackText,
-                                        FeedbackReaction = reaction
-                                    });
-                                }
+                                // Add pre-processed feedback detail directly
+                                kpi.FeedbackDetails.Add(feedbackDetail);
                             }
                         }
                     }
@@ -393,13 +310,18 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// Upserts KPI records to Dataverse using ExecuteMultipleRequest.
         /// Uses alternate key for upsert behavior.
         /// </summary>
+        /// <param name="context">The plugin execution context.</param>
+        /// <param name="kpiGroups">The list of KPI groups to upsert.</param>
+        /// <param name="agentId">The agent identifier.</param>
+        /// <param name="agentConfigurationDetails">The agent configuration details.</param>
         /// <returns>Dictionary mapping KPI group index to success status.</returns>
         private Dictionary<int, bool> UpsertKpiRecords(
             IPluginExecutionContext context,
             List<KpiGroup> kpiGroups,
             string agentId,
-            AgentMetadata agentMetadata)
+            AgentConfigurationDetails agentConfigurationDetails)
         {
+            const string methodName = nameof(UpsertKpiRecords);
             var groupResults = new Dictionary<int, bool>();
 
             var requestWithResults = new ExecuteMultipleRequest
@@ -412,37 +334,36 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
             };
 
+            // Track KPI group identifiers for error reporting
+            var requestIndexToKpiInfo = new List<(DateTime ConversationDate, string ChannelId, int DataSourceCode, string AgentConfigName)>();
+
             foreach (var kpi in kpiGroups)
             {
                 // Build entity with alternate key for upsert
-                var entity = new Entity(MetricsTableLogicalName);
+                var entity = new Entity(_metricsTableLogicalName);
                 
                 // Set alternate key attributes for matching existing records
-
-
                 entity.KeyAttributes["cat_conversationdate"] = kpi.ConversationDate.Date;
-                entity.KeyAttributes["cat_agentconfigurationname"] = agentMetadata.AgentConfigurationName;
+                entity.KeyAttributes["cat_agentconfigurationname"] = agentConfigurationDetails.AgentConfigurationName;
                 entity.KeyAttributes["cat_channelid"] = kpi.ChannelId;
                 entity.KeyAttributes["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
 
                 // Determine data source name for primary name field
                 string dataSourceName = kpi.DataSourceCode == 2 ? "TestData" : "Production";
-
                 entity["cat_agentid"] = agentId;
 
                 // Primary name
-                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate.Date:yyyy-MM-dd}-{agentMetadata.AgentConfigurationName}-{kpi.ChannelId}-{dataSourceName}";
-                entity["cat_agentconfigurationname"] = agentMetadata.AgentConfigurationName;
-
+                entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate.Date:yyyy-MM-dd}-{agentConfigurationDetails.AgentConfigurationName}-{kpi.ChannelId}-{dataSourceName}";
+                entity["cat_agentconfigurationname"] = agentConfigurationDetails.AgentConfigurationName;
                 entity["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
-                // agentMetadata.AgentConfigurationId is a GUID string and not null/empty here
-                if (Guid.TryParse(agentMetadata.AgentConfigurationId, out Guid configId))
+                // agentConfigurationDetails.AgentConfigurationId is a GUID string and not null/empty here
+                if (Guid.TryParse(agentConfigurationDetails.AgentConfigurationId, out Guid configId))
                 {
                     entity["cat_agentconfigurationid"] = new EntityReference("cat_copilotconfiguration", configId);
                 }
                 else
                 {
-                    _tracingService.Trace($"Invalid AgentConfigurationId GUID format: {agentMetadata.AgentConfigurationId}. Skipping configuration reference.");
+                    _tracingService.Trace($"{methodName}: Invalid AgentConfigurationId GUID format: {agentConfigurationDetails.AgentConfigurationId}. Skipping configuration reference.");
                 }
 
                 // KPI columns
@@ -468,11 +389,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 // UpsertRequest: creates if not exists, updates if exists (based on alternate key)
                 UpsertRequest request = new UpsertRequest() { Target = entity };
                 requestWithResults.Requests.Add(request);
+                requestIndexToKpiInfo.Add((kpi.ConversationDate, kpi.ChannelId, kpi.DataSourceCode, agentConfigurationDetails.AgentConfigurationName));
             }
 
             if (requestWithResults.Requests.Count == 0)
             {
-                _tracingService.Trace("No records to upsert");
+                _tracingService.Trace($"{methodName}: No records to upsert");
                 context.OutputParameters["IsSuccess"] = true;
                 context.OutputParameters["SuccessCount"] = 0;
                 context.OutputParameters["FailureCount"] = 0;
@@ -480,10 +402,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 return groupResults;
             }
 
-            _tracingService.Trace($"Executing batch upsert for {requestWithResults.Requests.Count} records");
-
+            _tracingService.Trace($"{methodName}: Executing batch upsert for {requestWithResults.Requests.Count} records");
             var response = (ExecuteMultipleResponse)_organizationService.Execute(requestWithResults);
-
             // Check for errors and track per-group results
             int successCount = 0;
             int failureCount = 0;
@@ -495,7 +415,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 {
                     failureCount++;
                     groupResults[responseItem.RequestIndex] = false;
-                    errors.Add($"Index {responseItem.RequestIndex}: {responseItem.Fault.Message}");
+                    var kpiInfo = requestIndexToKpiInfo.Count > responseItem.RequestIndex
+                        ? requestIndexToKpiInfo[responseItem.RequestIndex]
+                        : (ConversationDate: DateTime.MinValue, ChannelId: "Unknown", DataSourceCode: 0, AgentConfigName: "Unknown");
+                    errors.Add($"{methodName}: AgentConfigurationName: {kpiInfo.AgentConfigName}, Date: {kpiInfo.ConversationDate:yyyy-MM-dd}, ChannelId: {kpiInfo.ChannelId}, DataSourceCode: {kpiInfo.DataSourceCode} - {responseItem.Fault.Message}");
                 }
                 else
                 {
@@ -504,7 +427,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
             }
 
-            _tracingService.Trace($"Upsert results - Success: {successCount}, Failures: {failureCount}");
+            _tracingService.Trace($"{methodName}: Upsert results - Success: {successCount}, Failures: {failureCount}");
 
             // Set output parameters with detailed results
             context.OutputParameters["IsSuccess"] = failureCount == 0;
@@ -513,8 +436,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
             if (failureCount > 0)
             {
-                string errorDetails = string.Join("; ", errors.Take(5));
-                context.OutputParameters["ErrorMessage"] = $"Upsert completed with {failureCount} errors. First errors: {errorDetails}";
+                string errorDetails = string.Join(";\n ", errors.Take(5));
+                context.OutputParameters["ErrorMessage"] = $"{methodName}: Upsert completed with {failureCount} errors. First errors: {errorDetails}";
             }
             else
             {
@@ -525,74 +448,100 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         }
 
         /// <summary>
-        /// Updates the workflow status on conversation records based on upsert results.
-        /// </summary>
-        /// <param name="kpiGroups">The KPI groups with source conversation IDs.</param>
-        /// <param name="groupResults">Dictionary mapping group index to success/failure.</param>
-        private void UpdateConversationWorkflowStatus(List<KpiGroup> kpiGroups, Dictionary<int, bool> groupResults)
-        {
-            const int BatchSize = 500; // Dataverse limit is 1000, using 500 for safety
-
-            var updateRequests = new List<UpdateRequest>();
-
-            for (int i = 0; i < kpiGroups.Count; i++)
-            {
-                // Determine status: 2 = Successful, 3 = Failed
-                int statusCode = groupResults.ContainsKey(i) && groupResults[i] ? 2 : 3;
-
-                foreach (var conversationId in kpiGroups[i].SourceConversationIds)
-                {
-                    if (conversationId != Guid.Empty)
-                    {
-                        var entity = new Entity(TranscriptTableLogicalName, conversationId);
-                        entity["cat_workflowstatus"] = new OptionSetValue(statusCode);
-
-                        updateRequests.Add(new UpdateRequest { Target = entity });
-                    }
-                }
-            }
-
-            if (updateRequests.Count == 0)
-            {
-                return;
-            }
-
-            _tracingService.Trace($"Updating workflow status for {updateRequests.Count} conversation records in batches of {BatchSize}");
-
-            // Process in batches
-            for (int batchStart = 0; batchStart < updateRequests.Count; batchStart += BatchSize)
-            {
-                var batch = updateRequests.Skip(batchStart).Take(BatchSize).ToList();
-
-                var requestWithResults = new ExecuteMultipleRequest
-                {
-                    Requests = new OrganizationRequestCollection(),
-                    Settings = new ExecuteMultipleSettings
-                    {
-                        ContinueOnError = true,
-                        ReturnResponses = false
-                    }
-                };
-
-                foreach (var request in batch)
-                {
-                    requestWithResults.Requests.Add(request);
-                }
-
-                _tracingService.Trace($"Executing batch {(batchStart / BatchSize) + 1} with {batch.Count} records");
-                _organizationService.Execute(requestWithResults);
-            }
-        }
-
-        /// <summary>
         /// Sets error response output parameters.
         /// </summary>
+        /// <param name="context">The plugin execution context to set output parameters on.</param>
+        /// <param name="errorMessage">The error message to include in the response.</param>
         private void SetErrorResponse(IPluginExecutionContext context, string errorMessage)
         {
             context.OutputParameters["IsSuccess"] = false;
             context.OutputParameters["SuccessCount"] = 0;
             context.OutputParameters["FailureCount"] = 1;
             context.OutputParameters["ErrorMessage"] = errorMessage;
+        }
+
+        /// <summary>
+        /// Gets the conversation IDs from groups, separated by success/failure status.
+        /// </summary>
+        /// <param name="kpiGroups">The KPI groups with source conversation IDs.</param>
+        /// <param name="groupResults">Dictionary mapping group index to success/failure.</param>
+        /// <param name="successGuids">Output list of successful conversation GUIDs.</param>
+        /// <param name="failedGuids">Output list of failed conversation GUIDs.</param>
+        private void GetConversationIdsByStatus(
+            List<KpiGroup> kpiGroups,
+            Dictionary<int, bool> groupResults,
+            out List<Guid> successGuids,
+            out List<Guid> failedGuids)
+        {
+            const string methodName = nameof(GetConversationIdsByStatus);
+            successGuids = new List<Guid>();
+            failedGuids = new List<Guid>();
+
+            for (int i = 0; i < kpiGroups.Count; i++)
+            {
+                if (groupResults.TryGetValue(i, out bool success))
+                {
+                    var targetList = success ? successGuids : failedGuids;
+                    var sourceIds = kpiGroups[i].SourceConversationIds;
+
+                    for (int j = 0; j < sourceIds.Count; j++)
+                    {
+                        if (sourceIds[j] != Guid.Empty)
+                        {
+                            targetList.Add(sourceIds[j]);
+                        }
+                    }
+                }
+            }
+
+            _tracingService.Trace($"{methodName}: Found {successGuids.Count} successful and {failedGuids.Count} failed conversation IDs");
+        }
+
+        /// <summary>
+        /// Processes all SessionInfo items for a conversation and updates the KPI counters.
+        /// </summary>
+        /// <param name="sessionInfoList">The list of session info items to process.</param>
+        /// <param name="kpi">The KPI group to update.</param>
+        private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi)
+        {
+            if (sessionInfoList == null)
+            {
+                return;
+            }
+
+            foreach (var sessionInfo in sessionInfoList)
+            {
+                var sessionValue = sessionInfo?.Value;
+                if (sessionValue != null)
+                {
+                    // Increment session count
+                    kpi.SessionCount++;
+
+                    // Session type counts
+                    if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
+                        kpi.EngagedCount++;
+                    else if (string.Equals(sessionValue.Type, "Unengaged", StringComparison.OrdinalIgnoreCase))
+                        kpi.UnengagedCount++;
+
+                    // Outcome counts
+                    if (string.Equals(sessionValue.Outcome, "Resolved", StringComparison.OrdinalIgnoreCase))
+                        kpi.ResolvedCount++;
+                    else if (string.Equals(sessionValue.Outcome, "Abandoned", StringComparison.OrdinalIgnoreCase))
+                        kpi.AbandonedCount++;
+                    else if (string.Equals(sessionValue.Outcome, "HandOff", StringComparison.OrdinalIgnoreCase))
+                        kpi.EscalatedCount++;
+
+                    // Turn count
+                    kpi.TotalTurns += sessionValue.TurnCount;
+
+                    // CSAT score
+                    if (sessionValue.CsatScore.HasValue && sessionValue.CsatScore.Value > 0)
+                    {
+                        kpi.CsatScore += sessionValue.CsatScore.Value;
+                        kpi.CsatCount++;
+                    }
+                }
+            }
         }
     }
 }

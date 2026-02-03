@@ -17,6 +17,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         [JsonIgnore]
         public Guid EntityId { get; set; }
 
+        /// <summary>
+        /// Record name (cat_name) used for counting distinct conversations.
+        /// </summary>
+        [DataMember(Name = "Name")]
+        public string Name { get; set; }
+
         [DataMember(Name = "AgentName")]
         public string AgentName { get; set; }
 
@@ -26,8 +32,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         [DataMember(Name = "ConversationDate")]
         public string ConversationDate { get; set; }
 
-        [DataMember(Name = "isDesignMode")]
-        public bool IsDesignMode { get; set; }
+        [DataMember(Name = "DataSourceCode")]
+        public int DataSourceCode { get; set; }
 
         [DataMember(Name = "channelId")]
         public string ChannelId { get; set; }
@@ -35,26 +41,16 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         [DataMember(Name = "SessionInfo")]
         public List<SessionInfo> SessionInfo { get; set; }
 
-        [DataMember(Name = "feedback")]
-        public List<FeedbackItem> Feedback { get; set; }
-
-        [DataMember(Name = "botmessages")]
-        public List<Activity> BotMessagesActivities { get; set; }
-
-        /// <summary>
-        /// Dictionary of bot messages keyed by activity ID for quick lookup.
-        /// Populated during processing.
-        /// </summary>
-        [JsonIgnore]
-        public Dictionary<string, string> BotMessages { get; set; }
+        [DataMember(Name = "feedbackdetails")]
+        public List<FeedbackDetailRecord> FeedbackDetails { get; set; }
     }
 
     /// <summary>
-    /// Agent metadata containing configuration information.
+    /// Agent configuration details containing configuration information.
     /// This class is extensible - additional properties can be added as needed.
     /// </summary>
     [DataContract]
-    public class AgentMetadata
+    public class AgentConfigurationDetails
     {
         [DataMember(Name = "agentConfigurationName")]
         public string AgentConfigurationName { get; set; }
