@@ -105,7 +105,7 @@ stages:
         $releaseMonth = "$(varReleaseMonth)"
         $releaseYear = "$(varReleaseYear)"
         $outputSolutionName = "$(varOutputSolutionName)"
-        $downloadPath = "$(Pipeline.Workspace)/drop"
+        $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
         $repoPath = "$(Build.SourcesDirectory)"
         $artefactsFolder = "${repoPath}/CopilotstudioAcceleratorResources/Release/Artefacts"
         
