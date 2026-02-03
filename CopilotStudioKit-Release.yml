@@ -177,15 +177,24 @@ stages:
             Write-Host "##vso[task.logissue type=warning]Folder not found: $artefactsFolder"
         }
         
-        # Create assets list for GitHub Release task
-        $assetsString = $allAssets -join "`n"
-        Write-Host "##vso[task.setvariable variable=AllAssets;isOutput=false]$assetsString"
+        # Copy all files to a single staging directory for GitHub Release
+        $stagingFolder = "${downloadPath}/ReleaseAssets"
+        if (Test-Path $stagingFolder) {
+            Remove-Item -Path $stagingFolder -Recurse -Force
+        }
+        New-Item -Path $stagingFolder -ItemType Directory | Out-Null
         
         Write-Host ""
-        Write-Host "Assets to be uploaded:"
+        Write-Host "Copying all assets to staging folder..."
         foreach ($asset in $allAssets) {
-            Write-Host "  - $asset"
+            $fileName = Split-Path $asset -Leaf
+            $destination = Join-Path $stagingFolder $fileName
+            Copy-Item -Path $asset -Destination $destination -Force
+            Write-Host "  ✓ Copied: $fileName"
         }
+        
+        # Set staging folder path for GitHub Release task
+        Write-Host "##vso[task.setvariable variable=StagingFolder]$stagingFolder"
         
         Write-Host ""
         Write-Host "============================================"
@@ -224,8 +233,7 @@ stages:
           
           ---
           *Release notes will be updated manually.*
-        assets: |
-          $(AllAssets)
+        assets: '$(StagingFolder)/*'
         isDraft: true
         isPreRelease: false
         addChangeLog: false
