@@ -127,8 +127,16 @@ stages:
         # Generate release tag: e.g., "CopilotStudioAccelerator-January2026"
         $releaseTag = "${releaseName}-${releaseMonth}${releaseYear}"
         
+        # Generate release title with spaces: e.g., "Copilot Studio Kit February 2026"
+        # Convert CopilotStudioKit to "Copilot Studio Kit" by adding spaces before capitals
+        $titleName = $outputSolutionName -creplace '([A-Z])', ' $1'
+        $titleName = $titleName.Trim()
+        $releaseTitle = "${titleName} ${releaseMonth} ${releaseYear}"
+        
         Write-Host "##[section]Generated Release Tag: $releaseTag"
+        Write-Host "##[section]Generated Release Title: $releaseTitle"
         Write-Host "##vso[task.setvariable variable=ReleaseTag]$releaseTag"
+        Write-Host "##vso[task.setvariable variable=ReleaseTitle]$releaseTitle"
         
         # Find unmanaged solution
         $unmanagedFile = "${downloadPath}/${outputSolutionName}.zip"
@@ -358,39 +366,34 @@ stages:
         $milestoneFile = "$(MilestoneIssuesFile)"
         $releaseNotesPath = "$(Pipeline.Workspace)/release-notes.md"
         
-        # Build release notes
-        $releaseNotes = "## Release $(ReleaseTag)`n`n"
-        $releaseNotes += "**Solution Name**: $(varOutputSolutionName)`n"
-        $releaseNotes += "**Release Date**: $(Build.BuildNumber)`n`n"
-        $releaseNotes += "### Included Assets`n"
-        $releaseNotes += "- Managed Solution (with version)`n"
-        $releaseNotes += "- Unmanaged Solution`n"
+        # Initialize release notes (empty by default)
+        $releaseNotes = ""
         
         # Append milestone issues if file exists and has content
         if (Test-Path $milestoneFile) {
             $milestoneContent = Get-Content -Path $milestoneFile -Raw
             if (-not [string]::IsNullOrWhiteSpace($milestoneContent)) {
                 Write-Host "✓ Adding milestone issues to release notes"
-                $releaseNotes += $milestoneContent
+                $releaseNotes = $milestoneContent
             } else {
-                Write-Host "ℹ Milestone file is empty, skipping"
+                Write-Host "ℹ Milestone file is empty, no content to add"
             }
         } else {
-            Write-Host "ℹ No milestone file found, skipping"
+            Write-Host "ℹ No milestone file found, no content to add"
         }
         
-        # Add footer
-        $releaseNotes += "`n---`n"
-        $releaseNotes += "*Release notes will be updated manually.*"
-        
-        # Write combined release notes to file
+        # Write release notes to file (will be empty if no milestone)
         Set-Content -Path $releaseNotesPath -Value $releaseNotes -NoNewline
         Write-Host "##vso[task.setvariable variable=ReleaseNotesFile]$releaseNotesPath"
         
         Write-Host ""
         Write-Host "Release notes preview:"
         Write-Host "============================================"
-        Write-Host $releaseNotes
+        if ([string]::IsNullOrWhiteSpace($releaseNotes)) {
+            Write-Host "(Empty - no milestone issues found)"
+        } else {
+            Write-Host $releaseNotes
+        }
         Write-Host "============================================"
       displayName: 'Generate Combined Release Notes'
       condition: succeeded()
@@ -407,7 +410,7 @@ stages:
         target: 'main'
         tagSource: 'userSpecifiedTag'
         tag: '$(ReleaseTag)'
-        title: '$(ReleaseTag)'
+        title: '$(ReleaseTitle)'
         releaseNotesSource: 'filePath'
         releaseNotesFilePath: '$(ReleaseNotesFile)'
         assets: '$(StagingFolder)/*'
