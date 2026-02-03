@@ -329,32 +329,71 @@ stages:
             Write-Host "Milestone issues markdown generated:"
             Write-Host $issuesMarkdown
             
-            # Set variable for use in release notes
-            Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+            # Write to file for release notes
+            $releaseNotesFile = "$(Pipeline.Workspace)/milestone-issues.md"
+            Set-Content -Path $releaseNotesFile -Value $issuesMarkdown -NoNewline
+            Write-Host "Written to file: $releaseNotesFile"
+            Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
             
         } catch {
             Write-Host "##[warning]Failed to fetch milestone issues: $($_.Exception.Message)"
             Write-Host "##[warning]Continuing without milestone issues."
-            Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+            # Create empty file on error
+            $releaseNotesFile = "$(Pipeline.Workspace)/milestone-issues.md"
+            Set-Content -Path $releaseNotesFile -Value "" -NoNewline
+            Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
         }
       displayName: 'Fetch GitHub Milestone Issues (Optional)'
       env:
         GITHUB_PAT: $(GitHubPAT)
     
     # ============================================================================
-    # Step 6.5: Debug Milestone Variable
+    # Step 6.5: Generate Combined Release Notes
     # ============================================================================
     - powershell: |
         Write-Host "============================================"
-        Write-Host "MILESTONE VARIABLE DEBUG"
+        Write-Host "GENERATING COMBINED RELEASE NOTES"
         Write-Host "============================================"
-        $milestoneVar = "$(MilestoneIssues)"
-        Write-Host "Variable length: $($milestoneVar.Length)"
-        Write-Host "Variable content:"
-        Write-Host $milestoneVar
+        
+        $milestoneFile = "$(MilestoneIssuesFile)"
+        $releaseNotesPath = "$(Pipeline.Workspace)/release-notes.md"
+        
+        # Build release notes
+        $releaseNotes = "## Release $(ReleaseTag)`n`n"
+        $releaseNotes += "**Solution Name**: $(varOutputSolutionName)`n"
+        $releaseNotes += "**Release Date**: $(Build.BuildNumber)`n`n"
+        $releaseNotes += "### Included Assets`n"
+        $releaseNotes += "- Managed Solution (with version)`n"
+        $releaseNotes += "- Unmanaged Solution`n"
+        
+        # Append milestone issues if file exists and has content
+        if (Test-Path $milestoneFile) {
+            $milestoneContent = Get-Content -Path $milestoneFile -Raw
+            if (-not [string]::IsNullOrWhiteSpace($milestoneContent)) {
+                Write-Host "✓ Adding milestone issues to release notes"
+                $releaseNotes += $milestoneContent
+            } else {
+                Write-Host "ℹ Milestone file is empty, skipping"
+            }
+        } else {
+            Write-Host "ℹ No milestone file found, skipping"
+        }
+        
+        # Add footer
+        $releaseNotes += "`n---`n"
+        $releaseNotes += "*Release notes will be updated manually.*"
+        
+        # Write combined release notes to file
+        Set-Content -Path $releaseNotesPath -Value $releaseNotes -NoNewline
+        Write-Host "##vso[task.setvariable variable=ReleaseNotesFile]$releaseNotesPath"
+        
+        Write-Host ""
+        Write-Host "Release notes preview:"
         Write-Host "============================================"
-      displayName: 'Debug Milestone Variable'
-      condition: and(succeeded(), ne(variables['varMileStone'], ''))
+        Write-Host $releaseNotes
+        Write-Host "============================================"
+      displayName: 'Generate Combined Release Notes'
+      condition: succeeded()
     
     # ============================================================================
     # Step 7: Create GitHub Draft Release
@@ -369,19 +408,8 @@ stages:
         tagSource: 'userSpecifiedTag'
         tag: '$(ReleaseTag)'
         title: '$(ReleaseTag)'
-        releaseNotesSource: 'inline'
-        releaseNotesInline: |
-          ## Release $(ReleaseTag)
-          
-          **Solution Name**: $(varOutputSolutionName)
-          **Release Date**: $(Build.BuildNumber)
-          
-          ### Included Assets
-          - Managed Solution (with version)
-          - Unmanaged Solution
-          $(MilestoneIssues)
-          ---
-          *Release notes will be updated manually.*
+        releaseNotesSource: 'filePath'
+        releaseNotesFilePath: '$(ReleaseNotesFile)'
         assets: '$(StagingFolder)/*'
         isDraft: true
         isPreRelease: false
