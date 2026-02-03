@@ -157,7 +157,7 @@ stages:
         gitHubConnection: '$(varGitHubConnection)'
         repositoryName: '$(varGitHubRepo)'
         action: 'create'
-        target: '$(Build.SourceVersion)'
+        target: 'main'
         tagSource: 'userSpecifiedTag'
         tag: '$(ReleaseTag)'
         title: '$(ReleaseTag)'
