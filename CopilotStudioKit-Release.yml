@@ -34,16 +34,16 @@ resources:
 stages:
 - stage: Release
   displayName: 'Create GitHub Draft Release'
-  variables:
-    # Variable group with GitHubPAT (Required if using varMileStone)
-    - group: alm-accelerator-variable-group
-    
-    # Internal variables
-    - name: DownloadPath
-      value: $(Pipeline.Workspace)/ExportPipeline/drop
   jobs:
   - job: ReleaseJob
     displayName: 'GitHub Release'
+    variables:
+      # Variable group with GitHubPAT (Required if using varMileStone)
+      - group: alm-accelerator-variable-group
+      
+      # Internal variables
+      - name: DownloadPath
+        value: $(Pipeline.Workspace)/ExportPipeline/drop
     steps:
     
     # ============================================================================
@@ -220,9 +220,9 @@ stages:
         Write-Host "============================================"
         
         # Check if GitHubPAT is available
-        $githubPAT = "$(GitHubPAT)"
+        $githubPAT = $env:GITHUB_PAT
         
-        if ([string]::IsNullOrWhiteSpace($githubPAT) -or $githubPAT -eq '$(GitHubPAT)') {
+        if ([string]::IsNullOrWhiteSpace($githubPAT)) {
             Write-Host "❌ GitHubPAT: NOT FOUND or NOT ACCESSIBLE"
             Write-Host ""
             Write-Host "Possible causes:"
@@ -243,6 +243,8 @@ stages:
         Write-Host "============================================"
       displayName: 'Debug Variable Group Access'
       condition: and(succeeded(), ne(variables['varMileStone'], ''))
+      env:
+        GITHUB_PAT: $(GitHubPAT)
     
     # ============================================================================
     # Step 6: Fetch GitHub Milestone Issues (Optional)
@@ -263,10 +265,10 @@ stages:
         Write-Host "##[section]Fetching issues from milestone: $milestoneName"
         
         try {
-            # Get GitHub PAT from variable group
-            $token = "$(GitHubPAT)".Trim()
+            # Get GitHub PAT from environment variable
+            $token = $env:GITHUB_PAT
             
-            if ([string]::IsNullOrWhiteSpace($token) -or $token -eq '$(GitHubPAT)') {
+            if ([string]::IsNullOrWhiteSpace($token)) {
                 Write-Host "##[warning]GitHubPAT not found in variable group 'alm-accelerator-variable-group'."
                 Write-Host "##[warning]Cannot fetch milestone issues without GitHub PAT."
                 Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
@@ -336,6 +338,8 @@ stages:
             Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
         }
       displayName: 'Fetch GitHub Milestone Issues (Optional)'
+      env:
+        GITHUB_PAT: $(GitHubPAT)
     
     # ============================================================================
     # Step 7: Create GitHub Draft Release
