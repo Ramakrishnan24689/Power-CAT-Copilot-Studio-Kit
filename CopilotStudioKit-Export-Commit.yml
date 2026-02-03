@@ -67,7 +67,7 @@ steps:
     SolutionInputFile: '$(SolutionOutputFolder)/$(varSolutionName).zip'
     SolutionTargetFolder: '$(UnpackedSolutionFolder)/SolutionPackage'
     SolutionType: 'Both'
-    ProcessCanvasApps: true
+    ProcessCanvasApps: false
 
 # ============================================================================
 # Step 6: Publish Pipeline Artifacts
