@@ -299,7 +299,9 @@ stages:
 # ============================================================================
 - stage: Release
   displayName: 'GitHub Release'
-  dependsOn: Export
+  dependsOn: 
+    - Export
+    - Deploy
   condition: succeeded()
   jobs:
   - job: ReleaseJob
