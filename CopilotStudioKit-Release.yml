@@ -38,7 +38,13 @@ stages:
     steps:
     
     # ============================================================================
-    # Step 1: Validate Required Variables
+    # Step 1: Checkout GitHub Repository
+    # ============================================================================
+    - checkout: self
+      displayName: 'Checkout GitHub Repository'
+    
+    # ============================================================================
+    # Step 2: Validate Required Variables
     # ============================================================================
     - powershell: |
         Write-Host "============================================"
@@ -85,21 +91,23 @@ stages:
       displayName: 'Validate Required Variables'
     
     # ============================================================================
-    # Step 2: Download Solution Artifacts from Export-Commit Pipeline
+    # Step 3: Download Solution Artifacts from Export-Commit Pipeline
     # ============================================================================
     - download: ExportPipeline
       artifact: drop
       displayName: 'Download Solution Artifacts'
     
     # ============================================================================
-    # Step 3: Generate Release Tag and Validate Artifacts
+    # Step 4: Generate Release Tag and Collect All Assets
     # ============================================================================
     - powershell: |
         $releaseName = "$(varReleaseName)"
         $releaseMonth = "$(varReleaseMonth)"
         $releaseYear = "$(varReleaseYear)"
         $outputSolutionName = "$(varOutputSolutionName)"
-        $downloadPath = "$(DownloadPath)"
+        $downloadPath = "$(Pipeline.Workspace)/drop"
+        $repoPath = "$(Build.SourcesDirectory)"
+        $artefactsFolder = "${repoPath}/CopilotstudioAcceleratorResources/Release/Artefacts"
         
         # Generate release tag: e.g., "CopilotStudioAccelerator-January2026"
         $releaseTag = "${releaseName}-${releaseMonth}${releaseYear}"
@@ -134,9 +142,33 @@ stages:
         $managedFile = $managedFiles[0].FullName
         Write-Host "✓ Managed solution found: $($managedFiles[0].Name)"
         
-        # Set variables for asset paths
-        Write-Host "##vso[task.setvariable variable=UnmanagedAsset]$unmanagedFile"
-        Write-Host "##vso[task.setvariable variable=ManagedAsset]$managedFile"
+        # Collect all assets
+        $allAssets = @()
+        $allAssets += $unmanagedFile
+        $allAssets += $managedFile
+        
+        # Add files from GitHub repository folder
+        Write-Host ""
+        Write-Host "Collecting additional assets from GitHub repository..."
+        
+        if (Test-Path $artefactsFolder) {
+            $repoFiles = Get-ChildItem -Path $artefactsFolder -File
+            if ($repoFiles.Count -gt 0) {
+                Write-Host "✓ Found $($repoFiles.Count) additional file(s) in CopilotstudioAcceleratorResources/Release/Artefacts:"
+                foreach ($file in $repoFiles) {
+                    Write-Host "  - $($file.Name)"
+                    $allAssets += $file.FullName
+                }
+            } else {
+                Write-Host "⚠ No files found in CopilotstudioAcceleratorResources/Release/Artefacts folder"
+            }
+        } else {
+            Write-Host "##vso[task.logissue type=warning]Folder not found: $artefactsFolder"
+        }
+        
+        # Create assets list for GitHub Release task
+        $assetsString = $allAssets -join "`n"
+        Write-Host "##vso[task.setvariable variable=AllAssets]$assetsString"
         
         Write-Host ""
         Write-Host "============================================"
@@ -145,11 +177,12 @@ stages:
         Write-Host "Release Tag: $releaseTag"
         Write-Host "Solution Name: $outputSolutionName"
         Write-Host "GitHub Repo: $(varGitHubRepo)"
+        Write-Host "Total Assets: $($allAssets.Count)"
         Write-Host "============================================"
-      displayName: 'Generate Release Tag and Validate Artifacts'
+      displayName: 'Generate Release Tag and Collect All Assets'
     
     # ============================================================================
-    # Step 4: Create GitHub Draft Release
+    # Step 5: Create GitHub Draft Release
     # ============================================================================
     - task: GitHubRelease@1
       displayName: 'Create GitHub Draft Release'
@@ -174,15 +207,13 @@ stages:
           
           ---
           *Release notes will be updated manually.*
-        assets: |
-          $(UnmanagedAsset)
-          $(ManagedAsset)
+        assets: '$(AllAssets)'
         isDraft: true
         isPreRelease: false
         addChangeLog: false
     
     # ============================================================================
-    # Step 5: Release Summary
+    # Step 6: Release Summary
     # ============================================================================
     - powershell: |
         Write-Host "============================================"
