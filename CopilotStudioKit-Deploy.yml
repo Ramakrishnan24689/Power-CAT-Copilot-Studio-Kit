@@ -22,7 +22,8 @@ variables:
   # Pipeline variables (set in Azure DevOps pipeline UI):
   # - varTargetEnvironmentURL: Target environment URL (e.g., https://org-test.crm.dynamics.com/)
   # - varTargetServiceConnection: Service connection name for target (e.g., PowerPlatform-TEST)
-  # - varSolutionName: Unique name of the solution to deploy
+  # - varSolutionName: Unique name of the solution in Power Platform
+  # - varOutputSolutionName: Display name used in solution file names (e.g., CopilotStudioAccelerator)
   # - varSolutionType: 'managed' or 'unmanaged'
   
   # Internal variables
@@ -54,13 +55,13 @@ stages:
     # ============================================================================
     - powershell: |
         $solutionType = "$(varSolutionType)".ToLower()
-        $solutionName = "$(varSolutionName)"
+        $outputSolutionName = "$(varOutputSolutionName)"
         $downloadPath = "$(DownloadPath)"
         
         if ($solutionType -eq "managed") {
-            # Managed solution has version in filename: SolutionName_VERSION_managed.zip
+            # Managed solution has version in filename: OutputSolutionName_VERSION_managed.zip
             # Use pattern matching to find the file
-            $pattern = "${solutionName}_*_managed.zip"
+            $pattern = "${outputSolutionName}_*_managed.zip"
             $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
             
             if ($managedFiles.Count -eq 0) {
@@ -80,8 +81,8 @@ stages:
         }
         elseif ($solutionType -eq "unmanaged") {
             # Unmanaged solution has no version in filename
-            $solutionFile = "${downloadPath}/${solutionName}.zip"
-            Write-Host "##[section]Deploying UNMANAGED solution: ${solutionName}.zip"
+            $solutionFile = "${downloadPath}/${outputSolutionName}.zip"
+            Write-Host "##[section]Deploying UNMANAGED solution: ${outputSolutionName}.zip"
         }
         else {
             Write-Host "##vso[task.logissue type=error]Invalid varSolutionType. Must be 'managed' or 'unmanaged'"
