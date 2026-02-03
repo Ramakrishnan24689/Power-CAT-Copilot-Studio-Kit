@@ -18,8 +18,9 @@ resources:
 variables:
   # ==================== Export Variables ====================
   # - varSourceEnvironmentURL: Source Power Platform environment URL
-  # - varSolutionName: Internal solution name in Power Platform (e.g., CopilotStudioKit)
-  # - varOutputSolutionName: Display name for output files (e.g., CopilotStudioAccelerator)
+  # - varSourceServiceConnection: Service connection for source environment
+  # - varSolutionName: Internal solution name in Power Platform (e.g., CopilotStudioAccelerator)
+  # - varOutputSolutionName: Display name for output files (e.g., CopilotStudioKit)
   
   # ==================== Deploy Variables ====================
   # - varTargetEnvironmentURL: Target Power Platform environment URL
@@ -69,7 +70,7 @@ stages:
       displayName: 'Export Unmanaged Solution'
       inputs:
         authenticationType: 'PowerPlatformSPN'
-        PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+        PowerPlatformSPN: '$(varSourceServiceConnection)'
         Environment: '$(varSourceEnvironmentURL)'
         SolutionName: '$(varSolutionName)'
         SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
@@ -82,7 +83,7 @@ stages:
       displayName: 'Export Managed Solution'
       inputs:
         authenticationType: 'PowerPlatformSPN'
-        PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+        PowerPlatformSPN: '$(varSourceServiceConnection)'
         Environment: '$(varSourceEnvironmentURL)'
         SolutionName: '$(varSolutionName)'
         SolutionOutputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName)_managed.zip'
