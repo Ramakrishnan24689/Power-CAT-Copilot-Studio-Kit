@@ -16,6 +16,11 @@ resources:
     - pipeline: ExportPipeline
       source: Copilot-Studio-Kit-Export-Commit
       trigger: none  # Manual release creation
+  repositories:
+    - repository: GitHubRepo
+      type: github
+      endpoint: powercat-alm
+      name: microsoft/Power-CAT-Copilot-Studio-Kit
 
 variables:
   # Pipeline variables (set in Azure DevOps pipeline UI):
@@ -38,10 +43,16 @@ stages:
     steps:
     
     # ============================================================================
-    # Step 1: Checkout GitHub Repository
+    # Step 1: Checkout Azure DevOps Repository (for pipeline)
     # ============================================================================
     - checkout: self
-      displayName: 'Checkout GitHub Repository'
+      displayName: 'Checkout Azure DevOps Repository'
+    
+    # ============================================================================
+    # Step 2: Checkout GitHub Repository (for artifacts)
+    # ============================================================================
+    - checkout: GitHubRepo
+      displayName: 'Checkout GitHub Repository for Assets'
     
     # ============================================================================
     # Step 2: Validate Required Variables
@@ -106,7 +117,7 @@ stages:
         $releaseYear = "$(varReleaseYear)"
         $outputSolutionName = "$(varOutputSolutionName)"
         $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
-        $repoPath = "$(Build.SourcesDirectory)"
+        $repoPath = "$(Build.SourcesDirectory)/Power-CAT-Copilot-Studio-Kit"
         $artefactsFolder = "${repoPath}/CopilotstudioAcceleratorResources/Release/Artefacts"
         
         # Generate release tag: e.g., "CopilotStudioAccelerator-January2026"
@@ -168,7 +179,13 @@ stages:
         
         # Create assets list for GitHub Release task
         $assetsString = $allAssets -join "`n"
-        Write-Host "##vso[task.setvariable variable=AllAssets]$assetsString"
+        Write-Host "##vso[task.setvariable variable=AllAssets;isOutput=false]$assetsString"
+        
+        Write-Host ""
+        Write-Host "Assets to be uploaded:"
+        foreach ($asset in $allAssets) {
+            Write-Host "  - $asset"
+        }
         
         Write-Host ""
         Write-Host "============================================"
@@ -207,7 +224,8 @@ stages:
           
           ---
           *Release notes will be updated manually.*
-        assets: '$(AllAssets)'
+        assets: |
+          $(AllAssets)
         isDraft: true
         isPreRelease: false
         addChangeLog: false
