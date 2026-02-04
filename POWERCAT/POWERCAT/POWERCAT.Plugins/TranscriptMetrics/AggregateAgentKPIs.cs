@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Crm.Sdk.Messages;
 
 namespace POWERCAT.Plugins.TranscriptMetrics
 {
@@ -380,11 +381,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity["cat_csatscore"] = kpi.CsatScore;
                 entity["cat_csatcount"] = kpi.CsatCount;
 
-                // Feedback details JSON
-                if (kpi.FeedbackDetails != null && kpi.FeedbackDetails.Count > 0)
-                {
-                    entity["cat_feedbackdetails"] = JsonConvert.SerializeObject(kpi.FeedbackDetails);
-                }
+                // Note: Feedback details file upload happens after upsert in UploadFeedbackDetailsFile()
 
                 // UpsertRequest: creates if not exists, updates if exists (based on alternate key)
                 UpsertRequest request = new UpsertRequest() { Target = entity };
@@ -428,6 +425,19 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             }
 
             _tracingService.Trace($"{methodName}: Upsert results - Success: {successCount}, Failures: {failureCount}");
+
+            // After the ExecuteMultiple upsert completes successfully, upload files
+            foreach (var responseItem in response.Responses)
+            {
+                if (responseItem.Fault == null && responseItem.Response is UpsertResponse upsertResponse)
+                {
+                    var kpi = kpiGroups[responseItem.RequestIndex];
+                    if (kpi.FeedbackDetails != null && kpi.FeedbackDetails.Count > 0)
+                    {
+                        UploadFeedbackDetailsFile(upsertResponse.Target, kpi);
+                    }
+                }
+            }
 
             // Set output parameters with detailed results
             context.OutputParameters["IsSuccess"] = failureCount == 0;
@@ -541,6 +551,97 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         kpi.CsatCount++;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Uploads the feedback details file to Dataverse after upsert.
+        /// </summary>
+        /// <param name="target">The target entity reference where the file is associated.</param>
+        /// <param name="kpi">The KPI group containing the feedback details.</param>
+        private void UploadFeedbackDetailsFile(EntityReference target, KpiGroup kpi)
+        {
+            const string methodName = nameof(UploadFeedbackDetailsFile);
+
+            try
+            {
+                _tracingService.Trace($"{methodName}: Starting file upload for entity {target.LogicalName} with Id {target.Id}");
+                _tracingService.Trace($"{methodName}: Feedback details count: {kpi.FeedbackDetails?.Count ?? 0}");
+
+                // Convert feedback details to JSON and then to byte array
+                string feedbackJson = JsonConvert.SerializeObject(kpi.FeedbackDetails);
+                byte[] fileContent = System.Text.Encoding.UTF8.GetBytes(feedbackJson);
+
+                _tracingService.Trace($"{methodName}: File content size: {fileContent.Length} bytes");
+
+                // Generate filename upfront - required for InitializeFileBlocksUploadRequest
+                string fileName = $"feedback_{kpi.ConversationDate:yyyyMMdd}_{kpi.ChannelId}.json";
+
+                // Initialize the file column upload - FileName is required
+                var initRequest = new InitializeFileBlocksUploadRequest
+                {
+                    Target = target,
+                    FileAttributeName = "cat_feedbackdetailsfile",
+                    FileName = fileName
+                };
+
+                _tracingService.Trace($"{methodName}: Initializing file blocks upload for attribute: {initRequest.FileAttributeName}, FileName: {fileName}");
+
+                var initResponse = (InitializeFileBlocksUploadResponse)_organizationService.Execute(initRequest);
+
+                _tracingService.Trace($"{methodName}: File blocks upload initialized. FileContinuationToken received: {!string.IsNullOrEmpty(initResponse.FileContinuationToken)}");
+
+                const int blockSize = 4 * 1024 * 1024; // 4 MB blocks
+                var blockList = new List<string>();
+                int blockIndex = 0;
+
+                for (int offset = 0; offset < fileContent.Length; offset += blockSize)
+                {
+                    int bytesToCopy = Math.Min(blockSize, fileContent.Length - offset);
+                    byte[] blockData = new byte[bytesToCopy];
+                    Buffer.BlockCopy(fileContent, offset, blockData, 0, bytesToCopy);
+
+                    string blockId = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"block{blockIndex:D6}"));
+                    blockList.Add(blockId);
+
+                    var uploadRequest = new UploadBlockRequest
+                    {
+                        FileContinuationToken = initResponse.FileContinuationToken,
+                        BlockData = blockData,
+                        BlockId = blockId
+                    };
+
+                    _tracingService.Trace($"{methodName}: Uploading block {blockIndex + 1} ({bytesToCopy} bytes) with Id: {blockId}");
+
+                    _organizationService.Execute(uploadRequest);
+                    blockIndex++;
+                }
+
+                _tracingService.Trace($"{methodName}: Uploaded {blockList.Count} blocks. Committing file upload.");
+
+                var commitRequest = new CommitFileBlocksUploadRequest
+                {
+                    FileContinuationToken = initResponse.FileContinuationToken,
+                    FileName = fileName,
+                    MimeType = "application/json",
+                    BlockList = blockList.ToArray()
+                };
+
+                _organizationService.Execute(commitRequest);
+
+                _tracingService.Trace($"{methodName}: File upload committed successfully for record Id: {target.Id}");
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"{methodName}: ERROR - File upload failed. Exception: {ex.Message}");
+                _tracingService.Trace($"{methodName}: ERROR - Stack trace: {ex.StackTrace}");
+
+                if (ex.InnerException != null)
+                {
+                    _tracingService.Trace($"{methodName}: ERROR - Inner exception: {ex.InnerException.Message}");
+                }
+
+                _tracingService.Trace($"{methodName}: Continuing execution despite file upload failure");
             }
         }
     }

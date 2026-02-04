@@ -66,6 +66,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     SetErrorResponse(context, $"{methodName}: Failed to parse Records: {ex.Message}");
                     throw new InvalidPluginExecutionException($"{methodName}: Failed to parse Records: {ex.Message}", ex);
                 }
+
                 if (inputRecords == null || inputRecords.Count == 0)
                 {
                     _tracingService.Trace($"{methodName}: No records to process.");
@@ -74,6 +75,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     context.OutputParameters["ErrorMessage"] = "No records provided.";
                     return;
                 }
+
                 _tracingService.Trace($"{methodName}: Processing {inputRecords.Count} records");
 
                 // 3. Collect all ConversationTranscriptGuid from input (trimmed)
@@ -103,18 +105,21 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 {
                     try
                     {
-                        var agentConversation = ProcessTranscriptRecord(record);
-                        if (!string.IsNullOrEmpty(record.ConversationTranscriptGuid) &&
-                            existingRecords.TryGetValue(record.ConversationTranscriptGuid, out Guid existingId))
+                        var transcriptGuid = record.ConversationTranscriptGuid?.Trim();
+                        Entity entityToUpsert = ProcessTranscriptRecord(record);
+
+                        if (!string.IsNullOrEmpty(transcriptGuid) &&
+                            existingRecords.TryGetValue(transcriptGuid, out Guid existingId))
                         {
-                            agentConversation.Id = existingId;
+                            entityToUpsert.Id = existingId;
                         }
                         else
                         {
-                            agentConversation.Id = Guid.NewGuid();
+                            entityToUpsert.Id = Guid.NewGuid();
                         }
-                        upsertRequests.Requests.Add(new UpsertRequest { Target = agentConversation });
-                        requestIndexToRecordInfo.Add((record.ConversationTranscriptGuid, record.RecordName));
+
+                        upsertRequests.Requests.Add(new UpsertRequest { Target = entityToUpsert });
+                        requestIndexToRecordInfo.Add((transcriptGuid, record.RecordName));
                     }
                     catch (Exception ex)
                     {
@@ -122,7 +127,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     }
                 }
 
-                // 6. Execute batch upsert
+                // 6. Execute batch upsert in chunks for better performance
                 if (upsertRequests.Requests.Count == 0)
                 {
                     _tracingService.Trace($"{methodName}: No valid records to upsert");
@@ -132,27 +137,61 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     return;
                 }
 
-                _tracingService.Trace($"{methodName}: Executing batch upsert for {upsertRequests.Requests.Count} records");
-                var response = (ExecuteMultipleResponse)_organizationService.Execute(upsertRequests);
+                const int batchSize = 50; // Optimal batch size for Dataverse
+                int totalRequests = upsertRequests.Requests.Count;
+                _tracingService.Trace($"{methodName}: Executing batch upsert for {totalRequests} records in chunks of {batchSize}");
 
                 // 7. Process response and set output parameters
                 int successCount = 0;
                 int failureCount = 0;
                 var errors = new List<string>();
 
-                foreach (var responseItem in response.Responses)
+                for (int i = 0; i < totalRequests; i += batchSize)
                 {
-                    if (responseItem.Fault != null)
+                    var batchRequest = new ExecuteMultipleRequest
                     {
-                        failureCount++;
-                        var recordInfo = requestIndexToRecordInfo.Count > responseItem.RequestIndex
-                            ? requestIndexToRecordInfo[responseItem.RequestIndex]
-                            : (TranscriptGuid: "Unknown", RecordName: "Unknown");
-                        errors.Add($"{methodName}:TranscriptGuid: {recordInfo.TranscriptGuid}, RecordName: {recordInfo.RecordName} - {responseItem.Fault.Message}");
+                        Requests = new OrganizationRequestCollection(),
+                        Settings = new ExecuteMultipleSettings
+                        {
+                            ContinueOnError = true,
+                            ReturnResponses = false // Set to false for better performance
+                        }
+                    };
+
+                    int batchEnd = Math.Min(i + batchSize, totalRequests);
+                    for (int j = i; j < batchEnd; j++)
+                    {
+                        batchRequest.Requests.Add(upsertRequests.Requests[j]);
                     }
-                    else
+
+                    try
                     {
-                        successCount++;
+                        var response = (ExecuteMultipleResponse)_organizationService.Execute(batchRequest);
+
+                        // Check for faults when ReturnResponses is false
+                        if (response.IsFaulted)
+                        {
+                            foreach (var responseItem in response.Responses.Where(r => r.Fault != null))
+                            {
+                                failureCount++;
+                                int originalIndex = i + responseItem.RequestIndex;
+                                var recordInfo = requestIndexToRecordInfo.Count > originalIndex
+                                    ? requestIndexToRecordInfo[originalIndex]
+                                    : (TranscriptGuid: "Unknown", RecordName: "Unknown");
+                                errors.Add($"{methodName}:TranscriptGuid: {recordInfo.TranscriptGuid}, RecordName: {recordInfo.RecordName} - {responseItem.Fault.Message}");
+                            }
+                            successCount += batchRequest.Requests.Count - response.Responses.Count(r => r.Fault != null);
+                        }
+                        else
+                        {
+                            successCount += batchRequest.Requests.Count;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _tracingService.Trace($"{methodName}: Batch {i / batchSize + 1} failed: {ex.Message}");
+                        failureCount += batchRequest.Requests.Count;
+                        errors.Add($"Batch {i / batchSize + 1} failed: {ex.Message}");
                     }
                 }
 
@@ -260,50 +299,43 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
             }
 
-            // Filter: SessionInfo rows (type='trace' AND valueType='SessionInfo')
-            var sessionInfoRows = activities
-                .Where(a => a["type"]?.ToString() == "trace" &&
-                           a["valueType"]?.ToString() == "SessionInfo")
-                .ToList();
-
-            // Filter: ConversationInfo rows (type='trace' AND valueType='ConversationInfo')
-            var conversationInfoRows = activities
-                .Where(a => a["type"]?.ToString() == "trace" &&
-                           a["valueType"]?.ToString() == "ConversationInfo")
-                .ToList();
-
-            // Determine dataSourceCode: false (production) = 1, true (testData) = 2
+            var sessionInfoRows = new List<JObject>();
             int dataSourceCode = 1;
-            if (conversationInfoRows.Any())
-            {
-                bool isDesignMode = conversationInfoRows.First()["value"]?["isDesignMode"]?.Value<bool>() ?? false;
-                dataSourceCode = isDesignMode ? 2 : 1;
-            }
-
-            // Filter: Channel ID rows
-            var channelIdRows = activities
-                .Where(a =>
-                {
-                    var type = a["type"]?.ToString();
-                    var isValidType = type == "event" || type == "message" || type == "conversationUpdate";
-                    var activityChannelId = a["channelId"]?.ToString() ?? a["value"]?["channelId"]?.ToString();
-                    return isValidType && !string.IsNullOrEmpty(activityChannelId);
-                })
-                .ToList();
-
-            // Determine channel ID
-            string channelId = "Unknown";
-            if (channelIdRows.Any())
-            {
-                channelId = channelIdRows.First()["channelId"]?.ToString() ?? "Unknown";
-            }
-
-            // Build bot messages dictionary for feedback correlation
+            bool dataSourceCodeSet = false;
+            JObject firstChannelRow = null;
             var botMessagesDictionary = new Dictionary<string, string>();
+            var feedbackRows = new List<JObject>();
+
             foreach (var activity in activities)
             {
-                if (activity["type"]?.ToString() == "message" &&
-                    activity["from"]?["role"]?.Value<int>() == 0)
+                var type = activity["type"]?.ToString();
+
+                if (type == "trace")
+                {
+                    var valueType = activity["valueType"]?.ToString();
+                    if (valueType == "SessionInfo")
+                    {
+                        sessionInfoRows.Add(activity);
+                    }
+                    else if (!dataSourceCodeSet && valueType == "ConversationInfo")
+                    {
+                        bool isDesignMode = activity["value"]?["isDesignMode"]?.Value<bool>() ?? false;
+                        dataSourceCode = isDesignMode ? 2 : 1;
+                        dataSourceCodeSet = true;
+                    }
+                }
+
+                if (firstChannelRow == null)
+                {
+                    var isValidType = type == "event" || type == "message" || type == "conversationUpdate";
+                    var activityChannelId = activity["channelId"]?.ToString() ?? activity["value"]?["channelId"]?.ToString();
+                    if (isValidType && !string.IsNullOrEmpty(activityChannelId))
+                    {
+                        firstChannelRow = activity;
+                    }
+                }
+
+                if (type == "message" && activity["from"]?["role"]?.Value<int>() == 0)
                 {
                     var id = activity["id"]?.ToString();
                     var text = activity["text"]?.ToString();
@@ -312,22 +344,24 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         botMessagesDictionary[id] = text;
                     }
                 }
+
+                if (type == "invoke" &&
+                    activity["name"]?.ToString() == "message/submitAction" &&
+                    activity["value"]?["actionName"]?.ToString() == "feedback")
+                {
+                    feedbackRows.Add(activity);
+                }
             }
 
-            // Filter feedback rows and build feedback details with agent message correlation
-            var feedbackDetails = new List<FeedbackDetailRecord>();
-            var feedbackRows = activities
-                .Where(a => a["type"]?.ToString() == "invoke" &&
-                           a["name"]?.ToString() == "message/submitAction" &&
-                           a["value"]?["actionName"]?.ToString() == "feedback");
+            string channelId = firstChannelRow?["channelId"]?.ToString() ?? "Unknown";
 
-            _tracingService.Trace($"{methodName}: Feedback rows found: {feedbackRows.Count()}");
+            var feedbackDetails = new List<FeedbackDetailRecord>();
+            _tracingService.Trace($"{methodName}: Feedback rows found: {feedbackRows.Count}");
 
             foreach (var feedback in feedbackRows)
             {
                 var reaction = feedback["value"]?["actionValue"]?["reaction"]?.ToString();
-                
-                // Get feedback value first, then determine how to extract feedbackText
+
                 var feedbackValue = feedback["value"]?["actionValue"]?["feedback"];
                 string feedbackText = null;
 
@@ -335,12 +369,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 {
                     if (feedbackValue.Type == JTokenType.Object)
                     {
-                        // It's already a JSON object, access directly
                         feedbackText = feedbackValue["feedbackText"]?.ToString();
                     }
                     else if (feedbackValue.Type == JTokenType.String)
                     {
-                        // It's a string (possibly escaped JSON), try to parse
                         var feedbackString = feedbackValue.ToString();
                         try
                         {
@@ -349,13 +381,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         }
                         catch
                         {
-                            // If parsing fails, use the raw string
                             feedbackText = feedbackString;
                         }
                     }
                 }
 
-                // Correlate with agent message using replyToId
                 string agentMessage = null;
                 var replyToId = feedback["replyToId"]?.ToString();
                 if (!string.IsNullOrEmpty(replyToId) && botMessagesDictionary.TryGetValue(replyToId, out string message))
@@ -363,7 +393,6 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     agentMessage = message;
                 }
 
-                // Only add if there's a reaction or feedback text
                 if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
                 {
                     feedbackDetails.Add(new FeedbackDetailRecord
@@ -377,7 +406,6 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
             }
 
-            // Create entity
             var entity = new Entity(_tableName);
             entity["cat_name"] = record.RecordName;
             entity["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", Guid.Parse(record.AgentConfigurationId));
