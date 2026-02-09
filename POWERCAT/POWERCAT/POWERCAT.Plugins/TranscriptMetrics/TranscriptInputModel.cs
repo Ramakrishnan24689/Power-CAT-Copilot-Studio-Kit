@@ -31,5 +31,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [JsonProperty("ConversationTranscriptGuid")]
         public string ConversationTranscriptGuid { get; set; }
+        [JsonProperty("CaptureUserFeedback")]
+        public bool CaptureUserFeedback { get; set; } = false;
     }
 }

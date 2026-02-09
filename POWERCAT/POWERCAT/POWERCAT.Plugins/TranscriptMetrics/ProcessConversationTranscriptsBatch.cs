@@ -335,75 +335,87 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     }
                 }
 
-                if (type == "message" && activity["from"]?["role"]?.Value<int>() == 0)
+                // Only collect bot messages and feedback rows when CaptureUserFeedback is enabled
+                if (record.CaptureUserFeedback)
                 {
-                    var id = activity["id"]?.ToString();
-                    var text = activity["text"]?.ToString();
-                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(text))
+                    if (type == "message" && activity["from"]?["role"]?.Value<int>() == 0)
                     {
-                        botMessagesDictionary[id] = text;
+                        var id = activity["id"]?.ToString();
+                        var text = activity["text"]?.ToString();
+                        if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(text))
+                        {
+                            botMessagesDictionary[id] = text;
+                        }
                     }
-                }
 
-                if (type == "invoke" &&
-                    activity["name"]?.ToString() == "message/submitAction" &&
-                    activity["value"]?["actionName"]?.ToString() == "feedback")
-                {
-                    feedbackRows.Add(activity);
+                    if (type == "invoke" &&
+                        activity["name"]?.ToString() == "message/submitAction" &&
+                        activity["value"]?["actionName"]?.ToString() == "feedback")
+                    {
+                        feedbackRows.Add(activity);
+                    }
                 }
             }
 
             string channelId = firstChannelRow?["channelId"]?.ToString() ?? "Unknown";
 
             var feedbackDetails = new List<FeedbackDetailRecord>();
-            _tracingService.Trace($"{methodName}: Feedback rows found: {feedbackRows.Count}");
 
-            foreach (var feedback in feedbackRows)
+            if (record.CaptureUserFeedback)
             {
-                var reaction = feedback["value"]?["actionValue"]?["reaction"]?.ToString();
+                _tracingService.Trace($"{methodName}: Feedback rows found: {feedbackRows.Count}");
 
-                var feedbackValue = feedback["value"]?["actionValue"]?["feedback"];
-                string feedbackText = null;
-
-                if (feedbackValue != null)
+                foreach (var feedback in feedbackRows)
                 {
-                    if (feedbackValue.Type == JTokenType.Object)
+                    var reaction = feedback["value"]?["actionValue"]?["reaction"]?.ToString();
+
+                    var feedbackValue = feedback["value"]?["actionValue"]?["feedback"];
+                    string feedbackText = null;
+
+                    if (feedbackValue != null)
                     {
-                        feedbackText = feedbackValue["feedbackText"]?.ToString();
-                    }
-                    else if (feedbackValue.Type == JTokenType.String)
-                    {
-                        var feedbackString = feedbackValue.ToString();
-                        try
+                        if (feedbackValue.Type == JTokenType.Object)
                         {
-                            var parsedFeedback = JObject.Parse(feedbackString);
-                            feedbackText = parsedFeedback["feedbackText"]?.ToString();
+                            feedbackText = feedbackValue["feedbackText"]?.ToString();
                         }
-                        catch
+                        else if (feedbackValue.Type == JTokenType.String)
                         {
-                            feedbackText = feedbackString;
+                            var feedbackString = feedbackValue.ToString();
+                            try
+                            {
+                                var parsedFeedback = JObject.Parse(feedbackString);
+                                feedbackText = parsedFeedback["feedbackText"]?.ToString();
+                            }
+                            catch
+                            {
+                                feedbackText = feedbackString;
+                            }
                         }
                     }
-                }
 
-                string agentMessage = null;
-                var replyToId = feedback["replyToId"]?.ToString();
-                if (!string.IsNullOrEmpty(replyToId) && botMessagesDictionary.TryGetValue(replyToId, out string message))
-                {
-                    agentMessage = message;
-                }
-
-                if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
-                {
-                    feedbackDetails.Add(new FeedbackDetailRecord
+                    string agentMessage = null;
+                    var replyToId = feedback["replyToId"]?.ToString();
+                    if (!string.IsNullOrEmpty(replyToId) && botMessagesDictionary.TryGetValue(replyToId, out string message))
                     {
-                        AgentName = record.AgentName,
-                        ConversationId = record.ConversationId,
-                        AgentMessage = agentMessage,
-                        FeedbackText = feedbackText,
-                        FeedbackReaction = reaction
-                    });
+                        agentMessage = message;
+                    }
+
+                    if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
+                    {
+                        feedbackDetails.Add(new FeedbackDetailRecord
+                        {
+                            AgentName = record.AgentName,
+                            ConversationId = record.ConversationId,
+                            AgentMessage = agentMessage,
+                            FeedbackText = feedbackText,
+                            FeedbackReaction = reaction
+                        });
+                    }
                 }
+            }
+            else
+            {
+                _tracingService.Trace($"{methodName}: CaptureUserFeedback is disabled, skipping feedback processing.");
             }
 
             var entity = new Entity(_tableName);

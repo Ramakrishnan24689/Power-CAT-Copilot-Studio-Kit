@@ -241,6 +241,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public DateTime ConversationDate { get; set; }
         public string ChannelId { get; set; }
         public int DataSourceCode { get; set; }
+        public string AgentName { get; set; }
         public int TotalConversations { get; set; }
         public int SessionCount { get; set; }
         public int EngagedCount { get; set; }

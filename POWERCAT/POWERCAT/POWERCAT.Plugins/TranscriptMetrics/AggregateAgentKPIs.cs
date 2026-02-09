@@ -276,6 +276,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     {
                         ConversationDate = conversationDate,
                         ChannelId = g.Key.ChannelId ?? "Unknown",
+                        AgentName = firstConversation.AgentName,
                         DataSourceCode = dataSourceCode,
                         TotalConversations = g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
                         SourceConversationIds = g.Select(c => c.EntityId).ToList()
@@ -345,7 +346,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 
                 // Set alternate key attributes for matching existing records
                 entity.KeyAttributes["cat_conversationdate"] = kpi.ConversationDate.Date;
-                entity.KeyAttributes["cat_agentconfigurationname"] = agentConfigurationDetails.AgentConfigurationName;
+                entity.KeyAttributes["cat_agentconfiguration"] = new EntityReference("cat_copilotconfiguration", Guid.Parse(agentConfigurationDetails.AgentConfigurationId));
                 entity.KeyAttributes["cat_channelid"] = kpi.ChannelId;
                 entity.KeyAttributes["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
 
@@ -355,17 +356,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
                 // Primary name
                 entity["cat_transcriptmetricname"] = $"{kpi.ConversationDate.Date:yyyy-MM-dd}-{agentConfigurationDetails.AgentConfigurationName}-{kpi.ChannelId}-{dataSourceName}";
-                entity["cat_agentconfigurationname"] = agentConfigurationDetails.AgentConfigurationName;
                 entity["cat_datasourcecode"] = new OptionSetValue(kpi.DataSourceCode);
-                // agentConfigurationDetails.AgentConfigurationId is a GUID string and not null/empty here
-                if (Guid.TryParse(agentConfigurationDetails.AgentConfigurationId, out Guid configId))
-                {
-                    entity["cat_agentconfigurationid"] = new EntityReference("cat_copilotconfiguration", configId);
-                }
-                else
-                {
-                    _tracingService.Trace($"{methodName}: Invalid AgentConfigurationId GUID format: {agentConfigurationDetails.AgentConfigurationId}. Skipping configuration reference.");
-                }
+                entity["cat_agentname"] = kpi.AgentName;
 
                 // KPI columns
                 entity["cat_totalconversations"] = kpi.TotalConversations;

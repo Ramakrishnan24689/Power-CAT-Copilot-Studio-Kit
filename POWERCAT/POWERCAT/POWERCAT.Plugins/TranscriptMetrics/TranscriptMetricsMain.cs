@@ -29,15 +29,17 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             {
                 switch (context.MessageName)
                 {
+                    // process batch of transcripts, upsert into staging table
                     case "cat_ProcessConversationTranscriptsBatch":
                         var processTranscripts = new ProcessConversationTranscriptsBatch(organizationService, tracingService);
                         processTranscripts.Execute(context);
                         break;
-                    //comments on each
+                    // calculate aggregate KPIs for a batch of conversations, upsert into metrics table
                     case "cat_CalculateAggregateAgentKPIs":
                         var aggregateAgentKPIs = new AggregateAgentKPIs(organizationService, tracingService);
                         aggregateAgentKPIs.Execute(context);
                         break;
+                    // update workflow status for a batch of transcripts in staging table
                     case "cat_UpdateWorkflowStatusBatch":
                         var updateWorkflowStatus = new UpdateWorkflowStatusBatch(organizationService, tracingService);
                         updateWorkflowStatus.Execute(context);
