@@ -418,7 +418,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
             _tracingService.Trace($"{methodName}: Upsert results - Success: {successCount}, Failures: {failureCount}");
 
-            // After the ExecuteMultiple upsert completes successfully, upload files
+            // After the ExecuteMultiple upsert completes successfully, upload or clear files
             foreach (var responseItem in response.Responses)
             {
                 if (responseItem.Fault == null && responseItem.Response is UpsertResponse upsertResponse)
@@ -427,6 +427,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     if (kpi.FeedbackDetails != null && kpi.FeedbackDetails.Count > 0)
                     {
                         UploadFeedbackDetailsFile(upsertResponse.Target, kpi);
+                    }
+                    else
+                    {
+                        ClearFeedbackDetailsFile(upsertResponse.Target);
                     }
                 }
             }
@@ -634,6 +638,39 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 }
 
                 _tracingService.Trace($"{methodName}: Continuing execution despite file upload failure");
+            }
+        }
+
+        /// <summary>
+        /// Clears the feedback details file column on the Dataverse record when no feedback data exists.
+        /// </summary>
+        /// <param name="target">The target entity reference to clear the file from.</param>
+        private void ClearFeedbackDetailsFile(EntityReference target)
+        {
+            const string methodName = nameof(ClearFeedbackDetailsFile);
+            try
+            {
+                // Retrieve the file column to check if an existing file needs to be removed
+                var entity = _organizationService.Retrieve(
+                    target.LogicalName,
+                    target.Id,
+                    new ColumnSet("cat_feedbackdetailsfile"));
+
+                var fileId = entity.GetAttributeValue<Guid>("cat_feedbackdetailsfile");
+                if (fileId == Guid.Empty)
+                {
+                    _tracingService.Trace($"{methodName}: No existing feedback file to clear for record {target.Id}");
+                    return;
+                }
+
+                var deleteRequest = new DeleteFileRequest { FileId = fileId };
+                _organizationService.Execute(deleteRequest);
+                _tracingService.Trace($"{methodName}: Cleared feedback details file for record {target.Id}");
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"{methodName}: Failed to clear feedback details file: {ex.Message}");
+                _tracingService.Trace($"{methodName}: Continuing execution despite file clear failure");
             }
         }
     }

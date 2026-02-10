@@ -67,15 +67,6 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     throw new InvalidPluginExecutionException($"{methodName}: Failed to parse Records: {ex.Message}", ex);
                 }
 
-                if (inputRecords == null || inputRecords.Count == 0)
-                {
-                    _tracingService.Trace($"{methodName}: No records to process.");
-                    context.OutputParameters["IsSuccess"] = true;
-                    context.OutputParameters["ProcessedCount"] = 0;
-                    context.OutputParameters["ErrorMessage"] = "No records provided.";
-                    return;
-                }
-
                 _tracingService.Trace($"{methodName}: Processing {inputRecords.Count} records");
 
                 // 3. Collect all ConversationTranscriptGuid from input (trimmed)

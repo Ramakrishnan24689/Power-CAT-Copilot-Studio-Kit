@@ -6,7 +6,8 @@ using Newtonsoft.Json;
 namespace POWERCAT.Plugins.TranscriptMetrics
 {
     /// <summary>
-    /// Input DTO matching Power Automate Select output for ProcessConversationTranscriptsBatch.
+    /// Represents a single transcript record received from Power Automate
+    /// for batch processing in ProcessConversationTranscriptsBatch.
     /// </summary>
     [System.Runtime.Serialization.DataContract]
     public class TranscriptInputModel
