@@ -138,7 +138,10 @@ namespace POWERCAT.Plugins.ConversationKpi
                                     duplicateAgentTranscriptIds.Add(duplicateTranscript.Id);
                                 }
 
-                                var serializedTranscript = JsonConvert.SerializeObject(transcriptModel);
+                                var serializedTranscript = JsonConvert.SerializeObject(transcriptModel, new JsonSerializerSettings
+                                {
+                                    NullValueHandling = NullValueHandling.Ignore
+                                });
                                 // size is less than 1 MB add parent transcript
                                 if (serializedTranscript.Length < 1048576)
                                 {

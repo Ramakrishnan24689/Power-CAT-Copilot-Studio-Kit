@@ -31,8 +31,24 @@ namespace POWERCAT.Plugins.ConversationKpi
                 errorLogId = context.InputParameters["cat_ErrorLogId"] as string; 
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
-                // group records by name
-                var groupedRecords = inputRecords
+                // Separate Teams channel records (processed individually, not grouped)
+                var teamsChannelRecords = new List<ConversationTranscriptModel>();
+                var nonTeamsRecords = new List<ConversationTranscriptModel>();
+
+                foreach (var record in inputRecords)
+                {
+                    if (IsTeamsChannelRecord(record))
+                    {
+                        teamsChannelRecords.Add(record);
+                    }
+                    else
+                    {
+                        nonTeamsRecords.Add(record);
+                    }
+                }
+
+                var groupedRecords = nonTeamsRecords
+                    .Where(r => r.Name != null)
                     .GroupBy(r => r.Name)
                     .ToList();
 
@@ -54,8 +70,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     {
                         var record = group.First();
                         // Check if Agent Transcript record already present
-                        if (!string.IsNullOrEmpty(record.Name) &&
-                            !existingRecords.Contains(record.Name))
+                        if (!string.IsNullOrEmpty(record.ConversationTranscriptId) &&
+                            !existingRecords.Contains(record.ConversationTranscriptId))
                         {
                             var createRequest = new CreateRequest
                             {
@@ -68,8 +84,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     {
                         // Create parent Agent Transcript
                         var parentRecord = orderedrecord.First();
-                        if (!string.IsNullOrEmpty(parentRecord.Name) &&
-                            !existingRecords.Contains(parentRecord.Name))
+                        if (!string.IsNullOrEmpty(parentRecord.ConversationTranscriptId) &&
+                            !existingRecords.Contains(parentRecord.ConversationTranscriptId))
                         {
                             var parentAgentTranscript = CreateAgentTranscriptEntity(parentRecord, null, true);
                             Guid parentId = organizationService.Create(parentAgentTranscript);
@@ -86,6 +102,19 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
                 }
 
+                // Process ungrouped teams channel records individually
+                foreach (var record in teamsChannelRecords)
+                {
+                    if (!string.IsNullOrEmpty(record.ConversationTranscriptId) &&
+                        !existingRecords.Contains(record.ConversationTranscriptId))
+                    {
+                        var createRequest = new CreateRequest
+                        {
+                            Target = CreateAgentTranscriptEntity(record, null, false)
+                        };
+                        createRequests.Add(createRequest);
+                    }
+                }
 
                 // Execute in batch
                 if (createRequests.Any())
@@ -199,7 +228,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 {
                     QueryExpression query = new QueryExpression("cat_agenttranscripts")
                     {
-                        ColumnSet = new ColumnSet("cat_name"),
+                        ColumnSet = new ColumnSet("cat_name", "cat_conversationtranscriptid"),
                         Criteria = new FilterExpression
                         {
                             Conditions =
@@ -213,7 +242,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     EntityCollection results = organizationService.RetrieveMultiple(query);
                     foreach (var entity in results.Entities)
                     {
-                        existingTranscriptNames.Add(entity.GetAttributeValue<String>("cat_name"));
+                        existingTranscriptNames.Add(entity.GetAttributeValue<string>("cat_conversationtranscriptid"));
                     }
                 }
 
@@ -252,6 +281,54 @@ namespace POWERCAT.Plugins.ConversationKpi
                 tracingService.Trace($"An error occurred in method AppendErrorDetails. Details:: {ex.Message}");
                 throw ex;
             }
+        }
+
+        /// <summary>
+        /// Checks if a conversation transcript record belongs to the Teams channel
+        /// by parsing the content and looking for channelId "msteams" in valid activity types.
+        /// </summary>
+        /// <param name="record">Conversation transcript record</param>
+        /// <returns>True if the record is from the Teams channel</returns>
+        private bool IsTeamsChannelRecord(ConversationTranscriptModel record)
+        {
+            if (string.IsNullOrEmpty(record.Content))
+            {
+                return false;
+            }
+
+            try
+            {
+                var transcript = JsonConvert.DeserializeObject<TranscriptModel>(record.Content);
+                if (transcript?.activities == null)
+                {
+                    return false;
+                }
+
+                foreach (var activity in transcript.activities)
+                {
+                    var isValidType = activity.type == "event" || activity.type == "message" || activity.type == "conversationUpdate";
+                    if (!isValidType)
+                    {
+                        continue;
+                    }
+
+                    var activityChannelId = activity.channelId ?? activity.valueToken?["channelId"]?.ToString();
+                    if (activityChannelId != null && activityChannelId != "msteams")
+                    {
+                        return false;
+                    }
+                    if (activityChannelId == "msteams")
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
         }
     }
 }
