@@ -15,6 +15,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
     public class Activity
     {
+        [JsonIgnore]
         public int index;         
         public string valueType { get; set; }
         public string type { get; set; }
