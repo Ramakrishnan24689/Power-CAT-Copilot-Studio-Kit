@@ -92,6 +92,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessAmbiguousUtterances processAmbiguousUtterances = new ProcessAmbiguousUtterances();
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
+                    ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -172,6 +173,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
                                 TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
+                                FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -333,6 +335,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_traversedcomponents"] = JsonConvert.SerializeObject(processDetails.TraversedComponentsList);
                     ConversationKpi["cat_trackedvariables"] = JsonConvert.SerializeObject(processDetails.TrackedVariables);
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
+                    ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }
