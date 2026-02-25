@@ -19,11 +19,11 @@ namespace POWERCAT.Plugins.ConversationKpi
         /// <param name="conversationId">Conversation Id</param>
         /// <param name="agentId">Agent Id</param>
         /// <returns>Feedback Details List</returns>
-        public List<FeedbackDetailRecord> ProcessForFeedbackDetails(List<Activity> model, string conversationId, string agentId)
+        public List<FeedbackDetails> ProcessForFeedbackDetails(List<Activity> model, string conversationId, string agentId)
         {
             if (model == null || model.Count == 0)
             {
-                return new List<FeedbackDetailRecord>();
+                return new List<FeedbackDetails>();
             }
 
             var botMessagesDictionary = model
@@ -46,7 +46,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                    activity.valueToken?["actionName"]?.ToString() == "feedback")
                 .ToList();
 
-            var feedbackDetails = new List<FeedbackDetailRecord>();
+            var feedbackDetails = new List<FeedbackDetails>();
 
             foreach (var feedback in feedbackRows)
             {
@@ -68,7 +68,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 var nextSession = sessionInfoActivities.FirstOrDefault(session => session.index > feedback.index);
 
-                feedbackDetails.Add(new FeedbackDetailRecord
+                feedbackDetails.Add(new FeedbackDetails
                 {
                     SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     AgentMessage = agentMessage,
@@ -80,6 +80,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             return feedbackDetails;
         }
 
+        /// <summary>
+        /// Extracts the feedback text from a feedback payload.
+        /// </summary>
+        /// <param name="feedbackValue">The feedback payload token.</param>
+        /// <returns>The extracted feedback text, or <c>null</c> if unavailable.</returns>
         private static string ExtractFeedbackText(JToken feedbackValue)
         {
             if (feedbackValue == null)

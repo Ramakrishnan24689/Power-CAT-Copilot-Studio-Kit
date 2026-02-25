@@ -16,7 +16,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public List<AmbiguousUtterances> AmbiguousUtterances { get; set; } = new List<AmbiguousUtterances>();
         public List<TraversedComponents> TraversedComponentsList { get; set; } = new List<TraversedComponents>();
         public List<GenerativeAnswers> GenerativeAnswersList { get; set; } = new List<GenerativeAnswers>();
-        public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
+        public List<FeedbackDetails> FeedbackDetails { get; set; } = new List<FeedbackDetails>();
         public ConversationInfoDetail ConversationInfoDetails { get; set; }
         public string AgentConfigurationId { get; set; }
         public string AgentId { get; set; }
@@ -147,7 +147,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public int BatchId { get; set; }
     }
 
-    public class FeedbackDetailRecord
+    public class FeedbackDetails
     {
         [JsonProperty("Session ID")]
         public string SessionID { get; set; }
