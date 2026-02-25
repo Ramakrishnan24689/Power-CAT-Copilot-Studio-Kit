@@ -122,6 +122,7 @@
     <Compile Include="ConversationKpi\ProcessConversationTranscripts.cs" />
     <Compile Include="ConversationKpi\OutputModel.cs" />
     <Compile Include="ConversationKpi\ProcessAmbiguousUtterances.cs" />
+    <Compile Include="ConversationKpi\ProcessFeedbackDetails.cs" />
     <Compile Include="ConversationKpi\ProcessGenerativeAnswersArray.cs" />
     <Compile Include="ConversationKpi\ProcessSessionInsight.cs" />
     <Compile Include="ConversationKpi\ProcessTrackedVariables.cs" />
