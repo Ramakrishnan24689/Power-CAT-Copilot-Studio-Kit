@@ -20,8 +20,8 @@ function hideAndShowConversationKPISettings(executionContext) {
     const conversationTranscriptsSection = tabGeneral.sections.get(
         "tab_general_section_conversationtranscriptsenrichment"
     );
-    const conversationAnalyzerSection = tabGeneral.sections.get(
-        "tab_general_section_conversationanalyzer"
+    const agentInsightsSection = tabGeneral.sections.get(
+        "tab_general_section_agentinsights"
     );
 
     const kpiLogsTab = formContext.ui.tabs.get("tab_conversation_kpi_logs");
@@ -37,9 +37,9 @@ function hideAndShowConversationKPISettings(executionContext) {
     toggleSectionVisibility(tabGeneral, sectionsToHideOrShow, false);
     kpiSection.setVisible(false);
     fileSection.setVisible(false);
-    conversationAnalyzerSection.setVisible(false);
     fileConfigDetailsSection.setVisible(false);
     conversationTranscriptsSection.setVisible(false);
+    agentInsightsSection.setVisible(false);
     kpiLogsTab.setVisible(false);
 
     // Check if configuration type includes 'Conversation KPIs' (2)
@@ -78,13 +78,23 @@ function hideAndShowConversationKPISettings(executionContext) {
         );
     }
 
-    // Check if configuration type includes 'Conversation Analyzer' (4)
+    // Hide 'Agent Insights' option (4) from configuration types for new record creation
+    // const formType = formContext.ui.getFormType();
+    // const configTypeControl = formContext.getControl("cat_configurationtypescodes");
+    // if (configTypeControl) {
+    //     if (formType === 1) {
+    //         // Create mode - remove Agent Insights option
+    //         //configTypeControl.removeOption(4);
+    //     }
+    // }
+
+    // Check if configuration type includes 'Agent Insights' (4)
     if (configurationTypeValues.includes(4)) {
-        // Show the Conversation Analyzer section
-        conversationAnalyzerSection.setVisible(true);
+        // Show only the Agent Insights section
+        agentInsightsSection.setVisible(true);
         setFieldRequirements(
             formContext,
-            ["cat_copilotid", "cat_dataverseurl"],
+            ["cat_agentname", "cat_copilotid", "cat_azureappinsightsapplicationid", "cat_azureappinsightsclientid", "cat_azureappinsightssecretlocationcode", "cat_dataverseurl", "cat_kpisourcecodes", "cat_iscaptureuserdetailsenabled", "cat_iscaptureuserfeedbackenabled"],
             "required"
         );
     }
@@ -201,7 +211,7 @@ function setFieldVisibilityForEachSections(executionContext) {
         );
         clearAndHideFields(formContext, ["cat_userauthenvironmentvariable"]);
     } else if (uasecretLocation === 2 && configurationTypeValues.includes(1)) {
-        // Show and require user authentication environment variable
+        // Show and require user auth environment variable
         setFieldVisibility(
             formContext,
             ["cat_userauthenvironmentvariable"],
@@ -217,60 +227,148 @@ function setFieldVisibilityForEachSections(executionContext) {
         ]);
     }
 
-    // Enrich With Azure Application Insights Secret Location Rule
-    const secretLocation = formContext
-        .getAttribute("cat_azureappinsightssecretlocationcode")
-        .getValue();
-    if (secretLocation === 1 && configurationTypeValues.includes(1)) {
-        setFieldVisibility(
-            formContext,
-            ["cat_azureappinsightssecret"],
-            true,
-            "required"
-        );
-        clearAndHideFields(formContext, [
-            "cat_azureappinsightsenvironmentvariable",
-        ]);
-    } else if (secretLocation === 2 && configurationTypeValues.includes(1)) {
-        setFieldVisibility(
-            formContext,
-            ["cat_azureappinsightsenvironmentvariable"],
-            true,
-            "required"
-        );
-        clearAndHideFields(formContext, ["cat_azureappinsightssecret"]);
-    } else {
-        clearAndHideFields(formContext, [
-            "cat_azureappinsightssecret",
-            "cat_azureappinsightsenvironmentvariable",
-        ]);
-    }
+    const resultsEnrichmentControls = {
+        applicationId: "cat_azureappinsightsapplicationid1",
+        tenantId: "cat_azureappinsightstenantid1",
+        clientId: "cat_azureappinsightsclientid1",
+        secretLocationCode: "cat_azureappinsightssecretlocationcode1",
+        secret: "cat_azureappinsightssecret1",
+        environmentVariable: "cat_azureappinsightsenvironmentvariable1"
+    };
 
-    // Enrich With Azure Application Insights Fields Rules
+    // Control names in Agent Insights section (numbered suffix)
+    const agentInsightsControls = {
+        agents: "cat_agentname",
+        copilotid: "cat_copilotid2",
+        dataverseUrl: "cat_dataverseurl2",
+        applicationId: "cat_azureappinsightsapplicationid",
+        tenantId: "cat_azureappinsightstenantid",
+        clientId: "cat_azureappinsightsclientid",
+        secretLocationCode: "cat_azureappinsightssecretlocationcode",
+        secret: "cat_azureappinsightssecret",
+        environmentVariable: "cat_azureappinsightsenvironmentvariable",
+        kpiSourceCodes: "cat_kpisourcecodes",
+        CaptureUserDetails: "cat_iscaptureuserdetailsenabled",
+        CaptureUserFeedback: "cat_iscaptureuserfeedbackenabled"
+    };
+
     const enrichWithAI = formContext
         .getAttribute("cat_isazureapplicationinsightsenabled")
         .getValue();
-    if (enrichWithAI === true && configurationTypeValues.includes(1)) {
-        setFieldVisibility(
-            formContext,
-            [
-                "cat_azureappinsightsapplicationid",
-                "cat_azureappinsightstenantid",
-                "cat_azureappinsightsclientid",
-                "cat_azureappinsightssecretlocationcode",
-            ],
-            true,
-            "required"
-        );
-    } else if (enrichWithAI === false && configurationTypeValues.includes(1)) {
-        clearAndHideFields(formContext, [
-            "cat_azureappinsightsapplicationid",
-            "cat_azureappinsightstenantid",
-            "cat_azureappinsightsclientid",
-            "cat_azureappinsightssecretlocationcode",
-            "cat_azureappinsightssecret",
-            "cat_azureappinsightsenvironmentvariable",
-        ]);
+    const secretLocation = formContext
+        .getAttribute("cat_azureappinsightssecretlocationcode")
+        .getValue();
+
+    function setControlVisibility(controlName, visible) {
+        const control = formContext.getControl(controlName);
+        if (control) control.setVisible(visible);
+    }
+
+    // Results Enrichment Section - Azure App Insights fields (for Test Automation - 1)
+    if (configurationTypeValues.includes(1)) {
+        if (enrichWithAI === true) {
+            // Show main fields in Results Enrichment section
+            setControlVisibility(resultsEnrichmentControls.applicationId, true);
+            setControlVisibility(resultsEnrichmentControls.tenantId, true);
+            setControlVisibility(resultsEnrichmentControls.clientId, true);
+            setControlVisibility(resultsEnrichmentControls.secretLocationCode, true);
+
+            // Handle secret/env variable based on secret location
+            if (secretLocation === 1) {
+                setControlVisibility(resultsEnrichmentControls.secret, true);
+                setControlVisibility(resultsEnrichmentControls.environmentVariable, false);
+            } else if (secretLocation === 2) {
+                setControlVisibility(resultsEnrichmentControls.secret, false);
+                setControlVisibility(resultsEnrichmentControls.environmentVariable, true);
+            } else {
+                setControlVisibility(resultsEnrichmentControls.secret, false);
+                setControlVisibility(resultsEnrichmentControls.environmentVariable, false);
+            }
+        } else {
+            // Hide all Azure App Insights fields in Results Enrichment section
+            setControlVisibility(resultsEnrichmentControls.applicationId, false);
+            setControlVisibility(resultsEnrichmentControls.tenantId, false);
+            setControlVisibility(resultsEnrichmentControls.clientId, false);
+            setControlVisibility(resultsEnrichmentControls.secretLocationCode, false);
+            setControlVisibility(resultsEnrichmentControls.secret, false);
+            setControlVisibility(resultsEnrichmentControls.environmentVariable, false);
+        }
+    }
+
+    // Agent Insights Section - Azure App Insights fields (for Agent Insights - 4)
+    if (configurationTypeValues.includes(4)) {
+        // Show all Agent Insights fields
+        setControlVisibility(agentInsightsControls.agents, true);
+        setControlVisibility(agentInsightsControls.dataverseUrl, true);
+        setControlVisibility(agentInsightsControls.applicationId, true);
+        setControlVisibility(agentInsightsControls.tenantId, true);
+        setControlVisibility(agentInsightsControls.clientId, true);
+        setControlVisibility(agentInsightsControls.secretLocationCode, true);
+        setControlVisibility(agentInsightsControls.kpiSourceCodes, true);
+        setControlVisibility(agentInsightsControls.CaptureUserDetails, true);
+        setControlVisibility(agentInsightsControls.CaptureUserFeedback, true);
+
+        // Handle secret/env variable based on secret location
+        if (secretLocation === 1) {
+            setControlVisibility(agentInsightsControls.secret, true);
+            setControlVisibility(agentInsightsControls.environmentVariable, false);
+        } else if (secretLocation === 2) {
+            setControlVisibility(agentInsightsControls.secret, false);
+            setControlVisibility(agentInsightsControls.environmentVariable, true);
+        } else {
+            setControlVisibility(agentInsightsControls.secret, false);
+            setControlVisibility(agentInsightsControls.environmentVariable, false);
+        }
+
+
+    }
+    // Set Required Levels based on Enrich with AI and Configuration Types
+    if ((enrichWithAI === true && configurationTypeValues.includes(1)) || configurationTypeValues.includes(4)) {
+        // At least one section needs the fields - set required levels accordingly
+        formContext.getAttribute("cat_azureappinsightsapplicationid")?.setRequiredLevel("required");
+        formContext.getAttribute("cat_azureappinsightstenantid")?.setRequiredLevel("required");
+        formContext.getAttribute("cat_azureappinsightsclientid")?.setRequiredLevel("required");
+        formContext.getAttribute("cat_azureappinsightssecretlocationcode")?.setRequiredLevel("required");
+
+        if (secretLocation === 1) {
+            formContext.getAttribute("cat_azureappinsightssecret")?.setRequiredLevel("required");
+            formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setRequiredLevel("none");
+            formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setValue(null);
+        } else if (secretLocation === 2) {
+            formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setRequiredLevel("required");
+            formContext.getAttribute("cat_azureappinsightssecret")?.setRequiredLevel("none");
+            formContext.getAttribute("cat_azureappinsightssecret")?.setValue(null);
+        } else {
+            formContext.getAttribute("cat_azureappinsightssecret")?.setRequiredLevel("none");
+            formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setRequiredLevel("none");
+        }
+
+        if (configurationTypeValues.includes(4)) {
+            formContext.getAttribute("cat_agentname")?.setRequiredLevel("required");
+        }
+    } else if (!configurationTypeValues.includes(4) && (enrichWithAI === false || enrichWithAI === null)) {
+        // Neither section needs AI fields - clear only AI/Agent Insights-specific fields
+        formContext.getAttribute("cat_azureappinsightsapplicationid")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_azureappinsightstenantid")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_azureappinsightsclientid")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_azureappinsightssecretlocationcode")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_azureappinsightssecret")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_kpisourcecodes")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_agentname")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_iscaptureuserdetailsenabled")?.setRequiredLevel("none");
+        formContext.getAttribute("cat_iscaptureuserfeedbackenabled")?.setRequiredLevel("none");
+
+        formContext.getAttribute("cat_azureappinsightsapplicationid")?.setValue(null);
+        formContext.getAttribute("cat_azureappinsightstenantid")?.setValue(null);
+        formContext.getAttribute("cat_azureappinsightsclientid")?.setValue(null);
+        formContext.getAttribute("cat_kpisourcecodes")?.setValue(null);
+        formContext.getAttribute("cat_azureappinsightssecretlocationcode")?.setValue(null);
+        formContext.getAttribute("cat_azureappinsightssecret")?.setValue(null);
+        formContext.getAttribute("cat_azureappinsightsenvironmentvariable")?.setValue(null);
+        formContext.getAttribute("cat_agentname")?.setValue(null);
+        formContext.getAttribute("cat_iscaptureuserdetailsenabled")?.setValue(null);
+        formContext.getAttribute("cat_iscaptureuserfeedbackenabled")?.setValue(null);
     }
 
     // Direct Line Channel Security Fields Rules
@@ -344,19 +442,36 @@ function setFieldVisibilityForEachSections(executionContext) {
         .getAttribute("cat_isenrichedwithconversationtranscripts")
         .getValue();
 
-    if (
-        isEnrichedWithTranscripts === true &&
-        configurationTypeValues.includes(1)
-    ) {
-        section.controls.get("cat_dataverseurl2").setVisible(true);
-        formContext.getAttribute("cat_dataverseurl").setRequiredLevel("required");
-        section.controls.get("cat_iscopyfulltranscriptenabled1").setVisible(true);
-        section.controls.get("cat_copilotid2").setVisible(true);
-        formContext.getAttribute("cat_copilotid").setRequiredLevel("required");
-    } else {
-        section.controls.get("cat_dataverseurl2").setVisible(false);
-        section.controls.get("cat_iscopyfulltranscriptenabled1").setVisible(false);
-        section.controls.get("cat_copilotid2").setVisible(false);
+    if (section) {
+        const dataverseUrlControl = section.controls.get("cat_dataverseurl3");
+        const copyFullTranscriptControl = section.controls.get("cat_iscopyfulltranscriptenabled1");
+        const copilotIdControl = section.controls.get("cat_copilotid3");
+
+        // Only show these controls if Test Automation (1) is selected AND enrichment is enabled
+        // Hide them if ONLY Agent Insights (4) is selected (without Test Automation)
+        if (
+            isEnrichedWithTranscripts === true &&
+            configurationTypeValues.includes(1)
+        ) {
+            if (dataverseUrlControl) dataverseUrlControl.setVisible(true);
+            formContext.getAttribute("cat_dataverseurl")?.setRequiredLevel("required");
+            if (copyFullTranscriptControl) copyFullTranscriptControl.setVisible(true);
+            if (copilotIdControl) copilotIdControl.setVisible(true);
+            formContext.getAttribute("cat_copilotid")?.setRequiredLevel("required");
+        } else {
+            // Hide controls - this includes when only Agent Insights (4) is selected
+            if (dataverseUrlControl) dataverseUrlControl.setVisible(false);
+            if (copyFullTranscriptControl) copyFullTranscriptControl.setVisible(false);
+            if (copilotIdControl) copilotIdControl.setVisible(false);
+        }
+    }
+
+    // Agent Insights Section - Show dataverseurl control and copilotid
+    if (configurationTypeValues.includes(4)) {
+        setControlVisibility(agentInsightsControls.dataverseUrl, true);
+        formContext.getAttribute("cat_dataverseurl")?.setRequiredLevel("required");
+        setControlVisibility(agentInsightsControls.copilotid, true);
+        formContext.getAttribute("cat_copilotid")?.setRequiredLevel("required");
     }
 }
 
