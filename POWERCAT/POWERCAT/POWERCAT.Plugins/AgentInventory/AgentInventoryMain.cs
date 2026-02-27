@@ -46,10 +46,11 @@ namespace POWERCAT.Plugins.AgentInventory
                     var createdAgent = agentOperation.CreateAgent(getAgentData);
 
                     //If agent creation is successfully completed then set the output to the api
-                    if (createdAgent != null)
+                    if (createdAgent.AgentDetailsId != null)
                     {
                         //Set the created agent guid to the api output
-                        context.OutputParameters["cat_AgentOutput"] = createdAgent;
+                        context.OutputParameters["cat_AgentOutput"] = createdAgent.AgentDetailsId;
+                        context.OutputParameters["cat_AgentComponentsOutput"] = JsonConvert.SerializeObject(createdAgent.AgentComponents, Formatting.Indented);
                     }
                     else
                     {
@@ -73,12 +74,10 @@ namespace POWERCAT.Plugins.AgentInventory
                         context.OutputParameters["cat_ExtractWorkFlowOutput"] = result;
                     }
                 }
-                //Check if custom API call is for tenant usage report generation
-                else if (context.MessageName == "cat_GenerateTenantUsageReport")
+                //Check if custom API call is for tenant usage report process
+                else if (context.MessageName == "cat_ProcessTenantUsageReport")
                 {
-                    string logId = (string)context.InputParameters["cat_UsageLogId"];
-                    string refreshStatus = (string)context.InputParameters["cat_UsageRefreshStatus"];
-                    string base64EncodedUsageData = (string)context.InputParameters["cat_UsageInput"];
+                    string base64EncodedUsageData = (string)context.InputParameters["cat_UsageData"];
 
                     //Decode the data
                     byte[] decodedBytes = Convert.FromBase64String(base64EncodedUsageData);
@@ -86,15 +85,37 @@ namespace POWERCAT.Plugins.AgentInventory
 
                     AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
 
-                    //Create usage data in TenantUsageData table
-                    bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId, refreshStatus);
+                    //Process usage data
+                    string result = usageDataOperation.ProcessUsageData(decodedUsageCsv);
+
+                    context.OutputParameters["cat_UsageJsonOutput"] = result;
+                }
+                //Check if custom API call is for tenant usage report generation
+                else if (context.MessageName == "cat_GenerateTenantUsageReport")
+                {
+                    string usageJson = (string)context.InputParameters["cat_UsageInput"];
+
+                    var usage = JsonConvert.DeserializeObject<AgentUsageInput>(usageJson);
+
+                    AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
+
+                    //Create usage data in usage history table
+                    bool result = usageDataOperation.CreateUsageData(usage);
 
                     context.OutputParameters["cat_UsageOutput"] = result;
+                }
+                //Check if custom API call is for bulk delete
+                else if (context.MessageName == "cat_AgentInventoryBulkDelete")
+                {
+                    string deleteTableName = (string)context.InputParameters["cat_DeleteTableName"];
+                    string recordIds = (string)context.InputParameters["cat_DeleteRecordIds"];
 
-                    if(result == false)
-                    {
-                        tracingService.Trace($"Plugin execution failed.");
-                    }
+                    AgentInventoryDeleteOperation deleteOperation = new AgentInventoryDeleteOperation(organizationService, tracingService);
+
+                    //Create usage data in usage history table
+                    bool result = deleteOperation.BulkDeleteOperation(deleteTableName, recordIds);
+
+                    context.OutputParameters["cat_DeleteResult"] = result;
                 }
             }
             catch (Exception ex)

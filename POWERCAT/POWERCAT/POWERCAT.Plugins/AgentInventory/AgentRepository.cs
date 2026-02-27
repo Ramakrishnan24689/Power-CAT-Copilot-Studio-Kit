@@ -4,9 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk;
 using Newtonsoft.Json.Linq;
 using static POWERCAT.Plugins.AgentInventory.AgentDataModel;
@@ -52,78 +49,37 @@ namespace POWERCAT.Plugins.AgentInventory
         /// Create agent in the agent details table.
         /// </summary>
         /// <param name="agentDetails">Agent details input for creating agent.</param>
-        /// <returns>Guid of created agent.</returns>
-        public Guid? CreateAgent(AgentDetails agentDetails)
+        /// <returns>Created agent detail id and its components.</returns>
+        public CreateAgentResponse CreateAgent(AgentDetails agentDetails)
         {
-            Guid? createdRecordId = null;
             try
             {
+                Guid? createdRecordId = null;
+
                 //Get entity for creating agent
                 Entity entity = GetAgentEntity(agentDetails);
+               
+                //Create an agent in the agent details table
+                createdRecordId = _organizationService.Create(entity);
 
-                //Delete agent in the agent details table
-                bool deletedResult = DeleteAgent(_tableName, agentDetails.ID, agentDetails.EnvironmentId, agentDetails.Name);
+                string prompts = entity.Contains("cat_prompts") ? entity.GetAttributeValue<string>("cat_prompts") : null;
+                string connections = entity.Contains("cat_connections") ? entity.GetAttributeValue<string>("cat_connections") : null;
 
-                if (deletedResult == true)
+                return new CreateAgentResponse
                 {
-                    //Create an agent in the agent details table
-                    createdRecordId = _organizationService.Create(entity);
-                }
+                    AgentDetailsId = createdRecordId,
+                    AgentComponents = new AgentComponents
+                    {
+                        Prompts = prompts ?? string.Empty,
+                        Connections = connections ?? string.Empty
+                    }
+                };
             }
             catch (Exception ex)
             {
                 _tracingService.Trace($"Agent creation failed for id - {agentDetails.ID.ToString()}. \n Details: {ex.Message}");
                 throw ex;
             }
-            return createdRecordId;
-        }
-
-        /// <summary>
-        /// Delete agent in the agent details table.
-        /// </summary>
-        /// <param name="tableName">Agent details table name for deleting the agent.</param>
-        /// <param name="agentDetails">Agent details for deleting agent in the agent details table.</param>
-        /// <returns>bool value to indicate the deletion status.</returns>
-        public bool DeleteAgent(string tableName, Guid agentId, string environmentID, string agentName)
-        {
-            bool result = false;
-            try
-            {
-                //Query expression for the delete operation
-                QueryExpression query = new QueryExpression(tableName)
-                {
-                    ColumnSet = new ColumnSet("cat_agentdetailsid"),
-                    Criteria = new FilterExpression(LogicalOperator.And)
-                    {
-                        Conditions =
-                        {
-                            new ConditionExpression("cat_agentid", ConditionOperator.Equal, agentId),
-                            new ConditionExpression("cat_name", ConditionOperator.Equal, agentName),
-                            new ConditionExpression("cat_environmentid", ConditionOperator.Equal, environmentID)
-                        }
-                    }
-
-                };
-
-                //Get agents data from the agent details table
-                EntityCollection entities = _organizationService.RetrieveMultiple(query);
-
-                if (entities.Entities.Count > 0)
-                {
-                    foreach (var item in entities.Entities)
-                    {
-                        //Delete the agent in the agent details table
-                        _organizationService.Delete(tableName, item.Id);
-                    }
-                }
-                result = true;
-            }
-            catch (Exception ex)
-            {
-                _tracingService.Trace($"Agent deletion failed for id - {agentId.ToString()}. \n Details: {ex.Message}");
-                throw ex;
-            }
-            return result;
         }
 
         /// <summary>
@@ -319,12 +275,16 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_name"] = agentDetails.Name;
                 entity["cat_type"] = !string.IsNullOrWhiteSpace(agentDetails.Template) && agentDetails.Template.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase) ? "Declarative" : "Custom";
                 entity["cat_template"] = agentDetails.Template;
+                entity["cat_agentcreatedin"] = "Copilot Studio";
+                entity["cat_hassysadminaccess"] = true;
+                entity["cat_agentschemaname"] = agentDetails.AgentSchemaName;
 
                 //Environment details of the agent
                 entity["cat_environmentname"] = agentDetails.EnvironmentName;
                 entity["cat_environmentid"] = agentDetails.EnvironmentId.ToString();
                 entity["cat_environmenttype"] = agentDetails.EnvironmentType;
                 entity["cat_environmenturl"] = agentDetails.EnvironmentUrl;
+                entity["cat_location"] = agentDetails.Location;
 
                 //Agent created and modified details
                 entity["cat_agentcreatedby"] = agentDetails.AgentCreatedBy;
