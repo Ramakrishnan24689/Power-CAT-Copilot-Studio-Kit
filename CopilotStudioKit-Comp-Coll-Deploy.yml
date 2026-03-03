@@ -17,13 +17,13 @@ resources:
     - pipeline: ExportPipeline
       source: CopilotStudioKit-Comp-Coll-Export-Commit
       trigger: none
-      version: latest  # Always use latest successful run
 
 variables:
   # Pipeline variables (set in Azure DevOps pipeline UI):
   # - varTargetEnvironmentURL: Target environment URL (e.g., https://org-test.crm.dynamics.com/)
   # - varTargetServiceConnection: Service connection name for target (e.g., PowerPlatform-TEST)
   # - varSolutionType: 'managed' or 'unmanaged'
+  # - varExportPipelineBuildId: (Optional) Specific build ID from export pipeline. Leave empty to use latest.
   
   # Internal variables
   DownloadPath: $(Pipeline.Workspace)/ExportPipeline/drop
