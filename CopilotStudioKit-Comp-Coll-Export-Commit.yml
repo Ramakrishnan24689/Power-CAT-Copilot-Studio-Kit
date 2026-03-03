@@ -1,0 +1,241 @@
+# ============================================================================
+# Pipeline: CopilotStudioKit-Component-Collections
+# Description: Export Power Platform component solutions, unpack to repo, and publish artifacts
+# ============================================================================
+
+trigger: none  # Manual trigger only
+
+pool:
+  vmImage: windows-latest
+
+variables:
+  # Pipeline variables (set in Azure DevOps pipeline UI):
+  # - varSourceEnvironmentURL: The source environment URL (e.g., https://org.crm.dynamics.com/)
+  
+  # Internal variables
+  SolutionOutputFolder: $(Build.ArtifactStagingDirectory)/solutions
+  UnpackedSolutionFolder1: $(Build.SourcesDirectory)/src/CopilotStudioKit_Components
+  UnpackedSolutionFolder2: $(Build.SourcesDirectory)/src/CopilotStudioKit_ServiceNow_Components
+
+steps:
+# ============================================================================
+# Step 1: Checkout repository with credentials for commit
+# ============================================================================
+- checkout: self
+  persistCredentials: true
+  clean: true
+  displayName: 'Checkout Repository'
+
+# ============================================================================
+# Step 2: Install Power Platform Build Tools
+# ============================================================================
+- task: PowerPlatformToolInstaller@2
+  displayName: 'Install Power Platform Build Tools'
+
+# ============================================================================
+# SOLUTION 1: CopilotStudioKit_Components
+# ============================================================================
+
+# ============================================================================
+# Step 3: Export CopilotStudioKit_Components - Unmanaged Solution
+# ============================================================================
+- task: PowerPlatformExportSolution@2
+  displayName: 'Export CopilotStudioKit_Components - Unmanaged'
+  inputs:
+    authenticationType: 'PowerPlatformSPN'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+    Environment: '$(varSourceEnvironmentURL)'
+    SolutionName: 'CopilotStudioKit_Components'
+    SolutionOutputFile: '$(SolutionOutputFolder)/CopilotStudioKit_Components.zip'
+    Managed: false
+
+# ============================================================================
+# Step 4: Export CopilotStudioKit_Components - Managed Solution
+# ============================================================================
+- task: PowerPlatformExportSolution@2
+  displayName: 'Export CopilotStudioKit_Components - Managed'
+  inputs:
+    authenticationType: 'PowerPlatformSPN'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+    Environment: '$(varSourceEnvironmentURL)'
+    SolutionName: 'CopilotStudioKit_Components'
+    SolutionOutputFile: '$(SolutionOutputFolder)/CopilotStudioKit_Components_managed.zip'
+    Managed: true
+
+# ============================================================================
+# Step 5: Unpack CopilotStudioKit_Components to Source Control
+# ============================================================================
+- task: PowerPlatformUnpackSolution@2
+  displayName: 'Unpack CopilotStudioKit_Components'
+  inputs:
+    SolutionInputFile: '$(SolutionOutputFolder)/CopilotStudioKit_Components.zip'
+    SolutionTargetFolder: '$(UnpackedSolutionFolder1)/SolutionPackage'
+    SolutionType: 'Both'
+    ProcessCanvasApps: false
+
+# ============================================================================
+# Step 6: Extract Version and Rename Managed Solution - CopilotStudioKit_Components
+# ============================================================================
+- powershell: |
+    $solutionXmlPath = "$(UnpackedSolutionFolder1)/SolutionPackage/Other/Solution.xml"
+    $outputSolutionName = "CopilotStudioKit_Components"
+    
+    Write-Host "Reading solution version from: $solutionXmlPath"
+    
+    if (-not (Test-Path $solutionXmlPath)) {
+        Write-Host "##vso[task.logissue type=error]Solution.xml not found at: $solutionXmlPath"
+        exit 1
+    }
+    
+    # Read and parse Solution.xml
+    [xml]$solutionXml = Get-Content $solutionXmlPath
+    $fullVersion = $solutionXml.ImportExportXml.SolutionManifest.Version
+    
+    if ([string]::IsNullOrWhiteSpace($fullVersion)) {
+        Write-Host "##vso[task.logissue type=error]Unable to extract version from Solution.xml"
+        exit 1
+    }
+    
+    Write-Host "Full solution version: $fullVersion"
+    
+    # Extract major version (first part before first dot) - e.g., "20260202.2" -> "20260202"
+    $majorVersion = $fullVersion.Split('.')[0]
+    Write-Host "Major version (for filename): $majorVersion"
+    
+    # Rename managed solution file
+    $originalManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_managed.zip"
+    $newManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_${majorVersion}_managed.zip"
+    
+    if (Test-Path $originalManagedFile) {
+        Rename-Item -Path $originalManagedFile -NewName (Split-Path $newManagedFile -Leaf)
+        Write-Host "##[section]Renamed managed solution:"
+        Write-Host "  From: ${outputSolutionName}_managed.zip"
+        Write-Host "  To:   ${outputSolutionName}_${majorVersion}_managed.zip"
+    } else {
+        Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalManagedFile"
+        exit 1
+    }
+    
+    # Set variable for later use
+    Write-Host "##vso[task.setvariable variable=SolutionVersion1]$majorVersion"
+    Write-Host ""
+    Write-Host "CopilotStudioKit_Components version: $majorVersion"
+  displayName: 'Extract Version - CopilotStudioKit_Components'
+
+# ============================================================================
+# SOLUTION 2: CopilotStudioKit_ServiceNow_Components
+# ============================================================================
+
+# ============================================================================
+# Step 7: Export CopilotStudioKit_ServiceNow_Components - Unmanaged Solution
+# ============================================================================
+- task: PowerPlatformExportSolution@2
+  displayName: 'Export CopilotStudioKit_ServiceNow_Components - Unmanaged'
+  inputs:
+    authenticationType: 'PowerPlatformSPN'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+    Environment: '$(varSourceEnvironmentURL)'
+    SolutionName: 'CopilotStudioKit_ServiceNow_Components'
+    SolutionOutputFile: '$(SolutionOutputFolder)/CopilotStudioKit_ServiceNow_Components.zip'
+    Managed: false
+
+# ============================================================================
+# Step 8: Export CopilotStudioKit_ServiceNow_Components - Managed Solution
+# ============================================================================
+- task: PowerPlatformExportSolution@2
+  displayName: 'Export CopilotStudioKit_ServiceNow_Components - Managed'
+  inputs:
+    authenticationType: 'PowerPlatformSPN'
+    PowerPlatformSPN: '$(varSourceEnvironmentURL)'
+    Environment: '$(varSourceEnvironmentURL)'
+    SolutionName: 'CopilotStudioKit_ServiceNow_Components'
+    SolutionOutputFile: '$(SolutionOutputFolder)/CopilotStudioKit_ServiceNow_Components_managed.zip'
+    Managed: true
+
+# ============================================================================
+# Step 9: Unpack CopilotStudioKit_ServiceNow_Components to Source Control
+# ============================================================================
+- task: PowerPlatformUnpackSolution@2
+  displayName: 'Unpack CopilotStudioKit_ServiceNow_Components'
+  inputs:
+    SolutionInputFile: '$(SolutionOutputFolder)/CopilotStudioKit_ServiceNow_Components.zip'
+    SolutionTargetFolder: '$(UnpackedSolutionFolder2)/SolutionPackage'
+    SolutionType: 'Both'
+    ProcessCanvasApps: false
+
+# ============================================================================
+# Step 10: Extract Version and Rename Managed Solution - CopilotStudioKit_ServiceNow_Components
+# ============================================================================
+- powershell: |
+    $solutionXmlPath = "$(UnpackedSolutionFolder2)/SolutionPackage/Other/Solution.xml"
+    $outputSolutionName = "CopilotStudioKit_ServiceNow_Components"
+    
+    Write-Host "Reading solution version from: $solutionXmlPath"
+    
+    if (-not (Test-Path $solutionXmlPath)) {
+        Write-Host "##vso[task.logissue type=error]Solution.xml not found at: $solutionXmlPath"
+        exit 1
+    }
+    
+    # Read and parse Solution.xml
+    [xml]$solutionXml = Get-Content $solutionXmlPath
+    $fullVersion = $solutionXml.ImportExportXml.SolutionManifest.Version
+    
+    if ([string]::IsNullOrWhiteSpace($fullVersion)) {
+        Write-Host "##vso[task.logissue type=error]Unable to extract version from Solution.xml"
+        exit 1
+    }
+    
+    Write-Host "Full solution version: $fullVersion"
+    
+    # Extract major version (first part before first dot) - e.g., "20260202.2" -> "20260202"
+    $majorVersion = $fullVersion.Split('.')[0]
+    Write-Host "Major version (for filename): $majorVersion"
+    
+    # Rename managed solution file
+    $originalManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_managed.zip"
+    $newManagedFile = "$(SolutionOutputFolder)/${outputSolutionName}_${majorVersion}_managed.zip"
+    
+    if (Test-Path $originalManagedFile) {
+        Rename-Item -Path $originalManagedFile -NewName (Split-Path $newManagedFile -Leaf)
+        Write-Host "##[section]Renamed managed solution:"
+        Write-Host "  From: ${outputSolutionName}_managed.zip"
+        Write-Host "  To:   ${outputSolutionName}_${majorVersion}_managed.zip"
+    } else {
+        Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalManagedFile"
+        exit 1
+    }
+    
+    # Set variable for later use
+    Write-Host "##vso[task.setvariable variable=SolutionVersion2]$majorVersion"
+    Write-Host ""
+    Write-Host "CopilotStudioKit_ServiceNow_Components version: $majorVersion"
+  displayName: 'Extract Version - CopilotStudioKit_ServiceNow_Components'
+
+# ============================================================================
+# Step 11: Publish Pipeline Artifacts
+# ============================================================================
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish Solution Artifacts'
+  inputs:
+    targetPath: '$(SolutionOutputFolder)'
+    artifact: 'drop'
+    publishLocation: 'pipeline'
+
+# ============================================================================
+# Step 12: Configure Git for Commit
+# ============================================================================
+- script: |
+    git config --global user.email "$(Build.RequestedForEmail)"
+    git config --global user.name "$(Build.RequestedFor)"
+  displayName: 'Configure Git Credentials'
+
+# ============================================================================
+# Step 13: Commit and Push Changes to Repository
+# ============================================================================
+- script: |
+    git add --all
+    git diff --cached --quiet || git commit -m "Exported component solutions from $(varSourceEnvironmentURL) [skip ci]"
+    git push origin HEAD:main
+  displayName: 'Commit and Push Component Solutions to Main'
+  workingDirectory: $(Build.SourcesDirectory)
