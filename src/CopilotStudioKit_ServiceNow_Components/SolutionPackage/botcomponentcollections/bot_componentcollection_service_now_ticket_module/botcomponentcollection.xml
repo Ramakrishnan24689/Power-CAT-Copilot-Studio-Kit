@@ -1,0 +1,7 @@
+<botcomponentcollection schemaname="bot_componentcollection_service_now_ticket_module">
+  <description>ServiceNow ticket component with topics to create, update, close, and fetch incidents.</description>
+  <iscustomizable>1</iscustomizable>
+  <name>Service Now Ticket Component</name>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponentcollection>

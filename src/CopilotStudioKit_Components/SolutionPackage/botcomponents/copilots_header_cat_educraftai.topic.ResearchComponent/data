@@ -1,0 +1,356 @@
+kind: AdaptiveDialog
+inputs:
+  - kind: AutomaticTaskInput
+    propertyName: ResearchPrompt
+    name: Research Prompt
+    description: The main topic or subject matter the user wants content about
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: AdditionalInstructions
+    name: Additional Instructions
+    description: Additional Instructions
+    shouldPromptUser: false
+
+  - kind: AutomaticTaskInput
+    propertyName: InstructionsForContentSynthesizer
+    name: Instructions For Content Synthesizer
+    description: Instructions For Content Synthesizer
+    shouldPromptUser: false
+
+  - kind: AutomaticTaskInput
+    propertyName: InstructionsForReportFinalizer
+    name: Instructions For Report Finalizer
+    description: Instructions For Report Finalizer
+    shouldPromptUser: false
+
+modelDescription: This will generate content using a 3-stage research workflow - planning, content synthesis, and report finalization.
+beginDialog:
+  kind: OnRecognizedIntent
+  id: main
+  intent: {}
+  actions:
+    - kind: SendActivity
+      id: sendActivity_zxDLsw
+      activity: 🔍 Reviewing your request to prepare a structured research plan…
+
+    - kind: SetVariable
+      id: setResearchPlannerInstructions
+      variable: Topic.ResearchPlannerInstructions
+      value: =If(IsBlank(Topic.AdditionalInstructions), "Begin with clear research objective", Topic.AdditionalInstructions)
+
+    - kind: SetVariable
+      id: setContentSynthesizerInstructions
+      variable: Topic.ContentSynthesizerInstructions
+      value: =If(IsBlank(Topic.InstructionsForContentSynthesizer), "Simple style, 200 words max", Topic.InstructionsForContentSynthesizer)
+
+    - kind: SetVariable
+      id: setReportFinalizerInstructions
+      variable: Topic.ReportFinalizerInstructions
+      value: =If(IsBlank(Topic.InstructionsForReportFinalizer), "Synthesize all drafted sections into a cohesive, professionally formatted report while preserving full detail", Topic.InstructionsForReportFinalizer)
+
+    - kind: InvokeAIBuilderModelAction
+      id: researchPlanner_Stage1
+      displayName: Create research plan
+      input:
+        binding:
+          Additional_Instructions: =Topic.ResearchPlannerInstructions
+          Research_Prompt: =Topic.ResearchPrompt
+
+      output:
+        binding:
+          predictionOutput: Topic.ResearchPlanText
+
+      aIModelId: 485155f9-489e-4356-acb3-240fa743f2c2
+
+    - kind: SetVariable
+      id: cleanJsonMarkers
+      variable: Topic.CleanedResearchPlanJson
+      value: =Trim(Topic.ResearchPlanText.text)
+
+    - kind: ParseValue
+      id: parseResearchPlan
+      variable: Topic.ResearchPlan
+      valueType:
+        kind: Record
+        properties:
+          cross_cutting_queries:
+            type:
+              kind: Table
+              properties:
+                purpose: String
+                relevant_sections: String
+                Value: String
+
+          research_metadata:
+            type:
+              kind: Record
+              properties:
+                inferred_depth: String
+                section_count: Number
+                time_horizon: String
+
+          sections:
+            type:
+              kind: Table
+              properties:
+                queries:
+                  type:
+                    kind: Table
+                    properties:
+                      Value: String
+
+                section_focus: String
+                section_id: String
+                section_title: String
+
+      value: =Topic.CleanedResearchPlanJson
+      errorPolicy: ThrowError
+
+    - kind: SendActivity
+      id: sendActivity_ResearchPlanComplete
+      activity: |
+        ✅ **Research plan created successfully!**
+
+        We will generate content for **{CountRows(Topic.ResearchPlan.sections)}** sections.
+
+    - kind: SetVariable
+      id: initConcatenatedContent
+      variable: Topic.DraftedSections
+      value: "\"\""
+
+    - kind: SetVariable
+      id: initAllCitations
+      variable: Topic.AllCitationsText
+      value: "\"\""
+
+    - kind: SetVariable
+      id: initCrossCuttingContext
+      variable: Topic.CrossCuttingContext
+      value: "\"\""
+
+    - kind: Foreach
+      id: loopCrossCuttingQueries
+      items: =Topic.ResearchPlan.cross_cutting_queries
+      value: init:Topic.CrossCuttingQuery
+      index: init:Topic.CrossCuttingIndex
+      actions:
+        - kind: SearchKnowledgeSources
+          id: searchCrossCuttingContext
+          displayName: Search cross-cutting context
+          webBrowsing: true
+          result: Topic.CrossCuttingResults
+          userInput: =Topic.CrossCuttingQuery.Value
+
+        - kind: Foreach
+          id: loopCrossCuttingResults
+          items: =Topic.CrossCuttingResults
+          value: init:Topic.CrossCuttingResult
+          index: init:Topic.CrossCuttingResultIndex
+          actions:
+            - kind: SetVariable
+              id: appendCrossCuttingResult
+              variable: Topic.CrossCuttingContext
+              value: |-
+                =Concatenate(
+                    Topic.CrossCuttingContext,
+                    "\n\n---\n\n",
+                    "**Title:** ",
+                    Topic.CrossCuttingResult.Title,
+                    "\n",
+                    "**Source:** ",
+                    Topic.CrossCuttingResult.ContentLocation,
+                    "\n",
+                    "**Content:**\n",
+                    Topic.CrossCuttingResult.Content
+                )
+
+    - kind: Foreach
+      id: loopThroughSections
+      items: =Topic.ResearchPlan.sections
+      value: init:Topic.CurrentSection
+      index: init:Topic.SectionIndex
+      actions:
+        - kind: SetVariable
+          id: initSectionContext
+          variable: Topic.SectionContext
+          value: =Topic.CrossCuttingContext
+
+        - kind: Foreach
+          id: loopThroughQueries
+          items: =Topic.CurrentSection.queries
+          value: init:Topic.CurrentQuery
+          index: init:Topic.QueryIndex
+          actions:
+            - kind: SearchKnowledgeSources
+              id: searchForContext
+              displayName: Custom search from web
+              webBrowsing: true
+              result: Topic.SearchResults
+              userInput: =Topic.CurrentQuery
+
+            - kind: Foreach
+              id: loopThroughResults
+              items: =Topic.SearchResults
+              value: init:Topic.SearchResult
+              index: init:Topic.ResultIndex
+              actions:
+                - kind: SetVariable
+                  id: appendSearchResult
+                  variable: Topic.SectionContext
+                  value: |-
+                    =Concatenate(
+                        Topic.SectionContext,
+                        "\n\n---\n\n",
+                        "**Title:** ",
+                        Topic.SearchResult.Title,
+                        "\n",
+                        "**Source:** ",
+                        Topic.SearchResult.ContentLocation,
+                        "\n",
+                        "**Content:**\n",
+                        Topic.SearchResult.Content
+                    )
+
+        - kind: InvokeAIBuilderModelAction
+          id: contentSynthesizer_Stage2
+          displayName: Generate section content
+          input:
+            binding:
+              Additional_Instructions: =Topic.ContentSynthesizerInstructions
+              Context: =Topic.SectionContext
+              Research_Prompt: =Topic.ResearchPrompt
+              Section_Data: =JSON(Topic.CurrentSection, JSONFormat.IndentFour)
+
+          output:
+            binding:
+              predictionOutput: Topic.CurrentSectionContentResponse
+
+          aIModelId: ecf7b065-b130-483e-b2a4-10be485b68a0
+
+        - kind: SetVariable
+          id: cleanSectionContentJson
+          variable: Topic.CleanedSectionContentJson
+          value: =Trim(Topic.CurrentSectionContentResponse.text)
+
+        - kind: ParseValue
+          id: parseSectionContent
+          variable: Topic.CurrentSectionContent
+          valueType:
+            kind: Record
+            properties:
+              citations:
+                type:
+                  kind: Table
+                  properties:
+                    Value: String
+
+              section_content_markdown: String
+
+          value: =Topic.CleanedSectionContentJson
+          errorPolicy: ThrowError
+
+        - kind: SendActivity
+          id: sendActivity_SectionProgress
+          activity: |
+            📝 **Section {Topic.SectionIndex + 1} of {CountRows(Topic.ResearchPlan.sections)}:** "{Topic.CurrentSection.section_title}" - Content generated successfully!
+
+        - kind: SetVariable
+          id: concatenateSections
+          variable: Topic.DraftedSections
+          value: |-
+            =Concatenate(
+                Topic.DraftedSections,
+                "\n\n",
+                Topic.CurrentSectionContent.section_content_markdown
+            )
+
+        - kind: SetVariable
+          id: concatenateCitations
+          variable: Topic.AllCitationsText
+          value: |
+            =Concatenate(
+                Topic.AllCitationsText,
+                If(
+                    CountRows(Topic.CurrentSectionContent.citations) > 0,
+                    Concat(Topic.CurrentSectionContent.citations, Value, "\n"),
+                    ""
+                )
+            )
+
+    - kind: ConditionGroup
+      id: checkDraftedLength
+      conditions:
+        - id: ifContentTooLarge
+          condition: =Len(Topic.DraftedSections) > 60000
+          actions:
+            - kind: SendActivity
+              id: warnContentTruncation
+              activity: ⚠️ **Generated content is very large.** Truncating to fit within model limits before finalizing...
+
+            - kind: SetVariable
+              id: truncateDraftedSections
+              variable: Topic.DraftedSections
+              value: =Left(Topic.DraftedSections, 60000)
+
+    - kind: SendActivity
+      id: sendActivity_GeneratingFinalReport
+      activity: |
+        🔄 **All sections completed!** Now generating the final report...
+
+    - kind: InvokeAIBuilderModelAction
+      id: reportFinalizer_Stage3
+      displayName: Generate final draft report
+      input:
+        binding:
+          Additional_Instructions: =Topic.ReportFinalizerInstructions
+          Citations: =Topic.AllCitationsText
+          Drafted_Content: =Topic.DraftedSections
+          Research_Prompt: =Topic.ResearchPrompt
+
+      output:
+        binding:
+          predictionOutput: Topic.FinalReportResponse
+
+      aIModelId: 7c2b4144-6d0e-4664-bcaf-aed69ab94572
+
+    - kind: SetVariable
+      id: extractFinalReportMarkdown
+      variable: Global.FinalReportContent
+      value: =Trim(Topic.FinalReportResponse.text)
+
+    - kind: SendActivity
+      id: sendActivity_eznKrB
+      activity: |
+        ✅ **Final report draft generated successfully!**
+
+    - kind: SendActivity
+      id: sendActivity_DisplayBrief
+      activity: "{Global.FinalReportContent}"
+
+    - kind: EndDialog
+      id: 5qCdAU
+
+inputType:
+  properties:
+    AdditionalInstructions:
+      displayName: Additional Instructions
+      description: Additional Instructions (optional - uses defaults if empty)
+      type: String
+
+    InstructionsForContentSynthesizer:
+      displayName: Instructions For Content Synthesizer
+      description: Instructions For Content Synthesizer
+      type: String
+
+    InstructionsForReportFinalizer:
+      displayName: Instructions For Report Finalizer
+      description: Instructions For Report Finalizer
+      type: String
+
+    ResearchPrompt:
+      displayName: Research Prompt
+      description: Research Prompt (e.g., Overview of electric vehicle market)
+      type: String
+
+outputType: {}

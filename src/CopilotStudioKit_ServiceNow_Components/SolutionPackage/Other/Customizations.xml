@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" OrganizationVersion="9.2.26014.164" OrganizationSchemaType="Standard" CRMServerServiceabilityVersion="9.2.26014.00164">
+  <Entities />
+  <Roles />
+  <Workflows />
+  <FieldSecurityProfiles />
+  <Templates />
+  <EntityMaps />
+  <EntityRelationships />
+  <OrganizationSettings />
+  <optionsets />
+  <CustomControls />
+  <EntityDataProviders />
+  <connectionreferences>
+    <connectionreference connectionreferencelogicalname="copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98">
+      <connectionreferencedisplayname>[CSK Comp Lib] Service Now</connectionreferencedisplayname>
+      <connectorid>/providers/Microsoft.PowerApps/apis/shared_service-now</connectorid>
+      <description>Connection reference used by the Service Now component</description>
+      <iscustomizable>0</iscustomizable>
+      <promptingbehavior>0</promptingbehavior>
+      <statecode>0</statecode>
+      <statuscode>1</statuscode>
+    </connectionreference>
+  </connectionreferences>
+  <Languages>
+    <Language>1033</Language>
+  </Languages>
+</ImportExportXml>

@@ -1,0 +1,23 @@
+<botcomponent_msdyn_aimodelset>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_apexbrief.topic.ExecutiveBriefComponent" msdyn_aimodelid.msdyn_aimodelid="1a4d3e39-6f19-4864-9653-cc2c0bb948ed">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_apexbrief.topic.ExecutiveBriefComponent" msdyn_aimodelid.msdyn_aimodelid="8bf5cd4d-7564-4e6a-8ee5-0ae821fdc203">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_apexbrief.topic.ExecutiveBriefComponent" msdyn_aimodelid.msdyn_aimodelid="ecf7b065-b130-483e-b2a4-10be485b68a0">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_educraftai.topic.ResearchComponent" msdyn_aimodelid.msdyn_aimodelid="485155f9-489e-4356-acb3-240fa743f2c2">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_educraftai.topic.ResearchComponent" msdyn_aimodelid.msdyn_aimodelid="7c2b4144-6d0e-4664-bcaf-aed69ab94572">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="copilots_header_cat_educraftai.topic.ResearchComponent" msdyn_aimodelid.msdyn_aimodelid="ecf7b065-b130-483e-b2a4-10be485b68a0">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+  <botcomponent_msdyn_aimodel botcomponentid.schemaname="cre1b_legalDocumentExtractionCopilot.action.DocExtraction" msdyn_aimodelid.msdyn_aimodelid="824cb778-48dc-4231-94bd-ca513575d1e5">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_msdyn_aimodel>
+</botcomponent_msdyn_aimodelset>

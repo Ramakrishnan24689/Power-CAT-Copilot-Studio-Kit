@@ -1,0 +1,7 @@
+<botcomponentcollection schemaname="bot_componentcollection_research_component">
+  <description>Synthesizes information from multiple sources into a comprehensive research report.</description>
+  <iscustomizable>1</iscustomizable>
+  <name>Research Component</name>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponentcollection>

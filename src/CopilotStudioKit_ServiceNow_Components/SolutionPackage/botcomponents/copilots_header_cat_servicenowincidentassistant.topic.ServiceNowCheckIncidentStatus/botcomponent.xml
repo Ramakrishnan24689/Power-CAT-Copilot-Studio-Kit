@@ -1,0 +1,10 @@
+<botcomponent schemaname="copilots_header_cat_servicenowincidentassistant.topic.ServiceNowCheckIncidentStatus">
+  <componenttype>9</componenttype>
+  <iscustomizable>0</iscustomizable>
+  <name>ServiceNow | Check Incident Status</name>
+  <parentbotcomponentcollectionid>
+    <schemaname>bot_componentcollection_service_now_ticket_module</schemaname>
+  </parentbotcomponentcollectionid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

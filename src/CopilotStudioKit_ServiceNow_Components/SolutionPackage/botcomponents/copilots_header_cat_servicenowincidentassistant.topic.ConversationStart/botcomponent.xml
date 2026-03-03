@@ -1,0 +1,11 @@
+<botcomponent schemaname="copilots_header_cat_servicenowincidentassistant.topic.ConversationStart">
+  <componenttype>9</componenttype>
+  <description>This system topic triggers when the agent receives an Activity indicating the beginning of a new conversation. If you do not want the agent to initiate the conversation, disable this topic.</description>
+  <iscustomizable>0</iscustomizable>
+  <name>Conversation Start</name>
+  <parentbotcomponentcollectionid>
+    <schemaname>bot_componentcollection_service_now_ticket_module</schemaname>
+  </parentbotcomponentcollectionid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

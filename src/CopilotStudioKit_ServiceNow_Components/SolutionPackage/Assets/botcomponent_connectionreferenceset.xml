@@ -1,0 +1,14 @@
+<botcomponent_connectionreferenceset>
+  <botcomponent_connectionreference botcomponentid.schemaname="copilots_header_cat_servicenowincidentassistant.topic.ServiceNowCheckIncidentStatus" connectionreferenceid.connectionreferencelogicalname="copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_connectionreference>
+  <botcomponent_connectionreference botcomponentid.schemaname="copilots_header_cat_servicenowincidentassistant.topic.ServiceNowCreateIncident" connectionreferenceid.connectionreferencelogicalname="copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_connectionreference>
+  <botcomponent_connectionreference botcomponentid.schemaname="copilots_header_cat_servicenowincidentassistant.topic.ServiceNowGetUserRecentIncidents" connectionreferenceid.connectionreferencelogicalname="copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_connectionreference>
+  <botcomponent_connectionreference botcomponentid.schemaname="copilots_header_cat_servicenowincidentassistant.topic.ServiceNowResolveorCloseanIncident" connectionreferenceid.connectionreferencelogicalname="copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98">
+    <iscustomizable>1</iscustomizable>
+  </botcomponent_connectionreference>
+</botcomponent_connectionreferenceset>

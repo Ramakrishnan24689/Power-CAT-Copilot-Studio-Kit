@@ -1,0 +1,34 @@
+kind: TaskDialog
+inputs:
+  - kind: AutomaticTaskInput
+    propertyName: additional_instructions
+    name: additional_instructions
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: document_content
+    name: document_content
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: document_type
+    name: document_type
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: extraction_schema
+    name: extraction_schema
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: language
+    name: language
+    shouldPromptUser: true
+
+modelDisplayName: Doc Extraction
+modelDescription: When a document is uploaded or pasted, call this tool
+action:
+  kind: InvokeAIBuilderModelTaskAction
+  aIModelId: 824cb778-48dc-4231-94bd-ca513575d1e5
+
+outputMode: All

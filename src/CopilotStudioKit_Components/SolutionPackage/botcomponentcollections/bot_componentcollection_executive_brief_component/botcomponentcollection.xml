@@ -1,0 +1,7 @@
+<botcomponentcollection schemaname="bot_componentcollection_executive_brief_component">
+  <description>Generates concise, decision-oriented summaries from complex inputs.</description>
+  <iscustomizable>1</iscustomizable>
+  <name>Executive Brief Component</name>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponentcollection>

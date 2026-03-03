@@ -1,0 +1,10 @@
+<botcomponent schemaname="cre1b_legalDocumentExtractionCopilot.action.DocExtraction">
+  <componenttype>9</componenttype>
+  <iscustomizable>0</iscustomizable>
+  <name>Doc Extraction</name>
+  <parentbotcomponentcollectionid>
+    <schemaname>bot_componentcollection_document_extraction_component</schemaname>
+  </parentbotcomponentcollectionid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>

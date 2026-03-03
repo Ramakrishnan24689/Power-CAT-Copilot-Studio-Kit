@@ -1,0 +1,684 @@
+kind: AdaptiveDialog
+modelDescription: |-
+  Purpose: Retrieve the latest status and key details of a ServiceNow incident using an Incident Number (INC…).
+
+  Use when user asks:
+
+  To check / track / view the status of an incident
+
+  To see current state/priority/details for an incident number
+
+  To confirm whether an incident is resolved/closed/in progress
+
+  Examples (user utterances):
+
+  “Check the status of INC0010002”
+
+  “What’s the status of my incident INC0000601?”
+
+  “Track incident INC0012345”
+
+  “Is INC0010002 resolved yet?”
+
+  “Show details for INC0010002”
+
+  “Get the latest update on INC0010002”
+
+  “What is the priority and state for INC0010002?”
+
+  “Can you look up INC0010002?”
+beginDialog:
+  kind: OnRecognizedIntent
+  id: main
+  intent: {}
+  actions:
+    - kind: AdaptiveCardPrompt
+      id: 7KqhpV
+      card: |-
+        {
+          "type": "AdaptiveCard",
+          "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+          "version": "1.5",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "Check ServiceNow Incident Status",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "Enter the Incident Number to retrieve the latest status and details from ServiceNow.",
+              "wrap": true,
+              "isSubtle": true,
+              "spacing": "Small"
+            },
+            {
+              "type": "Input.Text",
+              "id": "incidentNumber",
+              "label": "Incident Number",
+              "placeholder": "Example: INC0010002",
+              "isRequired": true,
+              "errorMessage": "Incident Number is required (Example: INC0010002).",
+              "maxLength": 20
+            },
+            {
+              "type": "TextBlock",
+              "text": "Tip: Incident Numbers usually start with 'INC' followed by digits.",
+              "wrap": true,
+              "isSubtle": true,
+              "spacing": "Small",
+              "size": "Small"
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.Submit",
+              "title": "Get Status"
+            }
+          ]
+        }
+      output:
+        binding:
+          actionSubmitId: Topic.actionSubmitId
+          incidentNumber: Topic.incidentNumber
+
+      outputType:
+        properties:
+          actionSubmitId: String
+          incidentNumber: String
+
+    - kind: InvokeConnectorAction
+      id: invokeConnectorAction_lI4rg1
+      displayName: Get Incident by Number
+      input:
+        binding:
+          sysparm_limit: 1
+          sysparm_query: ="number="&Topic.incidentNumber
+          tableType: incident
+
+      output:
+        kind: SingleVariableOutputBinding
+        variable: Topic.varResponseGetIncident
+
+      connectionReference: copilots_header_cat_servicenowincidentassistant.shared_service-now.shared-service-now-1c613b4d-4434-45ef-8b28-e9311d8a1a98
+      connectionProperties:
+        mode: Maker
+
+      dynamicOutputSchema:
+        kind: Record
+        properties:
+          result:
+            order: 0
+            type:
+              kind: Table
+              properties:
+                active:
+                  displayName: Active
+                  order: 29
+                  type: String
+
+                activity_due:
+                  displayName: Activity due
+                  description: Date by which the Inactivity Monitor expects the task to be updated
+                  order: 76
+                  type: String
+
+                additional_assignee_list:
+                  displayName: Additional assignee list
+                  description: Additional assignees
+                  order: 55
+                  type: String
+
+                approval:
+                  displayName: Approval
+                  order: 80
+                  type: String
+
+                approval_history:
+                  displayName: Approval history
+                  order: 10
+                  type: String
+
+                approval_set:
+                  displayName: Approval set
+                  order: 45
+                  type: String
+
+                assigned_to:
+                  displayName: Assigned to
+                  description: Person primarily responsible for working this task
+                  order: 77
+                  type: String
+
+                assignment_group:
+                  displayName: Assignment group
+                  order: 54
+                  type: String
+
+                business_duration:
+                  displayName: Business duration
+                  description: Business time elapsed before task was closed
+                  order: 39
+                  type: String
+
+                business_impact:
+                  displayName: Business impact
+                  order: 32
+                  type: String
+
+                business_service:
+                  displayName: Service
+                  order: 31
+                  type: String
+
+                business_stc:
+                  displayName: Business resolve time
+                  description: Business time elapsed (stored in seconds) before Incident was resolved
+                  order: 56
+                  type: String
+
+                calendar_duration:
+                  displayName: Duration
+                  description: Time elapsed before task was closed
+                  order: 60
+                  type: String
+
+                calendar_stc:
+                  displayName: Resolve time
+                  description: Time elapsed (stored in seconds) before Incident was Resolved
+                  order: 23
+                  type: String
+
+                caller_id:
+                  displayName: Caller
+                  description: Person who reported or is affected by this incident
+                  order: 42
+                  type: String
+
+                category:
+                  displayName: Category
+                  order: 91
+                  type: String
+
+                cause:
+                  displayName: Probable cause
+                  order: 57
+                  type: String
+
+                caused_by:
+                  displayName: Caused by Change
+                  description: Change request that caused the incident
+                  order: 2
+                  type: String
+
+                child_incidents:
+                  displayName: Child Incidents
+                  description: Number of child Incidents related to this Problem
+                  order: 6
+                  type: String
+
+                close_code:
+                  displayName: Resolution code
+                  description: For use in reporting
+                  order: 50
+                  type: String
+
+                close_notes:
+                  displayName: Resolution notes
+                  order: 61
+                  type: String
+
+                closed_at:
+                  displayName: Closed
+                  order: 24
+                  type: String
+
+                closed_by:
+                  displayName: Closed by
+                  order: 65
+                  type: String
+
+                cmdb_ci:
+                  displayName: Configuration item
+                  description: Item or service affected
+                  order: 25
+                  type: String
+
+                comments:
+                  displayName: Comments
+                  description: Journaled field, shared with the end user
+                  order: 79
+                  type: String
+
+                comments_and_work_notes:
+                  displayName: Comments and Work notes
+                  description: Combined output of Additional comments and Work notes
+                  order: 82
+                  type: String
+
+                company:
+                  displayName: Company
+                  order: 74
+                  type: String
+
+                contact_type:
+                  displayName: Channel
+                  order: 69
+                  type: String
+
+                contract:
+                  displayName: Contract
+                  order: 27
+                  type: String
+
+                correlation_display:
+                  displayName: Correlation display
+                  order: 51
+                  type: String
+
+                correlation_id:
+                  displayName: Correlation ID
+                  order: 89
+                  type: String
+
+                delivery_plan:
+                  displayName: Delivery plan
+                  order: 26
+                  type: String
+
+                delivery_task:
+                  displayName: Delivery task
+                  order: 52
+                  type: String
+
+                description:
+                  displayName: Description
+                  order: 58
+                  type: String
+
+                due_date:
+                  displayName: Due date
+                  description: Expected date from assigned to
+                  order: 83
+                  type: String
+
+                escalation:
+                  displayName: Escalation
+                  order: 87
+                  type: String
+
+                expected_start:
+                  displayName: Expected start
+                  order: 37
+                  type: String
+
+                follow_up:
+                  displayName: Follow up
+                  order: 66
+                  type: String
+
+                group_list:
+                  displayName: Group list
+                  description: Interested groups
+                  order: 40
+                  type: String
+
+                hold_reason:
+                  displayName: On hold reason
+                  order: 7
+                  type: String
+
+                impact:
+                  displayName: Impact
+                  description: Measure of the business criticality of the affected service
+                  order: 28
+                  type: String
+
+                incident_state:
+                  displayName: Incident state
+                  description: Workflow state of the incident
+                  order: 71
+                  type: String
+
+                knowledge:
+                  displayName: Knowledge
+                  description: If checked, will automatically create a Draft knowledge article upon closure
+                  order: 21
+                  type: String
+
+                location:
+                  displayName: Location
+                  description: Where the caller or service is located
+                  order: 90
+                  type: String
+
+                made_sla:
+                  displayName: Made SLA
+                  order: 1
+                  type: String
+
+                notify:
+                  displayName: Notify
+                  order: 62
+                  type: String
+
+                number:
+                  displayName: Number
+                  order: 11
+                  type: String
+
+                opened_at:
+                  displayName: Opened
+                  order: 38
+                  type: String
+
+                opened_by:
+                  displayName: Opened by
+                  order: 14
+                  type: String
+
+                order:
+                  displayName: Order
+                  order: 22
+                  type: String
+
+                origin_id:
+                  displayName: Origin
+                  order: 59
+                  type: String
+
+                origin_table:
+                  displayName: Origin table
+                  description: Table of the Origin record
+                  order: 8
+                  type: String
+
+                parent:
+                  displayName: Parent
+                  order: 0
+                  type: String
+
+                parent_incident:
+                  displayName: Parent Incident
+                  description: Can be used to collect Incidents for the same root issue
+                  order: 67
+                  type: String
+
+                priority:
+                  displayName: Priority
+                  description: Sequence in which an Incident or Problem needs to be resolved, based on impact and urgency
+                  order: 33
+                  type: String
+
+                problem_id:
+                  displayName: Problem
+                  description: Related problem, if one exists
+                  order: 73
+                  type: String
+
+                reassignment_count:
+                  displayName: Reassignment count
+                  order: 75
+                  type: String
+
+                reopen_count:
+                  displayName: Reopen count
+                  description: Number of times Incident state has changed from Resolved or Closed to another state
+                  order: 85
+                  type: String
+
+                reopened_by:
+                  displayName: Last reopened by
+                  order: 70
+                  type: String
+
+                reopened_time:
+                  displayName: Last reopened at
+                  order: 43
+                  type: String
+
+                resolved_at:
+                  displayName: Resolved
+                  order: 44
+                  type: String
+
+                resolved_by:
+                  displayName: Resolved by
+                  order: 12
+                  type: String
+
+                rfc:
+                  displayName: Change Request
+                  description: Related change, if one exists
+                  order: 35
+                  type: String
+
+                route_reason:
+                  displayName: Transfer reason
+                  order: 19
+                  type: String
+
+                service_offering:
+                  displayName: Service offering
+                  order: 63
+                  type: String
+
+                severity:
+                  displayName: Severity
+                  order: 78
+                  type: String
+
+                short_description:
+                  displayName: Short description
+                  order: 49
+                  type: String
+
+                sla_due:
+                  displayName: SLA due
+                  description: Date by which the SLA expects this task to be completed
+                  order: 81
+                  type: String
+
+                state:
+                  displayName: State
+                  order: 18
+                  type: String
+
+                subcategory:
+                  displayName: Subcategory
+                  order: 46
+                  type: String
+
+                sys_class_name:
+                  displayName: Task type
+                  order: 64
+                  type: String
+
+                sys_created_by:
+                  displayName: Created by
+                  order: 20
+                  type: String
+
+                sys_created_on:
+                  displayName: Created
+                  order: 16
+                  type: String
+
+                sys_domain:
+                  displayName: Domain
+                  description: Domain to which the task belongs
+                  order: 17
+                  type: String
+
+                sys_domain_path:
+                  displayName: Domain Path
+                  order: 34
+                  type: String
+
+                sys_id:
+                  displayName: Sys ID
+                  order: 68
+                  type: String
+
+                sys_mod_count:
+                  displayName: Updates
+                  order: 84
+                  type: String
+
+                sys_tags:
+                  displayName: Tags
+                  order: 86
+                  type: String
+
+                sys_updated_by:
+                  displayName: Updated by
+                  order: 13
+                  type: String
+
+                sys_updated_on:
+                  displayName: Updated
+                  order: 5
+                  type: String
+
+                task_effective_number:
+                  displayName: Effective number
+                  order: 9
+                  type: String
+
+                time_worked:
+                  displayName: Time worked
+                  order: 36
+                  type: String
+
+                universal_request:
+                  displayName: Universal Request
+                  order: 48
+                  type: String
+
+                upon_approval:
+                  displayName: Upon approval
+                  order: 88
+                  type: String
+
+                upon_reject:
+                  displayName: Upon reject
+                  order: 4
+                  type: String
+
+                urgency:
+                  displayName: Urgency
+                  description: Measure of the business criticality based on the impact and on the business needs of the Customer
+                  order: 72
+                  type: String
+
+                user_input:
+                  displayName: User input
+                  order: 15
+                  type: String
+
+                watch_list:
+                  displayName: Watch list
+                  description: Interested users
+                  order: 3
+                  type: String
+
+                work_end:
+                  displayName: Actual end
+                  order: 41
+                  type: String
+
+                work_notes:
+                  displayName: Work notes
+                  order: 47
+                  type: String
+
+                work_notes_list:
+                  displayName: Work notes list
+                  description: Users interested in work notes
+                  order: 30
+                  type: String
+
+                work_start:
+                  displayName: Actual start
+                  order: 53
+                  type: String
+
+      operationId: GetRecords
+
+    - kind: ConditionGroup
+      id: conditionGroup_PMghNB
+      conditions:
+        - id: conditionItem_YZu5Hn
+          condition: =CountRows(Topic.varResponseGetIncident.result)>0
+          displayName: Incident found
+          actions:
+            - kind: SendActivity
+              id: sendActivity_IIkUz6
+              displayName: Show Incident Summary
+              activity: |-
+                {"<b>Here are the latest incident details from ServiceNow:</b><br /><br />" &
+
+                "<b>Incident Number:</b> " & First(Topic.varResponseGetIncident.result).number & "<br />" &
+
+                "<b>State:</b> " &
+                Switch(
+                Text(First(Topic.varResponseGetIncident.result).state),
+                "1", "New",
+                "2", "In Progress",
+                "3", "On Hold",
+                "6", "Resolved",
+                "7", "Closed",
+                "8", "Canceled",
+                "Unknown"
+                ) & "<br />" &
+
+                "<b>Priority:</b> " &
+                Switch(
+                Text(First(Topic.varResponseGetIncident.result).priority),
+                "1", "1 - Critical",
+                "2", "2 - High",
+                "3", "3 - Moderate",
+                "4", "4 - Low",
+                "5", "5 - Planning",
+                "Unknown"
+                ) & "<br />" &
+
+                "<b>Created on:</b> " &
+                Mid(First(Topic.varResponseGetIncident.result).sys_created_on, 6, 2) & "/" &
+                Mid(First(Topic.varResponseGetIncident.result).sys_created_on, 9, 2) & "/" &
+                Mid(First(Topic.varResponseGetIncident.result).sys_created_on, 1, 4) & " " &
+                Mid(First(Topic.varResponseGetIncident.result).sys_created_on, 12, 8) & "<br />" &
+
+                "<b>Last updated:</b> " &
+                Mid(First(Topic.varResponseGetIncident.result).sys_updated_on, 6, 2) & "/" &
+                Mid(First(Topic.varResponseGetIncident.result).sys_updated_on, 9, 2) & "/" &
+                Mid(First(Topic.varResponseGetIncident.result).sys_updated_on, 1, 4) & " " &
+                Mid(First(Topic.varResponseGetIncident.result).sys_updated_on, 12, 8) & "<br /><br />" &
+
+                "<b>Description:</b><br />" &
+                First(Topic.varResponseGetIncident.result).description
+                }
+
+      elseActions:
+        - kind: SendActivity
+          id: sendActivity_AuDGl8
+          activity: |-
+            No incident was found for incident number {Topic.incidentNumber}
+            Here are your recent Incidents to look for:
+
+        - kind: BeginDialog
+          id: 2SDcPZ
+          displayName: Redirect to recent incidents
+          dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowGetUserRecentIncidents
+
+        - kind: EndDialog
+          id: xxYtuc
+
+    - kind: BeginDialog
+      id: dkNKla
+      dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowNextActions
+
+inputType: {}
+outputType: {}

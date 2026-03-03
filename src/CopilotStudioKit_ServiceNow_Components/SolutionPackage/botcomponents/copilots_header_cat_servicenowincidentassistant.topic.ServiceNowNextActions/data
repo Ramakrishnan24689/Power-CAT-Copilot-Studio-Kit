@@ -1,0 +1,157 @@
+kind: AdaptiveDialog
+modelDescription: |-
+  Purpose: Display a reusable “Next Actions” menu to guide the user to the next supported ServiceNow operation.
+
+  Use when user asks:
+
+  The user wants to perform another ServiceNow task after completing an operation
+
+  The conversation needs to continue with a supported ServiceNow action
+
+  Examples (user utterances):
+
+  “What can I do next?”
+
+  “Show options”
+
+  “Help”
+
+  “Main menu”
+
+  “Show available actions”
+
+  “What else can you do?”
+
+  Do not use when:
+
+  The user is explicitly requesting a ServiceNow operation such as creating an incident, checking status, resolving/closing, or retrieving recent incidents (route to the corresponding topic instead).
+  This topic is primarily intended to be invoked via redirect from other topics.
+  This topic is designed as a reusable navigation topic and should typically be invoked using Redirect from other ServiceNow topics.
+beginDialog:
+  kind: OnRecognizedIntent
+  id: main
+  intent: {}
+  actions:
+    - kind: AdaptiveCardPrompt
+      id: GiDWqq
+      card: |-
+        {
+          "type": "AdaptiveCard",
+          "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+          "version": "1.5",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "What would you like to do next?",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "Select an option below or ask the agent using natural language.",
+              "isSubtle": true,
+              "wrap": true,
+              "spacing": "Small"
+            },
+            {
+              "type": "Input.ChoiceSet",
+              "id": "nextAction",
+              "label": "Next action",
+              "isRequired": true,
+              "errorMessage": "Select an option.",
+              "style": "expanded",
+              "choices": [
+                {
+                  "title": "Create a new incident",
+                  "value": "create"
+                },
+                {
+                  "title": "Check incident status",
+                  "value": "status"
+                },
+                {
+                  "title": "View my recent incidents",
+                  "value": "recent"
+                },
+                {
+                  "title": "Resolve / close an incident",
+                  "value": "resolve"
+                },
+                {
+                  "title": "Ask a question",
+                  "value": "ask"
+                }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.Submit",
+              "title": "Continue",
+              "data": {
+                "action": "nextActions"
+              }
+            }
+          ]
+        }
+      output:
+        binding:
+          action: Topic.action
+          actionSubmitId: Topic.actionSubmitId
+          nextAction: Topic.nextAction
+
+      outputType:
+        properties:
+          action: String
+          actionSubmitId: String
+          nextAction: String
+
+    - kind: ConditionGroup
+      id: conditionGroup_FT5CAv
+      conditions:
+        - id: conditionItem_QFeHJG
+          condition: =Topic.nextAction = "create"
+          displayName: nextAction == "create"
+          actions:
+            - kind: BeginDialog
+              id: B22DiC
+              dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowCreateIncident
+
+        - id: conditionItem_0caTGA
+          condition: =Topic.nextAction = "status"
+          displayName: nextAction == "status"
+          actions:
+            - kind: BeginDialog
+              id: VYYBC2
+              dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowCheckIncidentStatus
+
+        - id: conditionItem_5eUPoR
+          condition: =Topic.nextAction = "recent"
+          displayName: nextAction == "recent"
+          actions:
+            - kind: BeginDialog
+              id: L52wJq
+              dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowGetUserRecentIncidents
+
+        - id: conditionItem_rkr4oA
+          condition: =Topic.nextAction = "resolve"
+          displayName: nextAction == "resolve"
+          actions:
+            - kind: BeginDialog
+              id: otXB0l
+              dialog: copilots_header_cat_servicenowincidentassistant.topic.ServiceNowResolveorCloseanIncident
+
+        - id: conditionItem_oaLbrv
+          condition: =Topic.nextAction = "ask"
+          displayName: nextAction == "ask"
+          actions:
+            - kind: SendActivity
+              id: sendActivity_MJZt72
+              activity: Post your question
+
+    - kind: EndDialog
+      id: 6WHuLQ
+
+inputType: {}
+outputType: {}

@@ -1,0 +1,7 @@
+<botcomponentcollection schemaname="bot_componentcollection_document_extraction_component">
+  <description>Transforms uploaded documents into structured data.</description>
+  <iscustomizable>1</iscustomizable>
+  <name>Document Extraction Component</name>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponentcollection>

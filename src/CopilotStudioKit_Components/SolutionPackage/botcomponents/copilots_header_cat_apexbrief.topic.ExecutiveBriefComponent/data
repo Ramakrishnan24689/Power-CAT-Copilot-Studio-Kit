@@ -1,0 +1,318 @@
+kind: AdaptiveDialog
+inputs:
+  - kind: AutomaticTaskInput
+    propertyName: ResearchPrompt
+    name: Research Prompt
+    description: Research Prompt
+    shouldPromptUser: true
+
+  - kind: AutomaticTaskInput
+    propertyName: AdditionalInstructions
+    name: Additional Instructions
+    description: Additional Instructions
+    shouldPromptUser: false
+
+modelDescription: This will generate an executive brief using a 3-stage research workflow - strategic planning, insight synthesis, and brief finalization.
+beginDialog:
+  kind: OnRecognizedIntent
+  id: main
+  intent: {}
+  actions:
+    - kind: SendActivity
+      id: sendActivity_start
+      activity: 🔍 Reviewing your request to prepare a strategic research plan…
+
+    - kind: SetVariable
+      id: setPlannerInstructions
+      variable: Topic.PlannerInstructions
+      value: =If(IsBlank(Topic.AdditionalInstructions), "No company context provided. Generate broadly applicable strategic research areas based on research prompt.", Topic.AdditionalInstructions)
+
+    - kind: InvokeAIBuilderModelAction
+      id: invokeAIBuilderModelAction_CydC4Q
+      displayName: Create executive brief plan
+      input:
+        binding:
+          Additional_Instructions: =Topic.PlannerInstructions
+          Research_Prompt: =Topic.ResearchPrompt
+
+      output:
+        binding:
+          predictionOutput: Topic.ResearchPlanText
+
+      aIModelId: 8bf5cd4d-7564-4e6a-8ee5-0ae821fdc203
+
+    - kind: SetVariable
+      id: cleanJsonMarkers
+      variable: Topic.ResearchPlanJson
+      value: =Trim(Topic.ResearchPlanText.text)
+
+    - kind: ParseValue
+      id: parseResearchPlan
+      variable: Topic.ResearchPlan
+      valueType:
+        kind: Record
+        properties:
+          brief_metadata:
+            type:
+              kind: Record
+              properties:
+                company_centric: Boolean
+                company_name: String
+                decision_urgency: String
+                focus_type: String
+                sections: Number
+                time_horizon: String
+
+          document_structure:
+            type:
+              kind: Record
+              properties:
+                Audience: String
+                Company: String
+                Domain: String
+                Mode: String
+                Tone: String
+
+          sections:
+            type:
+              kind: Table
+              properties:
+                queries:
+                  type:
+                    kind: Table
+                    properties:
+                      Value: String
+
+                search_type: String
+                section_focus: String
+                section_id: String
+                section_title: String
+                strategic_relevance: String
+
+      value: =Topic.ResearchPlanJson
+      errorPolicy: ThrowError
+
+    - kind: SendActivity
+      id: sendActivity_ResearchPlanComplete
+      activity: |
+        ✅ **Strategic research plan created successfully!**
+
+        We will research **{CountRows(Topic.ResearchPlan.sections)}** strategic areas.
+
+    - kind: SetVariable
+      id: initAllKeyFacts
+      variable: Topic.AllKeyFacts
+      value: "\"\""
+
+    - kind: SetVariable
+      id: initAllCitations
+      variable: Topic.AllCitationsText
+      value: "\"\""
+
+    - kind: Foreach
+      id: loopThroughSections
+      items: =Topic.ResearchPlan.sections
+      value: init:Topic.CurrentSection
+      index: init:Topic.SectionIndex
+      actions:
+        - kind: SetVariable
+          id: initSectionContext
+          variable: Topic.SectionContext
+          value: "\"\""
+
+        - kind: Foreach
+          id: loopThroughQueries
+          items: =Topic.CurrentSection.queries
+          value: init:Topic.CurrentQuery
+          index: init:Topic.QueryIndex
+          actions:
+            - kind: ConditionGroup
+              id: routeSearchByType
+              conditions:
+                - id: checkInternalSearch
+                  condition: =Topic.CurrentSection.search_type = "internal"
+                  actions:
+                    - kind: SearchKnowledgeSources
+                      id: searchInternalKnowledge
+                      displayName: Search internal knowledge sources
+                      fileSearchDataSource:
+                        searchFilesMode:
+                          kind: SearchAllFiles
+
+                      knowledgeSources:
+                        kind: SearchAllKnowledgeSources
+
+                      result: Topic.SearchResults
+                      userInput: =Topic.CurrentQuery
+
+              elseActions:
+                - kind: SearchKnowledgeSources
+                  id: searchWebSources
+                  displayName: Search web sources
+                  webBrowsing: true
+                  result: Topic.SearchResults
+                  userInput: =Topic.CurrentQuery
+
+            - kind: Foreach
+              id: loopThroughResults
+              items: =Topic.SearchResults
+              value: init:Topic.SearchResult
+              index: init:Topic.ResultIndex
+              actions:
+                - kind: SetVariable
+                  id: appendSearchResult
+                  variable: Topic.SectionContext
+                  value: |-
+                    =Concatenate(
+                        Topic.SectionContext,
+                        "\n\n---\n\n",
+                        "**Title:** ",
+                        Topic.SearchResult.Title,
+                        "\n",
+                        "**Source:** ",
+                        Topic.SearchResult.ContentLocation,
+                        "\n",
+                        "**Content:**\n",
+                        Topic.SearchResult.Content
+                    )
+
+        - kind: InvokeAIBuilderModelAction
+          id: invokeSynthesizerV2
+          displayName: Synthesize insights for research section
+          input:
+            binding:
+              Additional_Instructions: =JSON(Topic.ResearchPlan.document_structure, JSONFormat.IndentFour)
+              Context: =Topic.SectionContext
+              Research_Prompt: =Topic.ResearchPrompt
+              Section_Data: =JSON(Topic.CurrentSection, JSONFormat.IndentFour)
+
+          output:
+            binding:
+              predictionOutput: Topic.SectionFactsResponse
+
+          aIModelId: ecf7b065-b130-483e-b2a4-10be485b68a0
+
+        - kind: SetVariable
+          id: cleanSectionFactsJson
+          variable: Topic.SectionFactsJson
+          value: =Trim(Topic.SectionFactsResponse.text)
+
+        - kind: ParseValue
+          id: parseSectionFacts
+          variable: Topic.CurrentSectionFacts
+          valueType:
+            kind: Record
+            properties:
+              citations:
+                type:
+                  kind: Table
+                  properties:
+                    Value: String
+
+              company_name: String
+              key_facts:
+                type:
+                  kind: Table
+                  properties:
+                    Value: String
+
+          value: =Topic.SectionFactsJson
+          errorPolicy: ThrowError
+
+        - kind: SendActivity
+          id: sendActivity_SectionProgress
+          activity: |
+            📊 **Research area {Topic.SectionIndex + 1} of {CountRows(Topic.ResearchPlan.sections)}:** "{Topic.CurrentSection.section_title}" - Key facts extracted!
+
+        - kind: SetVariable
+          id: concatenateKeyFacts
+          variable: Topic.AllKeyFacts
+          value: |-
+            =Concatenate(
+                Topic.AllKeyFacts,
+                "\n\n## ",
+                Topic.CurrentSection.section_title,
+                "\n\n",
+                If(
+                    CountRows(Topic.CurrentSectionFacts.key_facts) > 0,
+                    Concat(Topic.CurrentSectionFacts.key_facts, "- " & Value, "\n"),
+                    ""
+                )
+            )
+
+        - kind: SetVariable
+          id: concatenateCitations
+          variable: Topic.AllCitationsText
+          value: |
+            =Concatenate(
+                Topic.AllCitationsText,
+                If(
+                    CountRows(Topic.CurrentSectionFacts.citations) > 0,
+                    Concat(Topic.CurrentSectionFacts.citations, Value, "\n"),
+                    ""
+                )
+            )
+
+    - kind: ConditionGroup
+      id: checkKeyFactsLength
+      conditions:
+        - id: ifContentTooLarge
+          condition: =Len(Topic.AllKeyFacts) > 60000
+          actions:
+            - kind: SendActivity
+              id: warnContentTruncation
+              activity: ⚠️ **Extracted facts are very large.** Truncating to fit within model limits before finalizing...
+
+            - kind: SetVariable
+              id: truncateKeyFacts
+              variable: Topic.AllKeyFacts
+              value: =Left(Topic.AllKeyFacts, 60000)
+
+    - kind: SendActivity
+      id: sendActivity_GeneratingFinalBrief
+      activity: |
+        🔄 **All research areas completed!** Now generating the executive brief...
+
+    - kind: InvokeAIBuilderModelAction
+      id: invokeExecBriefFinalizer
+      displayName: Generate executive brief
+      input:
+        binding:
+          Citations: =Topic.AllCitationsText
+          Executive_Insights: =Topic.AllKeyFacts
+          Research_Prompt: =Topic.ResearchPrompt
+
+      output:
+        binding:
+          predictionOutput: Topic.FinalBriefResponse
+
+      aIModelId: 1a4d3e39-6f19-4864-9653-cc2c0bb948ed
+
+    - kind: SetVariable
+      id: extractFinalBriefMarkdown
+      variable: Global.FinalReportContent
+      value: =Trim(Topic.FinalBriefResponse.text)
+
+    - kind: SendActivity
+      id: sendActivity_BriefComplete
+      activity: |
+        ✅ **Executive brief generated successfully!**
+
+    - kind: SendActivity
+      id: sendActivity_DisplayBrief
+      activity: "{Global.FinalReportContent}"
+
+    - kind: EndDialog
+      id: endDialog
+
+inputType:
+  properties:
+    AdditionalInstructions:
+      displayName: Additional Instructions
+      description: Additional Instructions (optional - company context, focus areas, constraints)
+      type: String
+
+    ResearchPrompt:
+      displayName: Research Prompt
+      description: Research Prompt (e.g., AI adoption strategy for mid-market companies)
+      type: String

@@ -1,0 +1,10 @@
+<botcomponent schemaname="copilots_header_cat_apexbrief.topic.ExecutiveBriefComponent">
+  <componenttype>9</componenttype>
+  <iscustomizable>0</iscustomizable>
+  <name>Executive Brief Component</name>
+  <parentbotcomponentcollectionid>
+    <schemaname>bot_componentcollection_executive_brief_component</schemaname>
+  </parentbotcomponentcollectionid>
+  <statecode>0</statecode>
+  <statuscode>1</statuscode>
+</botcomponent>
