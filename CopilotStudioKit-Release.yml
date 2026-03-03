@@ -9,12 +9,15 @@ pool:
   vmImage: windows-latest
 
 # ============================================================================
-# Pipeline Resource: Reference the Export-Commit pipeline
+# Pipeline Resources: Reference the Export-Commit pipelines
 # ============================================================================
 resources:
   pipelines:
     - pipeline: ExportPipeline
       source: Copilot-Studio-Kit-Export-Commit
+      trigger: none  # Manual release creation
+    - pipeline: ComponentCollectionsExportPipeline
+      source: CopilotStudioKit-Comp-Coll-Export-Commit
       trigger: none  # Manual release creation
   repositories:
     - repository: GitHubRepo
@@ -44,6 +47,8 @@ stages:
       # Internal variables
       - name: DownloadPath
         value: $(Pipeline.Workspace)/ExportPipeline/drop
+      - name: ComponentCollectionsDownloadPath
+        value: $(Pipeline.Workspace)/ComponentCollectionsExportPipeline/drop
     steps:
     
     # ============================================================================
@@ -110,7 +115,14 @@ stages:
     # ============================================================================
     - download: ExportPipeline
       artifact: drop
-      displayName: 'Download Solution Artifacts'
+      displayName: 'Download Main Solution Artifacts'
+    
+    # ============================================================================
+    # Step 3.5: Download Component Collections Artifacts
+    # ============================================================================
+    - download: ComponentCollectionsExportPipeline
+      artifact: drop
+      displayName: 'Download Component Collections Artifacts'
     
     # ============================================================================
     # Step 4: Generate Release Tag and Collect All Assets
@@ -121,6 +133,7 @@ stages:
         $releaseYear = "$(varReleaseYear)"
         $outputSolutionName = "$(varOutputSolutionName)"
         $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
+        $componentDownloadPath = "$(Pipeline.Workspace)/ComponentCollectionsExportPipeline/drop"
         $repoPath = "$(Build.SourcesDirectory)/Power-CAT-Copilot-Studio-Kit"
         $artefactsFolder = "${repoPath}/CopilotstudioAcceleratorResources/Release/Artefacts"
         
@@ -138,15 +151,17 @@ stages:
         Write-Host "##vso[task.setvariable variable=ReleaseTag]$releaseTag"
         Write-Host "##vso[task.setvariable variable=ReleaseTitle]$releaseTitle"
         
-        # Find unmanaged solution
+        Write-Host ""
+        Write-Host "============================================"
+        Write-Host "COLLECTING MAIN SOLUTION ARTIFACTS"
+        Write-Host "============================================"
+        
+        # Find main solution unmanaged
         $unmanagedFile = "${downloadPath}/${outputSolutionName}.zip"
         
-        # Find managed solution (with version pattern)
+        # Find main solution managed (with version pattern)
         $managedPattern = "${outputSolutionName}_*_managed.zip"
         $managedFiles = Get-ChildItem -Path $downloadPath -Filter $managedPattern
-        
-        Write-Host ""
-        Write-Host "Validating solution artifacts..."
         
         if (-not (Test-Path $unmanagedFile)) {
             Write-Host "##vso[task.logissue type=error]Unmanaged solution not found: $unmanagedFile"
@@ -154,7 +169,7 @@ stages:
             Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $_" }
             exit 1
         }
-        Write-Host "✓ Unmanaged solution found: $(Split-Path $unmanagedFile -Leaf)"
+        Write-Host "✓ Main solution (unmanaged): $(Split-Path $unmanagedFile -Leaf)"
         
         if ($managedFiles.Count -eq 0) {
             Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $managedPattern"
@@ -163,16 +178,60 @@ stages:
             exit 1
         }
         $managedFile = $managedFiles[0].FullName
-        Write-Host "✓ Managed solution found: $($managedFiles[0].Name)"
+        Write-Host "✓ Main solution (managed): $($managedFiles[0].Name)"
         
         # Collect all assets
         $allAssets = @()
         $allAssets += $unmanagedFile
         $allAssets += $managedFile
         
-        # Add files from GitHub repository folder
         Write-Host ""
-        Write-Host "Collecting additional assets from GitHub repository..."
+        Write-Host "============================================"
+        Write-Host "COLLECTING COMPONENT COLLECTIONS ARTIFACTS"
+        Write-Host "============================================"
+        
+        # Component 1: CopilotStudioKit_Components
+        $component1Unmanaged = "${componentDownloadPath}/CopilotStudioKit_Components.zip"
+        $component1ManagedPattern = "CopilotStudioKit_Components_*_managed.zip"
+        $component1ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component1ManagedPattern -ErrorAction SilentlyContinue
+        
+        if (Test-Path $component1Unmanaged) {
+            Write-Host "✓ CopilotStudioKit_Components (unmanaged): $(Split-Path $component1Unmanaged -Leaf)"
+            $allAssets += $component1Unmanaged
+        } else {
+            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components unmanaged not found"
+        }
+        
+        if ($component1ManagedFiles.Count -gt 0) {
+            Write-Host "✓ CopilotStudioKit_Components (managed): $($component1ManagedFiles[0].Name)"
+            $allAssets += $component1ManagedFiles[0].FullName
+        } else {
+            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components managed not found"
+        }
+        
+        # Component 2: CopilotStudioKit_ServiceNow_Components
+        $component2Unmanaged = "${componentDownloadPath}/CopilotStudioKit_ServiceNow_Components.zip"
+        $component2ManagedPattern = "CopilotStudioKit_ServiceNow_Components_*_managed.zip"
+        $component2ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component2ManagedPattern -ErrorAction SilentlyContinue
+        
+        if (Test-Path $component2Unmanaged) {
+            Write-Host "✓ CopilotStudioKit_ServiceNow_Components (unmanaged): $(Split-Path $component2Unmanaged -Leaf)"
+            $allAssets += $component2Unmanaged
+        } else {
+            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components unmanaged not found"
+        }
+        
+        if ($component2ManagedFiles.Count -gt 0) {
+            Write-Host "✓ CopilotStudioKit_ServiceNow_Components (managed): $($component2ManagedFiles[0].Name)"
+            $allAssets += $component2ManagedFiles[0].FullName
+        } else {
+            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components managed not found"
+        }
+        
+        Write-Host ""
+        Write-Host "============================================"
+        Write-Host "COLLECTING ADDITIONAL ASSETS FROM GITHUB"
+        Write-Host "============================================"
         
         if (Test-Path $artefactsFolder) {
             $repoFiles = Get-ChildItem -Path $artefactsFolder -File
@@ -210,11 +269,17 @@ stages:
         
         Write-Host ""
         Write-Host "============================================"
-        Write-Host "RELEASE INFORMATION"
+        Write-Host "RELEASE SUMMARY"
         Write-Host "============================================"
         Write-Host "Release Tag: $releaseTag"
-        Write-Host "Solution Name: $outputSolutionName"
+        Write-Host "Release Title: $releaseTitle"
         Write-Host "GitHub Repo: $(varGitHubRepo)"
+        Write-Host ""
+        Write-Host "Solutions included:"
+        Write-Host "  • Main solution: $outputSolutionName"
+        Write-Host "  • Component 1: CopilotStudioKit_Components"
+        Write-Host "  • Component 2: CopilotStudioKit_ServiceNow_Components"
+        Write-Host ""
         Write-Host "Total Assets: $($allAssets.Count)"
         Write-Host "============================================"
       displayName: 'Generate Release Tag and Collect All Assets'
