@@ -28,73 +28,103 @@ namespace POWERCAT.Plugins.AgentInventory
             {
                 tracingService.Trace("Plugin execution started");
 
-                //Check if the custom api call is cat_AgentInventory
-                if (context.MessageName == "cat_AgentInventory")
+                switch (context.MessageName)
                 {
-                    //Agent input as a json from api
-                    string jsonData = (string)context.InputParameters["cat_AgentInput"];
+                    case "cat_AgentInventory":
+                        //Agent input as a json from api
+                        string jsonData = (string)context.InputParameters["cat_AgentInput"];
 
-                    //Deserializing json input into AgentInput in AgentInputDataModel
-                    var json = JsonConvert.DeserializeObject<AgentInput>(jsonData);
+                        //Deserializing json input into AgentInput in AgentInputDataModel
+                        var json = JsonConvert.DeserializeObject<AgentInput>(jsonData);
 
-                    AgentRepository agentOperation = new AgentRepository(organizationService, tracingService);
+                        AgentRepository agentOperation = new AgentRepository(organizationService, tracingService);
 
-                    //Process the agent data for agent creation
-                    var getAgentData = agentOperation.GetAgentData(json.AgentDetails, json.AgentComponentDetails);
+                        //Process the agent data for agent creation
+                        var getAgentData = agentOperation.GetAgentData(json.AgentDetails, json.AgentComponentDetails);
 
-                    //Delete and create the agent in agent details table
-                    var createdAgent = agentOperation.CreateAgent(getAgentData);
+                        //Delete and create the agent in agent details table
+                        var createdAgent = agentOperation.CreateAgent(getAgentData);
 
-                    //If agent creation is successfully completed then set the output to the api
-                    if (createdAgent != null)
-                    {
-                        //Set the created agent guid to the api output
-                        context.OutputParameters["cat_AgentOutput"] = createdAgent;
-                    }
-                    else
-                    {
-                        tracingService.Trace($"Plugin execution failed. \r\nCreated guid is - {createdAgent.ToString()}");
-                    }
+                        //If agent creation is successfully completed then set the output to the api
+                        if (createdAgent.AgentDetailsId != null)
+                        {
+                            //Set the created agent guid to the api output
+                            context.OutputParameters["cat_AgentOutput"] = createdAgent.AgentDetailsId;
+                            context.OutputParameters["cat_AgentComponentsOutput"] = JsonConvert.SerializeObject(createdAgent.AgentComponents, Formatting.Indented);
+                        }
+                        else
+                        {
+                            tracingService.Trace($"Plugin execution failed. \r\nCreated guid is - {createdAgent.ToString()}");
+                        }
+                        break;
 
-                }
-                //Check if the custom api call is cat_ExtractWorkFlowData
-                else if (context.MessageName == "cat_ExtractWorkFlowData")
-                {
-                    //list of WorkFlows as a json string from custom api
-                    string jsonData = (string)context.InputParameters["cat_ExtractWorkFlowInput"];
+                    case "cat_ExtractWorkFlowData":
+                        //list of WorkFlows as a json string from custom api
+                        string workflowJsonData = (string)context.InputParameters["cat_ExtractWorkFlowInput"];
 
-                    AgentDataProcessor agentDataProcess = new AgentDataProcessor();
+                        AgentDataProcessor agentDataProcess = new AgentDataProcessor();
 
-                    var result = agentDataProcess.ExtractWorkFlowData(jsonData);
+                        var workflowResult = agentDataProcess.ExtractWorkFlowData(workflowJsonData);
 
-                    if (!string.IsNullOrEmpty(result))
-                    {
-                        //Set output - list of connections extracted from workflows as json string
-                        context.OutputParameters["cat_ExtractWorkFlowOutput"] = result;
-                    }
-                }
-                //Check if custom API call is for tenant usage report generation
-                else if (context.MessageName == "cat_GenerateTenantUsageReport")
-                {
-                    string logId = (string)context.InputParameters["cat_UsageLogId"];
-                    string refreshStatus = (string)context.InputParameters["cat_UsageRefreshStatus"];
-                    string base64EncodedUsageData = (string)context.InputParameters["cat_UsageInput"];
+                        if (!string.IsNullOrEmpty(workflowResult))
+                        {
+                            //Set output - list of connections extracted from workflows as json string
+                            context.OutputParameters["cat_ExtractWorkFlowOutput"] = workflowResult;
+                        }
+                        break;
 
-                    //Decode the data
-                    byte[] decodedBytes = Convert.FromBase64String(base64EncodedUsageData);
-                    string decodedUsageCsv = Encoding.UTF8.GetString(decodedBytes);
+                    case "cat_ProcessTenantUsageReport":
+                        string base64EncodedUsageData = (string)context.InputParameters["cat_UsageData"];
 
-                    AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
+                        //Decode the data
+                        byte[] decodedBytes = Convert.FromBase64String(base64EncodedUsageData);
+                        string decodedUsageCsv = Encoding.UTF8.GetString(decodedBytes);
 
-                    //Create usage data in TenantUsageData table
-                    bool result = usageDataOperation.UpdateAgentUsageData(decodedUsageCsv, logId, refreshStatus);
+                        AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
 
-                    context.OutputParameters["cat_UsageOutput"] = result;
+                        //Process usage data
+                        string processedResult = usageDataOperation.ProcessUsageData(decodedUsageCsv);
 
-                    if(result == false)
-                    {
-                        tracingService.Trace($"Plugin execution failed.");
-                    }
+                        context.OutputParameters["cat_UsageJsonOutput"] = processedResult;
+                        break;
+
+                    case "cat_GenerateTenantUsageReport":
+                        string usageJson = (string)context.InputParameters["cat_UsageInput"];
+
+                        var usage = JsonConvert.DeserializeObject<AgentUsageInput>(usageJson);
+
+                        AgentUsageData createUsageDataOperation = new AgentUsageData(organizationService, tracingService);
+
+                        //Create usage data in usage history table
+                        bool result = createUsageDataOperation.CreateUsageData(usage);
+
+                        context.OutputParameters["cat_UsageOutput"] = result;
+                        break;
+
+                    case "cat_AgentInventoryBulkDelete":
+                        string deleteTableName = (string)context.InputParameters["cat_DeleteTableName"];
+                        string recordIds = (string)context.InputParameters["cat_DeleteRecordIds"];
+
+                        AgentInventoryDeleteOperation deleteOperation = new AgentInventoryDeleteOperation(organizationService, tracingService);
+
+                        //Bulk delete data in agent inventory table
+                        bool deleteResult = deleteOperation.BulkDeleteOperation(deleteTableName, recordIds);
+
+                        context.OutputParameters["cat_DeleteResult"] = deleteResult;
+                        break;
+
+                    case "cat_QueryAgentInventoryData":
+                        AgentInventoryQueryUtilities getAgentsCreationTimeline = new AgentInventoryQueryUtilities(organizationService, tracingService);
+
+                        //Get aggregated and accumulated agents creation timeline
+                        var timelineResult = getAgentsCreationTimeline.GetAgentsCreationTimeline();
+
+                        context.OutputParameters["cat_ResultJson"] = timelineResult;
+                        break;
+
+                    default:
+                        tracingService.Trace("The plug-in is not associated with the expected message.");
+                        break;
                 }
             }
             catch (Exception ex)

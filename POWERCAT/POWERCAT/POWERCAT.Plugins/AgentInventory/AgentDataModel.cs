@@ -44,13 +44,15 @@ namespace POWERCAT.Plugins.AgentInventory
             public string EndUserAuthenticationType { get; set; }
             public bool IsManaged { get; set; }
             public string Template { get; set; }
-            public bool IsTranscriptAvailable { get; set; }
+            public int IsTranscriptAvailable { get; set; }
             public string AgentCreatedByADID { get; set; }
             public string AgentCreatedByUPN { get; set; }
+            public string AgentSchemaName { get; set; }
+            public string Location { get; set; }
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
             public bool UsesEnhancedSearchResult { get; set; }
-            public bool UsesActions { get; set; }
+            public bool UsesTools { get; set; }
             public bool UsesPrompts { get; set; }
             public bool UsesHttpRequests { get; set; }
             public bool UsesSkills { get; set; }
@@ -91,10 +93,24 @@ namespace POWERCAT.Plugins.AgentInventory
             public string FileDataName { get; set; }
             public string Name { get; set; }
             public string SchemaName { get; set; }
-            public string CreatedOn { get; set; }
-            public string CreatedBy { get; set; }
-            public string ModifiedOn { get; set; }
-            public string ModifiedBy { get; set; }
+        }
+
+        /// <summary>
+        /// Represents Agent Response
+        /// </summary>
+        public class CreateAgentResponse
+        {
+            public Guid? AgentDetailsId { get; set; }
+            public AgentComponents AgentComponents { get; set; }
+        }
+
+        /// <summary>
+        /// Represents Agent Component Output
+        /// </summary>
+        public class AgentComponents
+        {
+            public string Prompts { get; set; }
+            public string Connections { get; set; }
         }
 
         /// <summary>
@@ -110,6 +126,38 @@ namespace POWERCAT.Plugins.AgentInventory
             public decimal BilledMessages { get; set; }
             public decimal NonBilledMessages { get; set; }
             public DateTime UsageDate { get; set; }
+        }
+
+        /// <summary>
+        /// Represents Agent Usage Data Output
+        /// </summary>
+        public class AgentUsageOutput
+        {
+            public string ID { get; set; }
+            public List<UsageRecord> Usage { get; set; }
+            public string UsageJson { get; set; }
+        }
+
+        /// <summary>
+        /// Usages details that represents the object you would create in the usage history table
+        /// </summary>
+        public class UsageRecord
+        {
+            public string Feature { get; set; }
+            public decimal Billed { get; set; }
+            public decimal NonBilled { get; set; }
+            public DateTime Date { get; set; }
+        }
+
+        /// <summary>
+        /// Represents Agent Usage Data Input for creation
+        /// </summary>
+        public class AgentUsageInput
+        {
+            public string AgentID { get; set; }
+            public string EnvironmentID { get; set; }
+            public Guid AgentDetailsID { get; set; }
+            public List<UsageRecord> Usages { get; set; }
         }
     }
 }
