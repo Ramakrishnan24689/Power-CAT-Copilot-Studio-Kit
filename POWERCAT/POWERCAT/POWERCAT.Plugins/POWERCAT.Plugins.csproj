@@ -113,6 +113,7 @@
     <Compile Include="AgentInventory\AgentDataProcessor.cs" />
     <Compile Include="AgentInventory\AgentInventoryDeleteOperation.cs" />
     <Compile Include="AgentInventory\AgentInventoryMain.cs" />
+    <Compile Include="AgentInventory\AgentInventoryQueryUtilities.cs" />
     <Compile Include="AgentInventory\AgentRepository.cs" />
     <Compile Include="AgentInventory\AgentUsageData.cs" />
     <Compile Include="ApplicationInsightsApi\AppInsightsTokenResponseModel.cs" />

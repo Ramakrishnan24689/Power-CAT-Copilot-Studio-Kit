@@ -149,8 +149,8 @@ namespace POWERCAT.Plugins.AgentInventory
                                                         obj => obj.Data != null && obj.ComponentType == 9 &&
                                                                obj.Data.Contains("InvokeSkillAction")).Count() > 0;
 
-                //If agent has actions then set to true
-                agentDetails.UsesActions = agentComponentDetails.Where(
+                //If agent has tools then set to true
+                agentDetails.UsesTools = agentComponentDetails.Where(
                                                         obj => obj.Data != null && obj.ComponentType == 9 &&
                                                                obj.Data.Contains("TaskDialog")).Count() > 0;
 
@@ -236,9 +236,9 @@ namespace POWERCAT.Plugins.AgentInventory
 
                 // Determines whether the agent utilizes generative AI capabilities by evaluating multiple other properties.
                 // If any of the following properties are true: 
-                // UsesActions, UsesAIKnowledge, UsesKnowledgeSources, UsesPrompts, UsesClassicGenerativeAnswersSources, UsesMCP, and UsesCustomizedResponse. 
+                // UsesTools, UsesAIKnowledge, UsesKnowledgeSources, UsesPrompts, UsesClassicGenerativeAnswersSources, UsesMCP, and UsesCustomizedResponse. 
                 // Also checks if the orchestration type is explicitly set to "Generative".
-                agentDetails.UsesGenAI = agentDetails.UsesActions || agentDetails.UsesAIKnowledge ||
+                agentDetails.UsesGenAI = agentDetails.UsesTools || agentDetails.UsesAIKnowledge ||
                                              agentDetails.UsesKnowledgeSources || agentDetails.UsesPrompts || agentDetails.UsesClassicGenerativeAnswersSources ||
                                              agentDetails.UsesMCP || agentDetails.UsesCustomizedResponse ||
                                              string.Equals(agentDetails.OrchestrationType, "Generative", StringComparison.OrdinalIgnoreCase);
@@ -268,6 +268,10 @@ namespace POWERCAT.Plugins.AgentInventory
         {
             try
             {
+                const int yesValue = 1;
+                const int noValue = 0;
+                const int unknownValue = 2;
+
                 Entity entity = new Entity(_tableName);
 
                 //Details of the agent
@@ -276,8 +280,9 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_type"] = !string.IsNullOrWhiteSpace(agentDetails.Template) && agentDetails.Template.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase) ? "Declarative" : "Custom";
                 entity["cat_template"] = agentDetails.Template;
                 entity["cat_agentcreatedin"] = "Copilot Studio";
-                entity["cat_hassysadminaccess"] = true;
                 entity["cat_agentschemaname"] = agentDetails.AgentSchemaName;
+                entity["cat_hassysadminaccess"] = new OptionSetValue(yesValue);
+                entity["cat_hasppacenvmismatch"] = new OptionSetValue(noValue);
 
                 //Environment details of the agent
                 entity["cat_environmentname"] = agentDetails.EnvironmentName;
@@ -300,36 +305,45 @@ namespace POWERCAT.Plugins.AgentInventory
                 entity["cat_publisheddate"] = !string.IsNullOrEmpty(agentDetails.PublishedDate) ? DateTime.Parse(agentDetails.PublishedDate?.ToString()).ToUniversalTime() : (DateTime?)null;
 
                 //Agent Specifications
-                entity["cat_orchestrationtype"] = agentDetails.OrchestrationType;
+                entity["cat_orchestrationtype"] = !string.IsNullOrEmpty(agentDetails.OrchestrationType) ? agentDetails.OrchestrationType : "Classic";
                 entity["cat_enduserauthenticationtype"] = agentDetails.EndUserAuthenticationType;
                 entity["cat_defaultapplicationid"] = agentDetails.DefaultApplicationId;
                 entity["cat_description"] = agentDetails.Description;
                 entity["cat_instructions"] = agentDetails.Instructions;
                 entity["cat_managedstate"] = agentDetails.IsManaged == true ? "Managed" : "Unmanaged";
-                entity["cat_istranscriptavailable"] = agentDetails.IsTranscriptAvailable;
+
+                var isTranscript = unknownValue;
+                if (agentDetails.IsTranscriptAvailable == yesValue)
+                {
+                    isTranscript = yesValue;
+                }
+                else if (agentDetails.IsTranscriptAvailable == noValue)
+                {
+                    isTranscript = noValue;
+                }
+                entity["cat_istranscriptavailable"] = new OptionSetValue(isTranscript);
 
                 //Agent Configurations
-                entity["cat_usesgenai"] = agentDetails.UsesGenAI;
-                entity["cat_usesaiknowledge"] = agentDetails.UsesAIKnowledge;
-                entity["cat_usesenhancedsearchresults"] = agentDetails.UsesEnhancedSearchResult;
-                entity["cat_usesfileinput"] = agentDetails.UsesFileInput;
-                entity["cat_usesdeepreasoningmodels"] = agentDetails.UsesDeepReasoningModels;
+                entity["cat_usesgenai"] = agentDetails.UsesGenAI ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesaiknowledge"] = agentDetails.UsesAIKnowledge ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesenhancedsearchresults"] = agentDetails.UsesEnhancedSearchResult ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesfileinput"] = agentDetails.UsesFileInput ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesdeepreasoningmodels"] = agentDetails.UsesDeepReasoningModels ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
 
                 //Agent features
-                entity["cat_usesactions"] = agentDetails.UsesActions;
-                entity["cat_usesprompts"] = agentDetails.UsesPrompts;
-                entity["cat_useshttprequests"] = agentDetails.UsesHttpRequests;
-                entity["cat_usesskills"] = agentDetails.UsesSkills;
-                entity["cat_usesknowledgesources"] = agentDetails.UsesKnowledgeSources;
-                entity["cat_autonomousagent"] = agentDetails.AutonomousAgent;
-                entity["cat_usesclassicgenerativeanswerssources"] = agentDetails.UsesClassicGenerativeAnswersSources;
-                entity["cat_usesmcp"] = agentDetails.UsesMCP;
-                entity["cat_usescustomizedresponse"] = agentDetails.UsesCustomizedResponse;
-                entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext;
-                entity["cat_usescloudflowauthcontext"] = agentDetails.UsesCloudFlowAuthContext;
-                entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource;
-                entity["cat_websearchenabled"] = agentDetails.WebSearchEnabled;
-                entity["cat_usesevaluation"] = agentDetails.UsesEvaluation;
+                entity["cat_usestools"] = agentDetails.UsesTools ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesprompts"] = agentDetails.UsesPrompts ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_useshttprequests"] = agentDetails.UsesHttpRequests ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesskills"] = agentDetails.UsesSkills ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesknowledgesources"] = agentDetails.UsesKnowledgeSources ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_autonomousagent"] = agentDetails.AutonomousAgent ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesclassicgenerativeanswerssources"] = agentDetails.UsesClassicGenerativeAnswersSources ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesmcp"] = agentDetails.UsesMCP ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usescustomizedresponse"] = agentDetails.UsesCustomizedResponse ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesconnectormakerauthcontext"] = agentDetails.UsesConnectorMakerAuthContext ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usescustomknowledgesource"] = agentDetails.UsesCustomKnowledgeSource ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_websearchenabled"] = agentDetails.WebSearchEnabled ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
+                entity["cat_usesevaluation"] = agentDetails.UsesEvaluation ? new OptionSetValue(yesValue) : new OptionSetValue(noValue);
 
                 //Agent Components
                 entity["cat_prompts"] = agentDetails.Prompts;

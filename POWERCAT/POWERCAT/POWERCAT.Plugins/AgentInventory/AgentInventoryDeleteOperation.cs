@@ -7,7 +7,10 @@ using Newtonsoft.Json.Linq;
 
 namespace POWERCAT.Plugins.AgentInventory
 {
-    internal class AgentInventoryDeleteOperation
+    /// <summary>
+    /// Bulk delete operations.
+    /// </summary>
+    public class AgentInventoryDeleteOperation
     {
         /// <summary>
         /// Organization Service

@@ -107,10 +107,19 @@ namespace POWERCAT.Plugins.AgentInventory
 
                         AgentInventoryDeleteOperation deleteOperation = new AgentInventoryDeleteOperation(organizationService, tracingService);
 
-                        //Create usage data in usage history table
+                        //Bulk delete data in agent inventory table
                         bool deleteResult = deleteOperation.BulkDeleteOperation(deleteTableName, recordIds);
 
                         context.OutputParameters["cat_DeleteResult"] = deleteResult;
+                        break;
+
+                    case "cat_QueryAgentInventoryData":
+                        AgentInventoryQueryUtilities getAgentsCreationTimeline = new AgentInventoryQueryUtilities(organizationService, tracingService);
+
+                        //Get aggregated and accumulated agents creation timeline
+                        var timelineResult = getAgentsCreationTimeline.GetAgentsCreationTimeline();
+
+                        context.OutputParameters["cat_ResultJson"] = timelineResult;
                         break;
 
                     default:

@@ -44,7 +44,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public string EndUserAuthenticationType { get; set; }
             public bool IsManaged { get; set; }
             public string Template { get; set; }
-            public bool IsTranscriptAvailable { get; set; }
+            public int IsTranscriptAvailable { get; set; }
             public string AgentCreatedByADID { get; set; }
             public string AgentCreatedByUPN { get; set; }
             public string AgentSchemaName { get; set; }
@@ -52,7 +52,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
             public bool UsesEnhancedSearchResult { get; set; }
-            public bool UsesActions { get; set; }
+            public bool UsesTools { get; set; }
             public bool UsesPrompts { get; set; }
             public bool UsesHttpRequests { get; set; }
             public bool UsesSkills { get; set; }
