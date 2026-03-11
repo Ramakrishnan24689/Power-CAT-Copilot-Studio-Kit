@@ -1307,10 +1307,12 @@ stages:
         
         # Initialize empty release notes
         $issuesMarkdown = ""
+        $releaseNotesFile = "$(Pipeline.Workspace)/milestone-issues.md"
         
         if ([string]::IsNullOrWhiteSpace($milestoneName)) {
             Write-Host "ℹ varMileStone is not set. Skipping milestone issues fetch."
-            Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+            Set-Content -Path $releaseNotesFile -Value "" -NoNewline
+            Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
             exit 0
         }
         
@@ -1323,7 +1325,8 @@ stages:
             if ([string]::IsNullOrWhiteSpace($token)) {
                 Write-Host "##[warning]GitHubPAT not found in variable group 'alm-accelerator-variable-group'."
                 Write-Host "##[warning]Cannot fetch milestone issues without GitHub PAT."
-                Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+                Set-Content -Path $releaseNotesFile -Value "" -NoNewline
+                Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
                 exit 0
             }
             
@@ -1342,7 +1345,8 @@ stages:
             
             if (-not $milestone) {
                 Write-Host "##[warning]Milestone '$milestoneName' not found. Continuing without milestone issues."
-                Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+                Set-Content -Path $releaseNotesFile -Value "" -NoNewline
+                Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
                 exit 0
             }
             
@@ -1356,7 +1360,8 @@ stages:
             
             if ($issues.Count -eq 0) {
                 Write-Host "##[warning]No issues found in milestone '$milestoneName'. Continuing without milestone issues."
-                Write-Host "##vso[task.setvariable variable=MilestoneIssues]$issuesMarkdown"
+                Set-Content -Path $releaseNotesFile -Value "" -NoNewline
+                Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
                 exit 0
             }
             
@@ -1382,7 +1387,6 @@ stages:
             Write-Host $issuesMarkdown
             
             # Write to file for release notes
-            $releaseNotesFile = "$(Pipeline.Workspace)/milestone-issues.md"
             Set-Content -Path $releaseNotesFile -Value $issuesMarkdown -NoNewline
             Write-Host "Written to file: $releaseNotesFile"
             Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
@@ -1391,7 +1395,6 @@ stages:
             Write-Host "##[warning]Failed to fetch milestone issues: $($_.Exception.Message)"
             Write-Host "##[warning]Continuing without milestone issues."
             # Create empty file on error
-            $releaseNotesFile = "$(Pipeline.Workspace)/milestone-issues.md"
             Set-Content -Path $releaseNotesFile -Value "" -NoNewline
             Write-Host "##vso[task.setvariable variable=MilestoneIssuesFile]$releaseNotesFile"
         }
