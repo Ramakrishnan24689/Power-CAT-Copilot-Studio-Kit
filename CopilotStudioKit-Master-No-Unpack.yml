@@ -24,8 +24,6 @@ variables:
     value: $(Build.ArtifactStagingDirectory)/solutions
   - name: ComponentCollectionsSolutionOutputFolder
     value: $(Build.ArtifactStagingDirectory)/component-collections
-  - name: varRunComponentsSolutions
-    value: false
 
 # ==================== Main Solution Export Variables ====================
 # - varSourceEnvironmentURL: Source Power Platform environment URL for main solution
@@ -38,7 +36,8 @@ variables:
 #   (Can be same as varSourceEnvironmentURL if both solutions are in same environment)
 # - varComponentCollectionsSourceServiceConnection: Service connection for component collections source
 #   (Can be same as varSourceServiceConnection if both solutions are in same environment)
-# - varRunComponentsSolutions: Set to 'true' to export/deploy component collections, 'false' to skip (default: false)
+# - varRunComponentsSolutions: Set to 'true' to export/deploy component collections, 'false' to skip
+#   IMPORTANT: This must be set as a pipeline variable in Azure DevOps (not defined in YAML)
 
 # ==================== Deploy Variables ====================
 # - varTargetEnvironmentURL: Target Power Platform environment URL (used for all solutions)
