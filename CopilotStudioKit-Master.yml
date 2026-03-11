@@ -85,7 +85,7 @@ stages:
     # Export Unmanaged Solution
     # ========================================================================
     - task: PowerPlatformExportSolution@2
-      displayName: 'Export Unmanaged Solution'
+      displayName: 'Export Unmanaged Solution ($(varOutputSolutionName))'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varSourceServiceConnection)'
@@ -98,7 +98,7 @@ stages:
     # Export Managed Solution
     # ========================================================================
     - task: PowerPlatformExportSolution@2
-      displayName: 'Export Managed Solution'
+      displayName: 'Export Managed Solution ($(varOutputSolutionName))'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varSourceServiceConnection)'
@@ -111,7 +111,7 @@ stages:
     # Unpack Unmanaged Solution
     # ========================================================================
     - task: PowerPlatformUnpackSolution@2
-      displayName: 'Unpack Unmanaged Solution'
+      displayName: 'Unpack Unmanaged Solution ($(varOutputSolutionName))'
       inputs:
         SolutionInputFile: '$(SolutionOutputFolder)/$(varOutputSolutionName).zip'
         SolutionTargetFolder: '$(UnpackedSolutionFolder)/SolutionPackage'
@@ -161,7 +161,7 @@ stages:
         Write-Host "##vso[task.setvariable variable=SolutionVersion]$majorVersion"
         Write-Host ""
         Write-Host "Solution version: $majorVersion"
-      displayName: 'Extract Version and Rename Managed Solution'
+      displayName: 'Extract Version and Rename Managed Solution ($(varOutputSolutionName))'
     
     # ========================================================================
     # COMPONENT COLLECTIONS EXPORT
@@ -329,7 +329,7 @@ stages:
     # Publish Pipeline Artifacts - Main Solution
     # ========================================================================
     - task: PublishPipelineArtifact@1
-      displayName: 'Publish Main Solution Artifacts'
+      displayName: 'Publish Solution Artifacts ($(varOutputSolutionName))'
       inputs:
         targetPath: '$(SolutionOutputFolder)'
         artifact: 'drop'
@@ -441,13 +441,13 @@ stages:
         
         Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
         Write-Host "Solution file validated: $solutionFile"
-      displayName: 'Determine Solution File Path - Main Solution'
+      displayName: 'Determine Solution File Path ($(varOutputSolutionName))'
     
     # ========================================================================
     # Import Solution - Main Solution
     # ========================================================================
     - task: PowerPlatformImportSolution@2
-      displayName: 'Import Main Solution ($(varSolutionType))'
+      displayName: 'Import Solution ($(varOutputSolutionName)) - $(varSolutionType)'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -465,7 +465,7 @@ stages:
     # Publish Customizations (Unmanaged Only) - Main Solution
     # ========================================================================
     - task: PowerPlatformPublishCustomizations@2
-      displayName: 'Publish Customizations - Main Solution'
+      displayName: 'Publish Customizations ($(varOutputSolutionName))'
       condition: eq(variables['varSolutionType'], 'unmanaged')
       inputs:
         authenticationType: 'PowerPlatformSPN'
