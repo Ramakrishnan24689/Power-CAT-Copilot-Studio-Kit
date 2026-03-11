@@ -24,6 +24,8 @@ variables:
     value: $(Build.ArtifactStagingDirectory)/solutions
   - name: ComponentCollectionsSolutionOutputFolder
     value: $(Build.ArtifactStagingDirectory)/component-collections
+  - name: varRunComponentsSolutions
+    value: false
 
 # ==================== Main Solution Export Variables ====================
 # - varSourceEnvironmentURL: Source Power Platform environment URL for main solution
@@ -36,6 +38,7 @@ variables:
 #   (Can be same as varSourceEnvironmentURL if both solutions are in same environment)
 # - varComponentCollectionsSourceServiceConnection: Service connection for component collections source
 #   (Can be same as varSourceServiceConnection if both solutions are in same environment)
+# - varRunComponentsSolutions: Set to 'true' to export/deploy component collections, 'false' to skip (default: false)
 
 # ==================== Deploy Variables ====================
 # - varTargetEnvironmentURL: Target Power Platform environment URL (used for all solutions)
@@ -124,6 +127,7 @@ stages:
     # ========================================================================
     - task: PowerPlatformExportSolution@2
       displayName: 'Export CopilotStudioKit_Components - Unmanaged'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
@@ -137,6 +141,7 @@ stages:
     # ========================================================================
     - task: PowerPlatformExportSolution@2
       displayName: 'Export CopilotStudioKit_Components - Managed'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
@@ -166,12 +171,14 @@ stages:
             exit 1
         }
       displayName: 'Rename CopilotStudioKit_Components Managed with Date Stamp'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Export CopilotStudioKit_ServiceNow_Components - Unmanaged
     # ========================================================================
     - task: PowerPlatformExportSolution@2
       displayName: 'Export CopilotStudioKit_ServiceNow_Components - Unmanaged'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
@@ -185,6 +192,7 @@ stages:
     # ========================================================================
     - task: PowerPlatformExportSolution@2
       displayName: 'Export CopilotStudioKit_ServiceNow_Components - Managed'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
@@ -214,6 +222,7 @@ stages:
             exit 1
         }
       displayName: 'Rename CopilotStudioKit_ServiceNow_Components Managed with Date Stamp'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Publish Pipeline Artifacts - Main Solution
@@ -230,6 +239,7 @@ stages:
     # ========================================================================
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Component Collections Artifacts'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         targetPath: '$(ComponentCollectionsSolutionOutputFolder)'
         artifact: 'component-collections'
@@ -257,6 +267,7 @@ stages:
     - download: current
       artifact: component-collections
       displayName: 'Download Component Collections Artifacts'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Install Power Platform Build Tools
@@ -386,12 +397,14 @@ stages:
         Write-Host "##vso[task.setvariable variable=SolutionFilePath_Components]$solutionFile"
         Write-Host "Solution file validated: $solutionFile"
       displayName: 'Determine Solution File Path - CopilotStudioKit_Components'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Import Solution - CopilotStudioKit_Components
     # ========================================================================
     - task: PowerPlatformImportSolution@2
       displayName: 'Import CopilotStudioKit_Components ($(varSolutionType))'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -410,7 +423,7 @@ stages:
     # ========================================================================
     - task: PowerPlatformPublishCustomizations@2
       displayName: 'Publish Customizations - CopilotStudioKit_Components'
-      condition: eq(variables['varSolutionType'], 'unmanaged')
+      condition: and(eq(variables['varRunComponentsSolutions'], 'true'), eq(variables['varSolutionType'], 'unmanaged'))
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -458,12 +471,14 @@ stages:
         Write-Host "##vso[task.setvariable variable=SolutionFilePath_ServiceNow]$solutionFile"
         Write-Host "Solution file validated: $solutionFile"
       displayName: 'Determine Solution File Path - CopilotStudioKit_ServiceNow_Components'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Import Solution - CopilotStudioKit_ServiceNow_Components
     # ========================================================================
     - task: PowerPlatformImportSolution@2
       displayName: 'Import CopilotStudioKit_ServiceNow_Components ($(varSolutionType))'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -482,7 +497,7 @@ stages:
     # ========================================================================
     - task: PowerPlatformPublishCustomizations@2
       displayName: 'Publish Customizations - CopilotStudioKit_ServiceNow_Components'
-      condition: eq(variables['varSolutionType'], 'unmanaged')
+      condition: and(eq(variables['varRunComponentsSolutions'], 'true'), eq(variables['varSolutionType'], 'unmanaged'))
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -492,13 +507,21 @@ stages:
     # Deployment Summary
     # ========================================================================
     - powershell: |
+        $runComponents = "$(varRunComponentsSolutions)".ToLower()
+        
         Write-Host "============================================"
         Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY"
         Write-Host "============================================"
         Write-Host "Solutions Deployed:"
         Write-Host "  1. Main Solution: $(varSolutionName)"
-        Write-Host "  2. Component Collection: CopilotStudioKit_Components"
-        Write-Host "  3. Component Collection: CopilotStudioKit_ServiceNow_Components"
+        
+        if ($runComponents -eq "true") {
+            Write-Host "  2. Component Collection: CopilotStudioKit_Components"
+            Write-Host "  3. Component Collection: CopilotStudioKit_ServiceNow_Components"
+        } else {
+            Write-Host "  (Component Collections: Skipped)"
+        }
+        
         Write-Host ""
         Write-Host "Solution Type: $(varSolutionType)"
         Write-Host "Target Environment: $(varTargetEnvironmentURL)"
@@ -593,6 +616,7 @@ stages:
     - download: current
       artifact: component-collections
       displayName: 'Download Component Collections Artifacts'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
     # Generate Release Tag and Collect All Assets
@@ -650,47 +674,59 @@ stages:
         $allAssets += $unmanagedFile
         $allAssets += $managedFile
         
-        Write-Host ""
-        Write-Host "============================================"
-        Write-Host "COLLECTING COMPONENT COLLECTIONS ARTIFACTS"
-        Write-Host "============================================"
+        # Check if component collections should be included
+        $runComponents = "$(varRunComponentsSolutions)".ToLower()
         
-        # Component 1: CopilotStudioKit_Components
-        $component1Unmanaged = "${componentDownloadPath}/CopilotStudioKit_Components.zip"
-        $component1ManagedPattern = "CopilotStudioKit_Components_*_managed.zip"
-        $component1ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component1ManagedPattern -ErrorAction SilentlyContinue
-        
-        if (Test-Path $component1Unmanaged) {
-            Write-Host "✓ CopilotStudioKit_Components (unmanaged): $(Split-Path $component1Unmanaged -Leaf)"
-            $allAssets += $component1Unmanaged
+        if ($runComponents -eq "true") {
+            Write-Host ""
+            Write-Host "============================================"
+            Write-Host "COLLECTING COMPONENT COLLECTIONS ARTIFACTS"
+            Write-Host "============================================"
+            
+            # Component 1: CopilotStudioKit_Components
+            $component1Unmanaged = "${componentDownloadPath}/CopilotStudioKit_Components.zip"
+            $component1ManagedPattern = "CopilotStudioKit_Components_*_managed.zip"
+            $component1ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component1ManagedPattern -ErrorAction SilentlyContinue
+            
+            if (Test-Path $component1Unmanaged) {
+                Write-Host "✓ CopilotStudioKit_Components (unmanaged): $(Split-Path $component1Unmanaged -Leaf)"
+                $allAssets += $component1Unmanaged
+            } else {
+                Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components unmanaged not found"
+            }
+            
+            if ($component1ManagedFiles.Count -gt 0) {
+                Write-Host "✓ CopilotStudioKit_Components (managed): $($component1ManagedFiles[0].Name)"
+                $allAssets += $component1ManagedFiles[0].FullName
+            } else {
+                Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components managed not found"
+            }
+            
+            # Component 2: CopilotStudioKit_ServiceNow_Components
+            $component2Unmanaged = "${componentDownloadPath}/CopilotStudioKit_ServiceNow_Components.zip"
+            $component2ManagedPattern = "CopilotStudioKit_ServiceNow_Components_*_managed.zip"
+            $component2ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component2ManagedPattern -ErrorAction SilentlyContinue
+            
+            if (Test-Path $component2Unmanaged) {
+                Write-Host "✓ CopilotStudioKit_ServiceNow_Components (unmanaged): $(Split-Path $component2Unmanaged -Leaf)"
+                $allAssets += $component2Unmanaged
+            } else {
+                Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components unmanaged not found"
+            }
+            
+            if ($component2ManagedFiles.Count -gt 0) {
+                Write-Host "✓ CopilotStudioKit_ServiceNow_Components (managed): $($component2ManagedFiles[0].Name)"
+                $allAssets += $component2ManagedFiles[0].FullName
+            } else {
+                Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components managed not found"
+            }
         } else {
-            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components unmanaged not found"
-        }
-        
-        if ($component1ManagedFiles.Count -gt 0) {
-            Write-Host "✓ CopilotStudioKit_Components (managed): $($component1ManagedFiles[0].Name)"
-            $allAssets += $component1ManagedFiles[0].FullName
-        } else {
-            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_Components managed not found"
-        }
-        
-        # Component 2: CopilotStudioKit_ServiceNow_Components
-        $component2Unmanaged = "${componentDownloadPath}/CopilotStudioKit_ServiceNow_Components.zip"
-        $component2ManagedPattern = "CopilotStudioKit_ServiceNow_Components_*_managed.zip"
-        $component2ManagedFiles = Get-ChildItem -Path $componentDownloadPath -Filter $component2ManagedPattern -ErrorAction SilentlyContinue
-        
-        if (Test-Path $component2Unmanaged) {
-            Write-Host "✓ CopilotStudioKit_ServiceNow_Components (unmanaged): $(Split-Path $component2Unmanaged -Leaf)"
-            $allAssets += $component2Unmanaged
-        } else {
-            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components unmanaged not found"
-        }
-        
-        if ($component2ManagedFiles.Count -gt 0) {
-            Write-Host "✓ CopilotStudioKit_ServiceNow_Components (managed): $($component2ManagedFiles[0].Name)"
-            $allAssets += $component2ManagedFiles[0].FullName
-        } else {
-            Write-Host "##vso[task.logissue type=warning]CopilotStudioKit_ServiceNow_Components managed not found"
+            Write-Host ""
+            Write-Host "============================================"
+            Write-Host "COMPONENT COLLECTIONS: SKIPPED"
+            Write-Host "============================================"
+            Write-Host "ℹ varRunComponentsSolutions is not set to 'true'"
+            Write-Host "ℹ Component collections will not be included in this release"
         }
         
         # Add files from GitHub repository folder
@@ -743,8 +779,14 @@ stages:
         Write-Host ""
         Write-Host "Solutions included:"
         Write-Host "  • Main solution: $outputSolutionName"
-        Write-Host "  • Component 1: CopilotStudioKit_Components"
-        Write-Host "  • Component 2: CopilotStudioKit_ServiceNow_Components"
+        
+        if ($runComponents -eq "true") {
+            Write-Host "  • Component 1: CopilotStudioKit_Components"
+            Write-Host "  • Component 2: CopilotStudioKit_ServiceNow_Components"
+        } else {
+            Write-Host "  (Component Collections: Skipped)"
+        }
+        
         Write-Host ""
         Write-Host "Total Assets: $($allAssets.Count)"
         Write-Host "============================================"
