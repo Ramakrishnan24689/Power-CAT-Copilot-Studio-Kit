@@ -421,7 +421,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             entity["cat_datasourcecode"] = new OptionSetValue(dataSourceCode);
             entity["cat_sessioninfo"] = JsonConvert.SerializeObject(sessionInfoRows);
             entity["cat_workflowstatus"] = new OptionSetValue(1);
-            entity["ttlinseconds"] = 86400;
+            entity["ttlinseconds"] = 259200;
 
             return entity;
         }
