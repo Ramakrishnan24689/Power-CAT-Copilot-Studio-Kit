@@ -71,7 +71,7 @@ stages:
     # Export Unmanaged Solution
     # ========================================================================
     - task: PowerPlatformExportSolution@2
-      displayName: 'Export Unmanaged Solution'
+      displayName: 'Export Unmanaged Solution ($(varOutputSolutionName))'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varSourceServiceConnection)'
@@ -84,7 +84,7 @@ stages:
     # Export Managed Solution
     # ========================================================================
     - task: PowerPlatformExportSolution@2
-      displayName: 'Export Managed Solution'
+      displayName: 'Export Managed Solution ($(varOutputSolutionName))'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varSourceServiceConnection)'
@@ -113,7 +113,7 @@ stages:
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename Main Managed Solution with Date Stamp'
+      displayName: 'Rename Managed Solution with Date Stamp ($(varOutputSolutionName))'
     
     # ========================================================================
     # COMPONENT COLLECTIONS EXPORT
@@ -309,13 +309,13 @@ stages:
         
         Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
         Write-Host "Solution file validated: $solutionFile"
-      displayName: 'Determine Solution File Path - Main Solution'
+      displayName: 'Determine Solution File Path ($(varOutputSolutionName))'
     
     # ========================================================================
     # Import Solution - Main Solution
     # ========================================================================
     - task: PowerPlatformImportSolution@2
-      displayName: 'Import Main Solution ($(varSolutionType))'
+      displayName: 'Import Solution ($(varOutputSolutionName)) - $(varSolutionType)'
       inputs:
         authenticationType: 'PowerPlatformSPN'
         PowerPlatformSPN: '$(varTargetServiceConnection)'
@@ -333,7 +333,7 @@ stages:
     # Publish Customizations (Unmanaged Only) - Main Solution
     # ========================================================================
     - task: PowerPlatformPublishCustomizations@2
-      displayName: 'Publish Customizations - Main Solution'
+      displayName: 'Publish Customizations ($(varOutputSolutionName))'
       condition: eq(variables['varSolutionType'], 'unmanaged')
       inputs:
         authenticationType: 'PowerPlatformSPN'
