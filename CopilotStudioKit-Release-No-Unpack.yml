@@ -101,7 +101,7 @@ stages:
         $runComponents = "$(varRunComponentsSolutions)".ToLower()
         if ($runComponents -eq "true") {
             $catalogFolderName = "$(varComponentCatalogFolderName)"
-            if ([string]::IsNullOrWhiteSpace($catalogFolderName) -or $catalogFolderName -eq '$(varComponentCatalogFolderName)') {
+            if ([string]::IsNullOrWhiteSpace($catalogFolderName)) {
                 $errors += "varComponentCatalogFolderName is required when varRunComponentsSolutions is 'true'"
                 Write-Host "##vso[task.logissue type=error]Missing variable: varComponentCatalogFolderName"
             } else {
