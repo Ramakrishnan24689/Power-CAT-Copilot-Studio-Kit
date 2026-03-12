@@ -125,6 +125,7 @@ stages:
       artifact: component-collections
       displayName: 'Download Component Collections Artifacts'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
+      continueOnError: true
     
     # ========================================================================
     # Generate Release Tag and Collect All Assets
@@ -196,24 +197,37 @@ stages:
             Write-Host "CREATING COMPONENT COLLECTIONS CATALOG"
             Write-Host "============================================"
             
-            $catalogFolderName = "$(varComponentCatalogFolderName)"
-            if ([string]::IsNullOrWhiteSpace($catalogFolderName)) {
-                Write-Host "##vso[task.logissue type=error]varComponentCatalogFolderName is not set or empty"
-                exit 1
-            }
-            
-            Write-Host "Catalog Folder Name: $catalogFolderName"
-            
-            # Create catalog folder in download path
-            $catalogFolder = "${downloadPath}/${catalogFolderName}"
-            if (Test-Path $catalogFolder) {
-                Remove-Item -Path $catalogFolder -Recurse -Force
-            }
-            New-Item -Path $catalogFolder -ItemType Directory | Out-Null
-            Write-Host "✓ Created catalog folder: $catalogFolderName"
-            
-            # Collect all component files into the catalog folder
-            $componentFiles = @()
+            # Check if component-collections folder exists (it won't if varRunComponentsSolutions was false during Export)
+            if (-not (Test-Path $componentDownloadPath)) {
+                Write-Host "##vso[task.logissue type=warning]Component collections folder not found: $componentDownloadPath"
+                Write-Host "##vso[task.logissue type=warning]This Export pipeline run did not include component collections."
+                Write-Host "##vso[task.logissue type=warning]Ensure varRunComponentsSolutions was set to 'true' during the Export stage."
+                Write-Host ""
+                Write-Host "============================================"
+                Write-Host "COMPONENT COLLECTIONS: NOT AVAILABLE"
+                Write-Host "============================================"
+                Write-Host "ℹ Component collections artifact was not found in the Export pipeline run"
+                Write-Host "ℹ The selected Export run likely had varRunComponentsSolutions='false'"
+                Write-Host "ℹ Continuing without component collections..."
+            } else {
+                $catalogFolderName = "$(varComponentCatalogFolderName)"
+                if ([string]::IsNullOrWhiteSpace($catalogFolderName)) {
+                    Write-Host "##vso[task.logissue type=error]varComponentCatalogFolderName is not set or empty"
+                    exit 1
+                }
+                
+                Write-Host "Catalog Folder Name: $catalogFolderName"
+                
+                # Create catalog folder in download path
+                $catalogFolder = "${downloadPath}/${catalogFolderName}"
+                if (Test-Path $catalogFolder) {
+                    Remove-Item -Path $catalogFolder -Recurse -Force
+                }
+                New-Item -Path $catalogFolder -ItemType Directory | Out-Null
+                Write-Host "✓ Created catalog folder: $catalogFolderName"
+                
+                # Collect all component files into the catalog folder
+                $componentFiles = @()
             
             # Component 1: CopilotStudioKit_ContentSynth_Component
             $component1Unmanaged = "${componentDownloadPath}/CopilotStudioKit_ContentSynth_Component.zip"
@@ -343,6 +357,7 @@ stages:
             Write-Host "============================================"
             Write-Host "Catalog: ${catalogFolderName}.zip"
             Write-Host "Contains: $($componentFiles.Count) component solution files"
+            }
         } else {
             Write-Host ""
             Write-Host "============================================"
@@ -404,12 +419,17 @@ stages:
         
         if ($runComponents -eq "true") {
             $catalogFolderName = "$(varComponentCatalogFolderName)"
-            Write-Host "  • Component Collections Catalog: ${catalogFolderName}.zip (contains 5 solutions, 10 files)"
-            Write-Host "    - CopilotStudioKit_ContentSynth_Component"
-            Write-Host "    - CopilotStudioKit_Research_Component"
-            Write-Host "    - CopilotStudioKit_ExecBrief_Component"
-            Write-Host "    - CopilotStudioKit_DocumentExtraction_Component"
-            Write-Host "    - CopilotStudioKit_ServiceNow_Components"
+            $catalogZipPath = "${downloadPath}/${catalogFolderName}.zip"
+            if (Test-Path $catalogZipPath) {
+                Write-Host "  • Component Collections Catalog: ${catalogFolderName}.zip (contains 5 solutions, 10 files)"
+                Write-Host "    - CopilotStudioKit_ContentSynth_Component"
+                Write-Host "    - CopilotStudioKit_Research_Component"
+                Write-Host "    - CopilotStudioKit_ExecBrief_Component"
+                Write-Host "    - CopilotStudioKit_DocumentExtraction_Component"
+                Write-Host "    - CopilotStudioKit_ServiceNow_Components"
+            } else {
+                Write-Host "  • Component Collections: Not available (artifact not found in Export run)"
+            }
         } else {
             Write-Host "  (Component Collections: Skipped)"
         }
