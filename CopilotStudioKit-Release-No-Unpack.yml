@@ -123,13 +123,25 @@ stages:
     # ========================================================================
     # Download artifacts from Export stage
     # ========================================================================
-    - download: ExportPipeline
-      artifact: drop
+    - task: DownloadPipelineArtifact@2
       displayName: 'Download Main Solution Artifacts'
-    
-    - download: ExportPipeline
-      artifact: component-collections
+      inputs:
+        buildType: 'specific'
+        project: '$(System.TeamProjectId)'
+        definition: 2487
+        buildVersionToDownload: 'latest'
+        artifactName: 'drop'
+        targetPath: '$(Pipeline.Workspace)/ExportPipeline/drop'
+
+    - task: DownloadPipelineArtifact@2
       displayName: 'Download Component Collections Artifacts'
+      inputs:
+        buildType: 'specific'
+        project: '$(System.TeamProjectId)'
+        definition: 2487
+        buildVersionToDownload: 'latest'
+        artifactName: 'component-collections'
+        targetPath: '$(Pipeline.Workspace)/ExportPipeline/component-collections'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
       continueOnError: true
     
