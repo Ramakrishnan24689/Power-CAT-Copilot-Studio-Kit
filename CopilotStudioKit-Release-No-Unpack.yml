@@ -25,6 +25,12 @@ resources:
 variables:
   # Variable group with GitHubPAT (Required if using varMileStone)
   - group: alm-accelerator-variable-group
+  
+  # Default values for optional variables (override in pipeline UI if needed)
+  - name: varComponentCatalogFolderName
+    value: ComponentCollectionsCatalogue
+  - name: varRunComponentsSolutions
+    value: 'true'
 
 # ==================== Release Variables (Set in Azure DevOps UI) ====================
 # - varGitHubConnection: GitHub service connection name
