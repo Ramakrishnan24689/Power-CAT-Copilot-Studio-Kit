@@ -44,6 +44,14 @@ variables:
 # - varTargetServiceConnection: Service connection for target environment (used for all solutions)
 # - varSolutionType: 'managed' or 'unmanaged' (applies to all solutions)
 
+# ==================== Internal Test Environment Deploy Variables ====================
+# - varRunInternalTestDeployment: Set to 'true' to deploy to internal test environments, 'false' to skip
+#   IMPORTANT: This must be set as a pipeline variable in Azure DevOps (not defined in YAML)
+# - varInternalTestManagedEnvironmentURL: Target Power Platform environment URL for managed test deployment
+# - varInternalTestManagedServiceConnection: Service connection for managed test environment
+# - varInternalTestUnmanagedEnvironmentURL: Target Power Platform environment URL for unmanaged test deployment
+# - varInternalTestUnmanagedServiceConnection: Service connection for unmanaged test environment
+
 # ==================== Release Variables ====================
 # - varGitHubConnection: GitHub service connection name
 # - varGitHubRepo: GitHub repository (format: owner/repo)
@@ -914,14 +922,53 @@ stages:
       displayName: 'Deployment Summary'
 
 # ============================================================================
-# STAGE 3: RELEASE
+# STAGE 3: DEPLOY TO INTERNAL TEST ENVIRONMENTS
+# ============================================================================
+- stage: DeployToInternalTestEnvironments
+  displayName: 'Deploy to Internal Test Environments'
+  dependsOn: Deploy
+  condition: and(succeeded(), eq(variables['varRunInternalTestDeployment'], 'true'))
+  jobs:
+  
+  # ========================================================================
+  # Deploy Managed Solution to Internal Test Environment
+  # ========================================================================
+  - template: deployment-job-template.yml
+    parameters:
+      jobName: 'DeployManagedToInternalTest'
+      jobDisplayName: 'Deploy Managed Solutions to Internal Test'
+      environmentURL: '$(varInternalTestManagedEnvironmentURL)'
+      serviceConnection: '$(varInternalTestManagedServiceConnection)'
+      solutionType: 'managed'
+      runComponentsSolutions: ${{ variables.varRunComponentsSolutions }}
+  
+  # ========================================================================
+  # Deploy Unmanaged Solution to Internal Test Environment
+  # ========================================================================
+  - template: deployment-job-template.yml
+    parameters:
+      jobName: 'DeployUnmanagedToInternalTest'
+      jobDisplayName: 'Deploy Unmanaged Solutions to Internal Test'
+      environmentURL: '$(varInternalTestUnmanagedEnvironmentURL)'
+      serviceConnection: '$(varInternalTestUnmanagedServiceConnection)'
+      solutionType: 'unmanaged'
+      runComponentsSolutions: ${{ variables.varRunComponentsSolutions }}
+
+# ============================================================================
+# STAGE 4: RELEASE
 # ============================================================================
 - stage: Release
   displayName: 'GitHub Release'
   dependsOn: 
     - Export
     - Deploy
-  condition: succeeded()
+    - DeployToInternalTestEnvironments
+  condition: |
+    and(
+      in(dependencies.Export.result, 'Succeeded'),
+      in(dependencies.Deploy.result, 'Succeeded'),
+      in(dependencies.DeployToInternalTestEnvironments.result, 'Succeeded', 'Skipped')
+    )
   jobs:
   - job: ReleaseJob
     displayName: 'Create Release'
