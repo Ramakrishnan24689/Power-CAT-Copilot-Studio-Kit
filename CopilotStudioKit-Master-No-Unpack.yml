@@ -940,8 +940,7 @@ stages:
       environmentURL: '$(varInternalTestManagedEnvironmentURL)'
       serviceConnection: '$(varInternalTestManagedServiceConnection)'
       solutionType: 'managed'
-      runComponentsSolutions: ${{ variables.varRunComponentsSolutions }}
-  
+
   # ========================================================================
   # Deploy Unmanaged Solution to Internal Test Environment
   # ========================================================================
@@ -952,7 +951,6 @@ stages:
       environmentURL: '$(varInternalTestUnmanagedEnvironmentURL)'
       serviceConnection: '$(varInternalTestUnmanagedServiceConnection)'
       solutionType: 'unmanaged'
-      runComponentsSolutions: ${{ variables.varRunComponentsSolutions }}
 
 # ============================================================================
 # STAGE 4: RELEASE
