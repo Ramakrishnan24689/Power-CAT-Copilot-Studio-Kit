@@ -53,6 +53,8 @@ variables:
 # - varInternalTestUnmanagedServiceConnection: Service connection for unmanaged test environment
 
 # ==================== Release Variables ====================
+# - varReleaseBuild: Set to 'true' to create GitHub release, 'false' to skip
+#   IMPORTANT: This must be set as a pipeline variable in Azure DevOps (not defined in YAML)
 # - varGitHubConnection: GitHub service connection name
 # - varGitHubRepo: GitHub repository (format: owner/repo)
 # - varReleaseName: Release name prefix (e.g., CopilotStudioAccelerator)
@@ -963,6 +965,7 @@ stages:
     - DeployToInternalTestEnvironments
   condition: |
     and(
+      eq(variables['varReleaseBuild'], 'true'),
       in(dependencies.Export.result, 'Succeeded'),
       in(dependencies.Deploy.result, 'Succeeded'),
       in(dependencies.DeployToInternalTestEnvironments.result, 'Succeeded', 'Skipped')
