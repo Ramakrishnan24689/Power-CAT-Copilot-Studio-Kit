@@ -153,6 +153,8 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string SessionID { get; set; }
         [JsonProperty("Agent Message")]
         public string AgentMessage { get; set; }
+        [JsonProperty("User Message")]
+        public string UserMessage { get; set; }
         [JsonProperty("Feedback Text")]
         public string FeedbackText { get; set; }
         [JsonProperty("Feedback Reaction")]
