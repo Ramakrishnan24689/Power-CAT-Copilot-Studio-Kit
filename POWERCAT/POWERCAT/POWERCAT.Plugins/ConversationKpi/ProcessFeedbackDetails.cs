@@ -26,14 +26,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 return new List<FeedbackDetails>();
             }
 
-            var botMessagesDictionary = model
+            var messageActivitiesDictionary = model
                 .Where(activity => activity.type == "message" &&
                                    activity.from != null &&
-                                   activity.from.role == 0 &&
-                                   !string.IsNullOrEmpty(activity.id) &&
-                                   !string.IsNullOrEmpty(activity.text))
+                                   !string.IsNullOrEmpty(activity.id))
                 .GroupBy(activity => activity.id)
-                .ToDictionary(group => group.Key, group => group.Last().text);
+                .ToDictionary(group => group.Key, group => group.Last());
 
             var sessionInfoActivities = model
                 .Where(activity => activity.valueType == "SessionInfo")
@@ -55,10 +53,17 @@ namespace POWERCAT.Plugins.ConversationKpi
                 var feedbackText = ExtractFeedbackText(feedbackValue);
 
                 string agentMessage = null;
+                string userMessage = null;
                 if (!string.IsNullOrEmpty(feedback.replyToId) &&
-                    botMessagesDictionary.TryGetValue(feedback.replyToId, out string message))
+                    messageActivitiesDictionary.TryGetValue(feedback.replyToId, out Activity agentMessageActivity))
                 {
-                    agentMessage = message;
+                    agentMessage = agentMessageActivity.text;
+
+                    if (!string.IsNullOrEmpty(agentMessageActivity.replyToId) &&
+                        messageActivitiesDictionary.TryGetValue(agentMessageActivity.replyToId, out Activity userMessageActivity))
+                    {
+                        userMessage = userMessageActivity.text;
+                    }
                 }
 
                 if (string.IsNullOrEmpty(reaction) && string.IsNullOrEmpty(feedbackText))
@@ -72,6 +77,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                 {
                     SessionID = $"{agentId}-{conversationId}-{nextSession?.timestamp}-{nextSession?.id}",
                     AgentMessage = agentMessage,
+                    UserMessage = userMessage,
                     FeedbackText = feedbackText,
                     FeedbackReaction = reaction
                 });
