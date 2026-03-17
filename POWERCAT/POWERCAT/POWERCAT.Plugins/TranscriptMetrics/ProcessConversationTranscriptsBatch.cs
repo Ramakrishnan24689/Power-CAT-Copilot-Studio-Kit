@@ -294,7 +294,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             int dataSourceCode = 1;
             bool dataSourceCodeSet = false;
             JObject firstChannelRow = null;
-            var botMessagesDictionary = new Dictionary<string, string>();
+            var messageActivitiesDictionary = new Dictionary<string, JObject>();
             var feedbackRows = new List<JObject>();
 
             foreach (var activity in activities)
@@ -329,13 +329,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 // Only collect bot messages and feedback rows when CaptureUserFeedback is enabled
                 if (record.CaptureUserFeedback)
                 {
-                    if (type == "message" && activity["from"]?["role"]?.Value<int>() == 0)
+                    if (type == "message")
                     {
                         var id = activity["id"]?.ToString();
-                        var text = activity["text"]?.ToString();
-                        if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(text))
+                        if (!string.IsNullOrEmpty(id))
                         {
-                            botMessagesDictionary[id] = text;
+                            messageActivitiesDictionary[id] = activity;
                         }
                     }
 
@@ -385,10 +384,17 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     }
 
                     string agentMessage = null;
+                    string userMessage = null;
                     var replyToId = feedback["replyToId"]?.ToString();
-                    if (!string.IsNullOrEmpty(replyToId) && botMessagesDictionary.TryGetValue(replyToId, out string message))
+                    if (!string.IsNullOrEmpty(replyToId) && messageActivitiesDictionary.TryGetValue(replyToId, out JObject agentMessageActivity))
                     {
-                        agentMessage = message;
+                        agentMessage = agentMessageActivity["text"]?.ToString();
+
+                        var userReplyToId = agentMessageActivity["replyToId"]?.ToString();
+                        if (!string.IsNullOrEmpty(userReplyToId) && messageActivitiesDictionary.TryGetValue(userReplyToId, out JObject userMessageActivity))
+                        {
+                            userMessage = userMessageActivity["text"]?.ToString();
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(reaction) || !string.IsNullOrEmpty(feedbackText))
@@ -398,6 +404,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                             AgentName = record.AgentName,
                             ConversationId = record.ConversationId,
                             AgentMessage = agentMessage,
+                            UserMessage = userMessage,
                             FeedbackText = feedbackText,
                             FeedbackReaction = reaction
                         });
