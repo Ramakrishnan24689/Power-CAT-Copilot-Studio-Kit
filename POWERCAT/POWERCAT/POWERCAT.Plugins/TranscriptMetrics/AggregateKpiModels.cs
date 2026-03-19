@@ -43,6 +43,15 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [DataMember(Name = "feedbackdetails")]
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; }
+
+        [DataMember(Name = "RunCount")]
+        public int RunCount { get; set; }
+
+        [DataMember(Name = "SuccessfulRunCount")]
+        public int SuccessfulRunCount { get; set; }
+
+        [DataMember(Name = "TotalDurationSeconds")]
+        public int TotalDurationSeconds { get; set; }
     }
 
     /// <summary>
@@ -254,6 +263,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public int FeedbackDislikeCount { get; set; }
         public int CsatScore { get; set; }
         public int CsatCount { get; set; }
+        public int RunCount { get; set; }
+        public int SuccessfulRunCount { get; set; }
+        public int TotalDurationSeconds { get; set; }
+        public int AverageDurationSeconds { get; set; }
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
 
         /// <summary>

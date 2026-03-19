@@ -349,6 +349,14 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             }
 
             string channelId = firstChannelRow?["channelId"]?.ToString() ?? "Unknown";
+            int runCount = 0;
+            int successfulRunCount = 0;
+            int totalDurationSeconds = 0;
+
+            if (string.Equals(channelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase))
+            {
+                CalculateAutonomousRunMetrics(activities, out runCount, out successfulRunCount, out totalDurationSeconds);
+            }
 
             var feedbackDetails = new List<FeedbackDetailRecord>();
 
@@ -420,10 +428,73 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             entity["cat_feedbackdetails"] = feedbackDetails.Count > 0 ? JsonConvert.SerializeObject(feedbackDetails) : null;
             entity["cat_datasourcecode"] = new OptionSetValue(dataSourceCode);
             entity["cat_sessioninfo"] = JsonConvert.SerializeObject(sessionInfoRows);
+            entity["cat_runcount"] = runCount;
+            entity["cat_successfulruncount"] = successfulRunCount;
+            entity["cat_totaldurationseconds"] = totalDurationSeconds;
             entity["cat_workflowstatus"] = new OptionSetValue(1);
             entity["ttlinseconds"] = 259200;
 
             return entity;
+        }
+
+        /// <summary>
+        /// Calculates autonomous run metrics from transcript activities.
+        /// </summary>
+        /// <param name="activities">The transcript activities.</param>
+        /// <param name="runCount">The total run count.</param>
+        /// <param name="successfulRunCount">The successful run count.</param>
+        /// <param name="totalDurationSeconds">The total duration in seconds across all runs.</param>
+        private void CalculateAutonomousRunMetrics(
+            List<JObject> activities,
+            out int runCount,
+            out int successfulRunCount,
+            out int totalDurationSeconds)
+        {
+            const string methodName = nameof(CalculateAutonomousRunMetrics);
+
+            runCount = 0;
+            successfulRunCount = 0;
+            totalDurationSeconds = 0;
+
+            if (activities == null || activities.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var activity in activities)
+            {
+                if (!string.Equals(activity["type"]?.ToString(), "trace", StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(activity["valueType"]?.ToString(), "SessionInfo", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                runCount++;
+
+                DateTime startTimeUtc;
+                DateTime endTimeUtc;
+                var startTimeValue = activity["value"]?["startTimeUtc"]?.ToString();
+                var endTimeValue = activity["value"]?["endTimeUtc"]?.ToString();
+                var outcomeReason = activity["value"]?["outcomeReason"]?.ToString();
+
+                if (!DateTime.TryParse(startTimeValue, out startTimeUtc) ||
+                    !DateTime.TryParse(endTimeValue, out endTimeUtc) ||
+                    endTimeUtc < startTimeUtc)
+                {
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(outcomeReason) &&
+                    (!outcomeReason.Contains("Error") ||
+                     string.Equals(outcomeReason, "NoError", StringComparison.OrdinalIgnoreCase)))
+                {
+                    successfulRunCount++;
+                }
+
+                totalDurationSeconds += (int)Math.Floor((endTimeUtc - startTimeUtc).TotalSeconds);
+            }
+
+            _tracingService.Trace($"{methodName}: Calculated autonomous metrics - Runs: {runCount}, SuccessfulRuns: {successfulRunCount}, TotalDurationSeconds: {totalDurationSeconds}");
         }
 
         /// <summary>

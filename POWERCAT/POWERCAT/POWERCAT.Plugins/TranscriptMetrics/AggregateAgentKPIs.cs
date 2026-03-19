@@ -166,7 +166,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     "cat_datasourcecode",
                     "cat_channelid",
                     "cat_sessioninfo",
-                    "cat_feedbackdetails"
+                    "cat_feedbackdetails",
+                    "cat_runcount",
+                    "cat_successfulruncount",
+                    "cat_totaldurationseconds"
                 ),
                 PageInfo = new PagingInfo
                 {
@@ -200,7 +203,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ConversationId = entity.GetAttributeValue<string>("cat_conversationid"),
                         ConversationDate = dateValue.Value.Date.ToString("yyyy-MM-dd"),
                         DataSourceCode = entity.GetAttributeValue<OptionSetValue>("cat_datasourcecode")?.Value ?? 1,
-                        ChannelId = entity.GetAttributeValue<string>("cat_channelid")
+                        ChannelId = entity.GetAttributeValue<string>("cat_channelid"),
+                        RunCount = entity.GetAttributeValue<int>("cat_runcount"),
+                        SuccessfulRunCount = entity.GetAttributeValue<int>("cat_successfulruncount"),
+                        TotalDurationSeconds = entity.GetAttributeValue<int>("cat_totaldurationseconds")
                     };
 
                     // Parse JSON columns
@@ -278,14 +284,19 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ChannelId = g.Key.ChannelId ?? "Unknown",
                         AgentName = firstConversation.AgentName,
                         DataSourceCode = dataSourceCode,
-                        TotalConversations = g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
+                        TotalConversations = string.Equals(g.Key.ChannelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase)
+                            ? 0
+                            : g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
                         SourceConversationIds = g.Select(c => c.EntityId).ToList()
                     };
 
                     foreach (var conversation in g)
                     {
                         // Process all SessionInfo items
-                        ProcessSessionInfoItems(conversation.SessionInfo, kpi);
+                        ProcessSessionInfoItems(conversation.SessionInfo, kpi, string.Equals(kpi.ChannelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase));
+                        kpi.RunCount += conversation.RunCount;
+                        kpi.SuccessfulRunCount += conversation.SuccessfulRunCount;
+                        kpi.TotalDurationSeconds += conversation.TotalDurationSeconds;
                         // Aggregate pre-processed feedback details
                         if (conversation.FeedbackDetails != null)
                         {
@@ -299,6 +310,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                                 kpi.FeedbackDetails.Add(feedbackDetail);
                             }
                         }
+                    }
+
+                    if (kpi.RunCount > 0)
+                    {
+                        kpi.AverageDurationSeconds = (int)Math.Floor((double)kpi.TotalDurationSeconds / kpi.RunCount);
                     }
 
                     return kpi;
@@ -372,6 +388,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity["cat_feedbackdislikecount"] = kpi.FeedbackDislikeCount;
                 entity["cat_csatscore"] = kpi.CsatScore;
                 entity["cat_csatcount"] = kpi.CsatCount;
+                entity["cat_runs"] = kpi.RunCount;
+                entity["cat_successfulruns"] = kpi.SuccessfulRunCount;
+                entity["cat_averagedurationseconds"] = kpi.AverageDurationSeconds;
 
                 // Note: Feedback details file upload happens after upsert in UploadFeedbackDetailsFile()
 
@@ -508,7 +527,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// </summary>
         /// <param name="sessionInfoList">The list of session info items to process.</param>
         /// <param name="kpi">The KPI group to update.</param>
-        private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi)
+        private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi, bool excludeSessionCount)
         {
             if (sessionInfoList == null)
             {
@@ -521,7 +540,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 if (sessionValue != null)
                 {
                     // Increment session count
-                    kpi.SessionCount++;
+                    if (!excludeSessionCount)
+                    {
+                        kpi.SessionCount++;
+                    }
 
                     // Session type counts
                     if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
