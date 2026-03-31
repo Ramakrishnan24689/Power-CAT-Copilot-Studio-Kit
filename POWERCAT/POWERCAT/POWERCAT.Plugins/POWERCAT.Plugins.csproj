@@ -116,6 +116,8 @@
     <Compile Include="AgentInventory\AgentInventoryQueryUtilities.cs" />
     <Compile Include="AgentInventory\AgentRepository.cs" />
     <Compile Include="AgentInventory\AgentUsageData.cs" />
+    <Compile Include="AgentTemplate\AgentTemplateMain.cs" />
+    <Compile Include="AgentTemplate\AgentTemplateOperations.cs" />
     <Compile Include="ApplicationInsightsApi\AppInsightsTokenResponseModel.cs" />
     <Compile Include="ApplicationInsightsApi\InvokeApplicationInsightsApi.cs" />
     <Compile Include="ConversationKpi\ContentConverter.cs" />
