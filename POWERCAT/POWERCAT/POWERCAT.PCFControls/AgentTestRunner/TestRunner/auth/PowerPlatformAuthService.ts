@@ -24,6 +24,11 @@ import {
   AuthenticationResult,
   InteractionRequiredAuthError,
 } from "@azure/msal-browser";
+import {
+  CopilotStudioClient,
+  PowerPlatformCloud,
+} from "@microsoft/agents-copilotstudio-client";
+import type { ConnectionSettings } from "@microsoft/agents-copilotstudio-client";
 
 /**
  * Configuration interface for agent authentication
@@ -34,6 +39,7 @@ export interface AgentConfig {
   tenantId: string;
   environmentId: string;
   agentIdentifier: string;
+  cloud?: PowerPlatformCloud;
 }
 
 /**
@@ -45,7 +51,7 @@ export interface AgentConfig {
 export class PowerPlatformAuthService {
   private msalInstance: PublicClientApplication | null = null;
   private config: AgentConfig | null = null;
-  private readonly scopes = ["https://api.powerplatform.com/.default"];
+  private scopes: string[] = [];
   private cachedToken: string | null = null;
   private tokenExpiryTime: Date | null = null;
 
@@ -57,11 +63,19 @@ export class PowerPlatformAuthService {
    */
   initialize(agentConfig: AgentConfig): void {
     // Validate required configuration
-    if (!agentConfig.clientId || !agentConfig.tenantId) {
-      throw new Error("ClientId and TenantId are required for authentication");
+    if (
+      !agentConfig.clientId ||
+      !agentConfig.tenantId ||
+      !agentConfig.environmentId ||
+      !agentConfig.agentIdentifier
+    ) {
+      throw new Error(
+        "ClientId, TenantId, EnvironmentId, and AgentIdentifier are required for authentication"
+      );
     }
 
     this.config = agentConfig;
+    this.scopes = [this.getScopeFromConfig(agentConfig)];
 
     // Get client URL from current window context
     const clientUrl =
@@ -80,6 +94,25 @@ export class PowerPlatformAuthService {
     };
 
     this.msalInstance = new PublicClientApplication(msalConfig);
+  }
+
+  /**
+   * Resolve the token audience from the same connection settings used by the SDK.
+   * This keeps the requested audience aligned with the selected Power Platform cloud.
+   * @param agentConfig - Configuration containing the connection details.
+   * @returns Token audience scope for MSAL requests.
+   * @private
+   */
+  private getScopeFromConfig(agentConfig: AgentConfig): string {
+    const settings: ConnectionSettings = {
+      environmentId: agentConfig.environmentId,
+      agentIdentifier: agentConfig.agentIdentifier,
+      appClientId: agentConfig.clientId,
+      tenantId: agentConfig.tenantId,
+      cloud: agentConfig.cloud,
+    };
+
+    return CopilotStudioClient.scopeFromSettings(settings);
   }
 
   /**

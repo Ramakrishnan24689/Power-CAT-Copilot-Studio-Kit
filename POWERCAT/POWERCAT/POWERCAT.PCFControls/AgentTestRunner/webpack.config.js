@@ -103,14 +103,15 @@ module.exports = {
       global: "globalThis",
     }),
     new webpack.DefinePlugin({
-      "process.env": JSON.stringify({}),
+      "process.env": JSON.stringify({ NODE_ENV: "production" }),
+      "process.env.NODE_ENV": JSON.stringify("production"),
       "process.platform": JSON.stringify("browser"),
       "process.version": JSON.stringify("v18.0.0"),
       "process.versions": JSON.stringify({ node: "18.0.0" }),
       "process.nextTick": "function(callback) { setTimeout(callback, 0); }",
       global: "globalThis",
       "global.process": JSON.stringify({
-        env: {},
+        env: { NODE_ENV: "production" },
         platform: "browser",
         version: "v18.0.0",
         versions: { node: "18.0.0" },
