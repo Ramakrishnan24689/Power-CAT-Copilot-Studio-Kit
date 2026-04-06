@@ -120,6 +120,8 @@ export class AgentConfigurationOperations extends DataverseOperationBase {
             break;
           case "gcc high":
           case "gcchigh":
+          case "gcc (high)":
+          case "gcc(high)":
             cloud = "gcchigh";
             break;
           case "dod":
