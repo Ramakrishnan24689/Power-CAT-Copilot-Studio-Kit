@@ -96,7 +96,7 @@ export class ConversationManager {
    */
   async initialize(agentConfig: AgentConfiguration): Promise<void> {
     // Retrieve cloud parameter from environment variable
-    let cloud: PowerPlatformCloud | undefined = undefined;
+    let cloud: PowerPlatformCloud = PowerPlatformCloud.Prod;
 
     if (this.configurationOperations) {
       try {
@@ -109,7 +109,7 @@ export class ConversationManager {
           case "public":
           case "commercial":
           case "prod":
-            cloud = undefined;
+            cloud = PowerPlatformCloud.Prod;
             break;
           case "gov":
           case "gcc":
@@ -127,7 +127,7 @@ export class ConversationManager {
             cloud = PowerPlatformCloud.DoD;
             break;
           default:
-            cloud = undefined;
+            cloud = PowerPlatformCloud.Prod;
             break;
         }
 
@@ -145,7 +145,7 @@ export class ConversationManager {
         }
 
         // Continue with default (Commercial cloud)
-        cloud = undefined;
+        cloud = PowerPlatformCloud.Prod;
       }
     } else {
       // If no context was provided, log warning and use default
@@ -162,7 +162,7 @@ export class ConversationManager {
       agentIdentifier: agentConfig.agentIdentifier,
       appClientId: agentConfig.clientId,
       tenantId: agentConfig.tenantId,
-      cloud: cloud,
+      cloud,
     };
 
     // Only initialize auth if not already done

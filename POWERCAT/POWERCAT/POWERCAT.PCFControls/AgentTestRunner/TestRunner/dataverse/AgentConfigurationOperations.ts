@@ -123,6 +123,8 @@ export class AgentConfigurationOperations extends DataverseOperationBase {
             cloud = "gcchigh";
             break;
           case "dod":
+            cloud = "dod";
+            break;
           case "china":
             cloud = "china";
             break;

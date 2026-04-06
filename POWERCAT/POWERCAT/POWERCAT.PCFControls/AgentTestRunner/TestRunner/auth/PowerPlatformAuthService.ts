@@ -109,7 +109,7 @@ export class PowerPlatformAuthService {
       agentIdentifier: agentConfig.agentIdentifier,
       appClientId: agentConfig.clientId,
       tenantId: agentConfig.tenantId,
-      cloud: agentConfig.cloud,
+      cloud: agentConfig.cloud ?? PowerPlatformCloud.Prod,
     };
 
     return CopilotStudioClient.scopeFromSettings(settings);
