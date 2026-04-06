@@ -16,8 +16,11 @@
  *   const { conversationId, startActivity } = await manager.createConversation();
  */
 
-import { CopilotStudioClient } from "@microsoft/agents-copilotstudio-client";
-import type { ConnectionSettings, PowerPlatformCloud } from "@microsoft/agents-copilotstudio-client";
+import {
+  CopilotStudioClient,
+  PowerPlatformCloud,
+} from "@microsoft/agents-copilotstudio-client";
+import type { ConnectionSettings } from "@microsoft/agents-copilotstudio-client";
 import type { Activity } from "@microsoft/agents-activity";
 import { PowerPlatformAuthService } from "../auth/PowerPlatformAuthService";
 import { AgentConfigurationOperations } from "../dataverse/AgentConfigurationOperations";
@@ -93,32 +96,38 @@ export class ConversationManager {
    */
   async initialize(agentConfig: AgentConfiguration): Promise<void> {
     // Retrieve cloud parameter from environment variable
-    let cloud: PowerPlatformCloud | undefined = undefined;
+    let cloud: PowerPlatformCloud = PowerPlatformCloud.Prod;
 
     if (this.configurationOperations) {
       try {
         const cloudResult =
           await this.configurationOperations.getCloudParameterFromEnvironment();
-        
-        // Map string cloud value to PowerPlatformCloud enum
-        switch (cloudResult.cloud?.toLowerCase()) {
+
+        switch (cloudResult.cloud?.toLowerCase().trim()) {
+          case undefined:
+          case "":
           case "public":
           case "commercial":
-          case "":
-            cloud = undefined; // Default/Commercial cloud
+          case "prod":
+            cloud = PowerPlatformCloud.Prod;
             break;
+          case "gov":
           case "gcc":
-            cloud = "GCC" as PowerPlatformCloud;
+            cloud = PowerPlatformCloud.Gov;
             break;
+          case "high":
+          case "gcc(high)":
+          case "gcc (high)":
+          case "gcc high":
           case "gcchigh":
           case "gcc-high":
-            cloud = "GCCHigh" as PowerPlatformCloud;
+            cloud = PowerPlatformCloud.High;
             break;
           case "dod":
-            cloud = "DoD" as PowerPlatformCloud;
+            cloud = PowerPlatformCloud.DoD;
             break;
           default:
-            cloud = undefined;
+            cloud = PowerPlatformCloud.Prod;
             break;
         }
 
@@ -136,7 +145,7 @@ export class ConversationManager {
         }
 
         // Continue with default (Commercial cloud)
-        cloud = undefined;
+        cloud = PowerPlatformCloud.Prod;
       }
     } else {
       // If no context was provided, log warning and use default
@@ -153,7 +162,7 @@ export class ConversationManager {
       agentIdentifier: agentConfig.agentIdentifier,
       appClientId: agentConfig.clientId,
       tenantId: agentConfig.tenantId,
-      cloud: cloud,
+      cloud,
     };
 
     // Only initialize auth if not already done
@@ -163,6 +172,7 @@ export class ConversationManager {
         tenantId: agentConfig.tenantId,
         environmentId: agentConfig.environmentId,
         agentIdentifier: agentConfig.agentIdentifier,
+        cloud,
       });
     }
 
