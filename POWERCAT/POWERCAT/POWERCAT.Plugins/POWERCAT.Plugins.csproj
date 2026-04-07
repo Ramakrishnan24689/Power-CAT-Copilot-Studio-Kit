@@ -144,6 +144,16 @@
     <Compile Include="TranscriptMetrics\TranscriptInputModel.cs" />
     <Compile Include="TranscriptMetrics\TranscriptMetricsMain.cs" />
     <Compile Include="TranscriptMetrics\UpdateWorkflowStatusBatch.cs" />
+    <Compile Include="PowerShield\ApplyBlockedConnectorRiskLevelsAction.cs" />
+    <Compile Include="PowerShield\CommentNotificationPlugin.cs" />
+    <Compile Include="PowerShield\DeactivateStaleConnectorsAction.cs" />
+    <Compile Include="PowerShield\NotificationHelper.cs" />
+    <Compile Include="PowerShield\ParticipantSharingPlugin.cs" />
+    <Compile Include="PowerShield\PolicyRequestCountPlugin.cs" />
+    <Compile Include="PowerShield\PolicyRequestNotificationPlugin.cs" />
+    <Compile Include="PowerShield\ServiceTreeMembersSyncPlugin.cs" />
+    <Compile Include="PowerShield\UpsertConnectorActionsAction.cs" />
+    <Compile Include="PowerShield\UpsertConnectorsAction.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
