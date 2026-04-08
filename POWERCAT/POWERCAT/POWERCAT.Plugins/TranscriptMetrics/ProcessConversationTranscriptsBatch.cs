@@ -352,6 +352,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             int runCount = 0;
             int successfulRunCount = 0;
             int totalDurationSeconds = 0;
+            var connectedAgentDetails = ExtractConnectedAgentDetails(activities);
 
             if (string.Equals(channelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase))
             {
@@ -426,6 +427,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             entity["cat_conversationdate"] = DateTime.Parse(record.ConversationDate);
             entity["cat_conversationid"] = record.ConversationId;
             entity["cat_feedbackdetails"] = feedbackDetails.Count > 0 ? JsonConvert.SerializeObject(feedbackDetails) : null;
+            entity["cat_connectedagentdetails"] = connectedAgentDetails.Count > 0 ? JsonConvert.SerializeObject(connectedAgentDetails) : null;
             entity["cat_datasourcecode"] = new OptionSetValue(dataSourceCode);
             entity["cat_sessioninfo"] = JsonConvert.SerializeObject(sessionInfoRows);
             entity["cat_runcount"] = runCount;
@@ -495,6 +497,98 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             }
 
             _tracingService.Trace($"{methodName}: Calculated autonomous metrics - Runs: {runCount}, SuccessfulRuns: {successfulRunCount}, TotalDurationSeconds: {totalDurationSeconds}");
+        }
+
+        /// <summary>
+        /// Extracts connected agent details from transcript activities.
+        /// </summary>
+        /// <param name="activities">The transcript activities.</param>
+        /// <returns>The connected agent detail records.</returns>
+        private List<ConnectedAgentDetailRecord> ExtractConnectedAgentDetails(List<JObject> activities)
+        {
+            const string methodName = nameof(ExtractConnectedAgentDetails);
+            var connectedAgentDetails = new List<ConnectedAgentDetailRecord>();
+
+            if (activities == null || activities.Count == 0)
+            {
+                return connectedAgentDetails;
+            }
+
+            var pendingConnectedAgentCalls = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var activity in activities)
+            {
+                if (!string.Equals(activity["type"]?.ToString(), "event", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var activityName = activity["name"]?.ToString();
+                var valueType = activity["valueType"]?.ToString();
+                var taskDialogId = activity["value"]?["taskDialogId"]?.ToString();
+
+                if (string.Equals(valueType, "DynamicPlanStepTriggered", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(activityName, "DynamicPlanStepTriggered", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrEmpty(taskDialogId) &&
+                    taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    int pendingCount;
+                    pendingConnectedAgentCalls.TryGetValue(taskDialogId, out pendingCount);
+                    pendingConnectedAgentCalls[taskDialogId] = pendingCount + 1;
+                    continue;
+                }
+
+                if (!string.Equals(activityName, "DynamicPlanStepFinished", StringComparison.OrdinalIgnoreCase) ||
+                    string.IsNullOrEmpty(taskDialogId) ||
+                    taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                int pendingMatchedCount;
+                if (!pendingConnectedAgentCalls.TryGetValue(taskDialogId, out pendingMatchedCount) || pendingMatchedCount == 0)
+                {
+                    continue;
+                }
+
+                if (pendingMatchedCount == 1)
+                {
+                    pendingConnectedAgentCalls.Remove(taskDialogId);
+                }
+                else
+                {
+                    pendingConnectedAgentCalls[taskDialogId] = pendingMatchedCount - 1;
+                }
+
+                var state = activity["value"]?["state"]?.ToString();
+                connectedAgentDetails.Add(new ConnectedAgentDetailRecord
+                {
+                    TaskDialogId = taskDialogId,
+                    IsSuccess = string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase)
+                });
+            }
+
+            foreach (var pendingConnectedAgentCall in pendingConnectedAgentCalls)
+            {
+                for (int i = 0; i < pendingConnectedAgentCall.Value; i++)
+                {
+                    connectedAgentDetails.Add(new ConnectedAgentDetailRecord
+                    {
+                        TaskDialogId = pendingConnectedAgentCall.Key,
+                        IsSuccess = false
+                    });
+                }
+            }
+
+            _tracingService.Trace($"{methodName}: Extracted connected agent details - Count: {connectedAgentDetails.Count}");
+            return connectedAgentDetails;
+        }
+
+        private class ConnectedAgentDetailRecord
+        {
+            public string TaskDialogId { get; set; }
+
+            public bool IsSuccess { get; set; }
         }
 
         /// <summary>

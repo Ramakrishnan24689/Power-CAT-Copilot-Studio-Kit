@@ -44,6 +44,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         [DataMember(Name = "feedbackdetails")]
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; }
 
+        [DataMember(Name = "connectedagentdetails")]
+        public List<ConnectedAgentDetailRecord> ConnectedAgentDetails { get; set; }
+
         [DataMember(Name = "RunCount")]
         public int RunCount { get; set; }
 
@@ -267,6 +270,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public int SuccessfulRunCount { get; set; }
         public int TotalDurationSeconds { get; set; }
         public int AverageDurationSeconds { get; set; }
+        public List<ConnectedAgentSummaryRecord> ConnectedAgentSummaries { get; set; } = new List<ConnectedAgentSummaryRecord>();
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
 
         /// <summary>
@@ -294,5 +298,35 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [JsonProperty("Feedback Reaction")]
         public string FeedbackReaction { get; set; }
+    }
+
+    public class ConnectedAgentDetailRecord
+    {
+        [JsonProperty("TaskDialogId")]
+        public string TaskDialogId { get; set; }
+
+        [JsonProperty("IsSuccess")]
+        public bool IsSuccess { get; set; }
+    }
+
+    public class ConnectedAgentSummaryRecord
+    {
+        [JsonProperty("Agent Name")]
+        public string AgentName { get; set; }
+
+        [JsonProperty("Total Count")]
+        public int TotalCount { get; set; }
+
+        [JsonProperty("Success Count")]
+        public int SuccessCount { get; set; }
+    }
+
+    public class ConnectedAgentDefinitionInput
+    {
+        [JsonProperty("schemaname")]
+        public string SchemaName { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
     }
 }
