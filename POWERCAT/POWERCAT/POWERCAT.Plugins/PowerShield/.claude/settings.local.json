@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Projects/CSK-Pro-Code/Power-CAT-Copilot-Studio-Kit/POWERCAT/POWERCAT/POWERCAT.Plugins/**)",
+      "Bash(dotnet build:*)",
+      "Bash(/c/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe:*)",
+      "Read(//c/Program Files/Microsoft Visual Studio//**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio//**)",
+      "Bash(find \"/c\" -name \"MSBuild.exe\")",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe:*)"
+    ]
+  }
+}

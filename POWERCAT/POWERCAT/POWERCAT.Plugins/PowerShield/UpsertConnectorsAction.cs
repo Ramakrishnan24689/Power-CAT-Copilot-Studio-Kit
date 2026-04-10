@@ -71,6 +71,7 @@ namespace POWERCAT.Plugins.PowerShield
                 var isPremium    = string.Equals(props.Tier, "Premium", StringComparison.OrdinalIgnoreCase);
                 var publisher    = props.Publisher ?? string.Empty;
                 var releaseTag   = props.ReleaseTag ?? string.Empty;
+                var blockedByAdmin = publisher.IndexOf("microsoft", StringComparison.OrdinalIgnoreCase) < 0;
                 var detailsUrl   = "https://learn.microsoft.com/en-us/connectors/"
                                   + connector.Name.Replace("shared_", string.Empty) + "/";
                 var now          = DateTime.UtcNow;
@@ -117,6 +118,7 @@ namespace POWERCAT.Plugins.PowerShield
                         ["cat_connectordetailsurl"] = detailsUrl,
                         ["cat_isactive"]            = true,
                         ["cat_lastsyncdatetime"]    = now,
+                        ["cat_blockedbyadmin"]      = blockedByAdmin,
                     };
                     service.Create(create);
                     result = "Created";

@@ -108,18 +108,18 @@ namespace POWERCAT.Plugins.PowerShield
                     "ApplyBlockedConnectorRiskLevelsAction: {0} distinct connector(s) to stamp as Blocked.",
                     connectorIdsToBlock.Count);
 
-                // --- Step 4: Stamp cat_risklevel = 4 (Blocked) on each unique connector ---
+                // --- Step 4: Set cat_blockedbyadmin = true (Blocked) on each unique connector ---
                 int updatedCount = 0;
                 foreach (var connectorId in connectorIdsToBlock)
                 {
                     var update = new Entity("cat_connector", connectorId)
                     {
-                        ["cat_risklevel"] = new OptionSetValue(4),
+                        ["cat_blockedbyadmin"] = true,
                     };
                     service.Update(update);
                     updatedCount++;
                     trace.Trace(
-                        "ApplyBlockedConnectorRiskLevelsAction: set cat_risklevel=4 on connector ({0}).",
+                        "ApplyBlockedConnectorRiskLevelsAction: set cat_blockedbyadmin=true on connector ({0}).",
                         connectorId);
                 }
 
