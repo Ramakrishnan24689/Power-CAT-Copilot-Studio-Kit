@@ -49,6 +49,8 @@ namespace POWERCAT.Plugins.AgentInventory
             public string AgentCreatedByUPN { get; set; }
             public string AgentSchemaName { get; set; }
             public string Location { get; set; }
+            public string AgentOwner { get; set; }
+            public string AgentOwnerEmail { get; set; }
             public bool UsesGenAI { get; set; }
             public bool UsesAIKnowledge { get; set; }
             public bool UsesEnhancedSearchResult { get; set; }
