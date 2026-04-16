@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace"/>
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0"/>
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string"/>
+              <xsd:attribute name="type" type="xsd:string"/>
+              <xsd:attribute name="mimetype" type="xsd:string"/>
+              <xsd:attribute ref="xml:space"/>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string"/>
+              <xsd:attribute name="name" type="xsd:string"/>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2"/>
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1"/>
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3"/>
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4"/>
+              <xsd:attribute ref="xml:space"/>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1"/>
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required"/>
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="FileExport_Display_Key" xml:space="preserve">
+    <value>File Export</value>
+    <comment>Name of the Export control.</comment>
+  </data>
+  <data name="FileExport_Desc" xml:space="preserve">
+    <value>Export the data as a file.</value>
+    <comment>Description of the Export control.</comment>
+  </data>
+  <data name="FileExport_Content_Display_Key" xml:space="preserve">
+    <value>Content</value>
+    <comment>Name of the property that specifies the plain text content to download.</comment>
+  </data>
+  <data name="FileExport_Content_Desc" xml:space="preserve">
+    <value>Plain text content to download as a file.</value>
+    <comment>Description of the content property.</comment>
+  </data>
+  <data name="FileExport_FileName_Display_Key" xml:space="preserve">
+    <value>File Name</value>
+    <comment>Name of the property that specifies the downloaded file name.</comment>
+  </data>
+  <data name="FileExport_FileName_Desc" xml:space="preserve">
+    <value>Name for the downloaded file (without extension).</value>
+    <comment>Description of the file name property.</comment>
+  </data>
+  <data name="FileExport_ButtonLabel_Display_Key" xml:space="preserve">
+    <value>Button Label</value>
+    <comment>Name of the property that specifies the text on the download button.</comment>
+  </data>
+  <data name="FileExport_ButtonLabel_Desc" xml:space="preserve">
+    <value>Label text displayed on the download button.</value>
+    <comment>Description of the button label property.</comment>
+  </data>
+  <data name="FileExport_ExportStatus_Display_Key" xml:space="preserve">
+    <value>Export Status</value>
+    <comment>Output property: "success" or "error" after export.</comment>
+  </data>
+  <data name="FileExport_ExportStatus_Desc" xml:space="preserve">
+    <value>Returns "success" or "error" after an export attempt.</value>
+    <comment>Description of the export status output property.</comment>
+  </data>
+  <data name="FileExport_ExportMessage_Display_Key" xml:space="preserve">
+    <value>Export Message</value>
+    <comment>Output property: human-readable result message.</comment>
+  </data>
+  <data name="FileExport_ExportMessage_Desc" xml:space="preserve">
+    <value>Returns a human-readable message describing the export result.</value>
+    <comment>Description of the export message output property.</comment>
+  </data>
+</root>
