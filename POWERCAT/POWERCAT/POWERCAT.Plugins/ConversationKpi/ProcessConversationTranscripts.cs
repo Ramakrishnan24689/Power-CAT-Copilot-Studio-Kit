@@ -23,12 +23,12 @@ namespace POWERCAT.Plugins.ConversationKpi
         public void GenerateAgentTranscripts(IPluginExecutionContext context, IOrganizationService organizationService, ITracingService tracingService)
         {
             List<OrganizationRequest> createRequests = new List<OrganizationRequest>();
-            string errorLogId = null; 
+            string errorLogId = null;
             try
             {
                 // Get Conversation Transcripts details
                 string conversationTranscripts = context.InputParameters["cat_ConversationTranscriptsList"] as string;
-                errorLogId = context.InputParameters["cat_ErrorLogId"] as string; 
+                errorLogId = context.InputParameters["cat_ErrorLogId"] as string;
                 var inputRecords = JsonConvert.DeserializeObject<List<ConversationTranscriptModel>>(conversationTranscripts);
 
                 // Separate Teams channel records (processed individually, not grouped)
@@ -75,7 +75,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                         {
                             var createRequest = new CreateRequest
                             {
-                                Target = CreateAgentTranscriptEntity(record, null, false)
+                                    Target = CreateAgentTranscriptEntity(record, null, false)
                             };
                             createRequests.Add(createRequest);
                         }

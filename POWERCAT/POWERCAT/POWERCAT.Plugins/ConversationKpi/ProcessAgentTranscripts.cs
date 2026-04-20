@@ -63,6 +63,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_iscopyfulltranscriptenabled' />
                                         <attribute name='cat_batchid' />
                                         <attribute name='cat_isparent' />
+                                        <attribute name='cat_userdisplayname' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
@@ -81,7 +82,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                 
                 // Track duplicate agent transcript IDs to update them as completed
                 List<Guid> duplicateAgentTranscriptIds = new List<Guid>();
-
                 if (agentTranscriptList.Entities.Count > 0)
                 {
                     // Process transcripts
@@ -103,6 +103,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                             string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
                             string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
+                            string agentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString();
                             TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
 
                             Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
@@ -157,17 +158,20 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 return model;
                             }).ToList();
 
+                            ConversationInfoDetail conversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel);
+
                             ProcessDetails processDetails = new ProcessDetails
                             {
-                                AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
+                                AgentConfigurationId = agentConfigurationId,
                                 AgentId = agentId,
                                 ConversationId = conversationId,
                                 ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                                 TranscriptContent = transcript,
+                                ConversationTurnsJson = BuildConversationTurnsJson(transcript, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
-                                ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
+                                ConversationInfoDetails = conversationInfoDetails,
                                 TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
                                 UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
                                 AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
@@ -325,7 +329,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
                     if (processDetails.CopyFullTranscript) {
                         ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
-                    }                    
+                    }
+                    ConversationKpi["cat_conversationturnsjson"] = processDetails.ConversationTurnsJson;
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
@@ -346,6 +351,119 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
             return entityCollection;
         }
+
+        private string BuildConversationTurnsJson(string transcriptContent, string conversationId, string agentId)
+        {
+            var conversationTurns = new List<ConversationTurn>();
+
+            if (string.IsNullOrWhiteSpace(transcriptContent))
+            {
+                return JsonConvert.SerializeObject(conversationTurns);
+            }
+
+            try
+            {
+                var transcript = JsonConvert.DeserializeObject<TranscriptModel>(transcriptContent);
+                if (transcript?.activities == null)
+                {
+                    return JsonConvert.SerializeObject(conversationTurns);
+                }
+
+                var sessionInfoActivities = transcript.activities
+                    .Select((activity, index) => new { activity, index })
+                    .Where(item => item.activity != null && item.activity.valueType == "SessionInfo")
+                    .ToList();
+
+                for (var index = 0; index < transcript.activities.Count; index++)
+                {
+                    var activity = transcript.activities[index];
+                    if (activity == null || !string.Equals(activity.type, "message", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var speaker = GetSpeaker(activity.from);
+                    if (string.IsNullOrWhiteSpace(speaker))
+                    {
+                        continue;
+                    }
+
+                    var message = GetMessageContent(activity);
+                    var adaptiveCardAttachments = GetAdaptiveCardAttachments(activity.attachments);
+                    if (string.IsNullOrWhiteSpace(message) && (adaptiveCardAttachments == null || !adaptiveCardAttachments.Any()))
+                    {
+                        continue;
+                    }
+
+                    var nextSession = sessionInfoActivities.FirstOrDefault(item => item.index > index);
+
+                    conversationTurns.Add(new ConversationTurn
+                    {
+                        SessionID = nextSession == null ? null : $"{agentId}-{conversationId}-{nextSession.activity.timestamp}-{nextSession.activity.id}",
+                        Speaker = speaker,
+                        Message = message,
+                        Attachments = adaptiveCardAttachments
+                    });
+                }
+            }
+            catch
+            {
+                return JsonConvert.SerializeObject(conversationTurns);
+            }
+
+            return JsonConvert.SerializeObject(conversationTurns);
+        }
+
+        private string GetSpeaker(From from)
+        {
+            if (from == null)
+            {
+                return null;
+            }
+
+            if (from.IsBot)
+            {
+                return "agent";
+            }
+
+            if (from.IsUser)
+            {
+                return "user";
+            }
+
+            if (string.Equals(from.id, "bot", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(from.id, "agent", StringComparison.OrdinalIgnoreCase))
+            {
+                return "agent";
+            }
+
+            if (string.Equals(from.id, "user", StringComparison.OrdinalIgnoreCase))
+            {
+                return "user";
+            }
+
+            return null;
+        }
+
+        private string GetMessageContent(Activity activity)
+        {
+            return string.IsNullOrWhiteSpace(activity.text) ? null : activity.text.Trim();
+        }
+
+        private List<Attachment> GetAdaptiveCardAttachments(List<Attachment> attachments)
+        {
+            if (attachments == null || !attachments.Any())
+            {
+                return null;
+            }
+
+            return attachments
+                .Where(attachment => attachment != null &&
+                    string.Equals(attachment.contentType, "application/vnd.microsoft.card.adaptive", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+       
 
         /// <summary>
         /// Common method for ExecuteMultipleRequests

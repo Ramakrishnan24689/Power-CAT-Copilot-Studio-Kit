@@ -90,7 +90,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             var lastElement = model.activities.Last();
 
             string userId = model.activities
-                .FirstOrDefault(activity => activity.from?.role == 1)?.from?.id ?? string.Empty;
+                .FirstOrDefault(activity => activity.from != null && activity.from.IsUser)?.from?.id ?? string.Empty;
 
             return new ConversationInfoDetail
             {

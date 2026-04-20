@@ -132,7 +132,72 @@ namespace POWERCAT.Plugins.ConversationKpi
     public class From
     {
         public string id { get; set; }
-        public int role { get; set; }
+
+        public string name { get; set; }
+
+        public string aadObjectId { get; set; }
+
+        [JsonProperty("role")]
+        public JToken roleToken { get; set; }
+
+        [JsonIgnore]
+        public bool IsBot
+        {
+            get
+            {
+                var roleValue = GetRoleValue();
+                if (roleValue.HasValue)
+                {
+                    return roleValue.Value == 0;
+                }
+
+                var roleName = GetRoleName();
+                return string.Equals(roleName, "bot", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(roleName, "agent", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [JsonIgnore]
+        public bool IsUser
+        {
+            get
+            {
+                var roleValue = GetRoleValue();
+                if (roleValue.HasValue)
+                {
+                    return roleValue.Value == 1;
+                }
+
+                var roleName = GetRoleName();
+                return string.Equals(roleName, "user", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private int? GetRoleValue()
+        {
+            if (roleToken == null)
+            {
+                return null;
+            }
+
+            if (roleToken.Type == JTokenType.Integer)
+            {
+                return roleToken.Value<int>();
+            }
+
+            int parsedRole;
+            if (int.TryParse(roleToken.ToString(), out parsedRole))
+            {
+                return parsedRole;
+            }
+
+            return null;
+        }
+
+        private string GetRoleName()
+        {
+            return roleToken?.ToString();
+        }
     }
 
     public class IntentScore
