@@ -88,15 +88,18 @@ namespace POWERCAT.Plugins.ConversationKpi
 
             var firstElement = model.activities.First();
             var lastElement = model.activities.Last();
+            var firstUserActivity = model.activities
+                .FirstOrDefault(activity => activity.from != null && activity.from.IsUser);
 
-            string userId = model.activities
-                .FirstOrDefault(activity => activity.from != null && activity.from.IsUser)?.from?.id ?? string.Empty;
+            string userId = firstUserActivity?.from?.id ?? string.Empty;
+            string aadObjectId = firstUserActivity?.from?.aadObjectId ?? string.Empty;
 
             return new ConversationInfoDetail
             {
                 Timestamp = firstElement.timestamp,
                 ConversationDuration = lastElement.timestamp - firstElement.timestamp,
-                UserId = userId
+                UserId = userId,
+                AadObjectId = aadObjectId
             };
         }
     }

@@ -43,6 +43,8 @@ namespace POWERCAT.Plugins.ConversationKpi
         public int? ConversationDuration { get; set; }
         public int? Timestamp { get; set; }
         public string UserId { get; set; }
+        public string AadObjectId { get; set; }
+        public string UserDisplayName { get; set; }
     }
 
     public class SessionDetail
