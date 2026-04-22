@@ -17,6 +17,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public List<TraversedComponents> TraversedComponentsList { get; set; } = new List<TraversedComponents>();
         public List<GenerativeAnswers> GenerativeAnswersList { get; set; } = new List<GenerativeAnswers>();
         public List<FeedbackDetails> FeedbackDetails { get; set; } = new List<FeedbackDetails>();
+        public List<KnowledgeSourceUsage> KnowledgeSourceUsageList { get; set; } = new List<KnowledgeSourceUsage>();
         public ConversationInfoDetail ConversationInfoDetails { get; set; }
         public string AgentConfigurationId { get; set; }
         public string AgentId { get; set; }
@@ -159,5 +160,23 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string FeedbackText { get; set; }
         [JsonProperty("Feedback Reaction")]
         public string FeedbackReaction { get; set; }
+    }
+
+    public class KnowledgeSourceUsage
+    {
+        [JsonProperty("Session ID")]
+        public string SessionID { get; set; }
+        [JsonProperty("Knowledge Source ID")]
+        public string KnowledgeSourceID { get; set; }
+        [JsonProperty("Knowledge Source Type")]
+        public string KnowledgeSourceType { get; set; }
+        [JsonProperty("Available")]
+        public bool Available { get; set; }
+        [JsonProperty("Used")]
+        public bool Used { get; set; }
+        [JsonProperty("Cited")]
+        public bool Cited { get; set; }
+        [JsonProperty("User Query")]
+        public string UserQuery { get; set; }
     }
 }

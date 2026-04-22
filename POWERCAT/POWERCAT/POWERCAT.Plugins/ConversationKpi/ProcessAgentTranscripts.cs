@@ -93,6 +93,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
                     ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
+                    ProcessKnowledgeSourceUsage processKnowledgeSourceUsage = new ProcessKnowledgeSourceUsage();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -174,6 +175,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                                 FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
+                                KnowledgeSourceUsageList = processKnowledgeSourceUsage.ProcessForKnowledgeSourceUsage(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -336,6 +338,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_trackedvariables"] = JsonConvert.SerializeObject(processDetails.TrackedVariables);
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
                     ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
+                    ConversationKpi["cat_knowledgesourceusage"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourceUsageList);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }
