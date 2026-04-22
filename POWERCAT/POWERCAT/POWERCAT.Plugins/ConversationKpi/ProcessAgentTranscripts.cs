@@ -64,7 +64,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                                         <attribute name='cat_iscopyfulltranscriptenabled' />
                                         <attribute name='cat_batchid' />
                                         <attribute name='cat_isparent' />
-                                        <attribute name='cat_userdisplayname' />
                                         <filter type='and'>
                                           <condition attribute='cat_workflowstatus' operator='eq' value='1'/>
                                           <condition attribute='cat_agenttranscriptsid' operator='in'>
