@@ -23,6 +23,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string ConversationId { get; set; }
         public DateTime ConversationDate { get; set; }
         public string TranscriptContent { get; set; }
+        public string ConversationTurnsJson { get; set; }
         public string ConversationTranscriptId { get; set; }
         public bool CopyFullTranscript { get; set; }
     }
@@ -42,6 +43,8 @@ namespace POWERCAT.Plugins.ConversationKpi
         public int? ConversationDuration { get; set; }
         public int? Timestamp { get; set; }
         public string UserId { get; set; }
+        public string AadObjectId { get; set; }
+        public string UserDisplayName { get; set; }
     }
 
     public class SessionDetail
@@ -64,6 +67,18 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string EndTimeUtc { get; set; }
         [JsonProperty("Outcome Reason", Order = 9)]
         public string OutcomeReason { get; set; }
+    }
+
+    public class ConversationTurn
+    {
+        [JsonProperty("Session ID", Order = 1)]
+        public string SessionID { get; set; }
+        [JsonProperty("Speaker", Order = 2)]
+        public string Speaker { get; set; }
+        [JsonProperty("Message", Order = 3)]
+        public string Message { get; set; }
+        [JsonProperty("Attachments", Order = 4)]
+        public List<Attachment> Attachments { get; set; }
     }
 
     public class TraversedComponents

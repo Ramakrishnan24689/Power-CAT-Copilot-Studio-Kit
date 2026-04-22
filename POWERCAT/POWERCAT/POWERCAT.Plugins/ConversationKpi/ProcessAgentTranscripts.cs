@@ -2,6 +2,7 @@
 using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -78,10 +79,10 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 //Dictionary to update agent status
                 Dictionary<Guid, Guid> idDictionary = new Dictionary<Guid, Guid>();
+                Dictionary<string, string> userDisplayNameDictionary = BuildUserDisplayNameDictionary(context);
                 
                 // Track duplicate agent transcript IDs to update them as completed
                 List<Guid> duplicateAgentTranscriptIds = new List<Guid>();
-
                 if (agentTranscriptList.Entities.Count > 0)
                 {
                     // Process transcripts
@@ -103,6 +104,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                             string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
                             string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
+                            string agentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString();
                             TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
 
                             Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
@@ -157,17 +159,24 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 return model;
                             }).ToList();
 
+                            ConversationInfoDetail conversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel);
+                            if (conversationInfoDetails != null)
+                            {
+                                conversationInfoDetails.UserDisplayName = ResolveUserDisplayName(conversationInfoDetails, userDisplayNameDictionary);
+                            }
+
                             ProcessDetails processDetails = new ProcessDetails
                             {
-                                AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
+                                AgentConfigurationId = agentConfigurationId,
                                 AgentId = agentId,
                                 ConversationId = conversationId,
                                 ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                                 TranscriptContent = transcript,
+                                ConversationTurnsJson = BuildConversationTurnsJson(transcript, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
-                                ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
+                                ConversationInfoDetails = conversationInfoDetails,
                                 TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
                                 UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
                                 AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
@@ -325,10 +334,13 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
                     if (processDetails.CopyFullTranscript) {
                         ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
-                    }                    
+                    }
+                    ConversationKpi["cat_conversationturnsjson"] = processDetails.ConversationTurnsJson;
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
+                    ConversationKpi["cat_aadobjectid"] = Convert.ToString(processDetails.ConversationInfoDetails?.AadObjectId);
+                    ConversationKpi["cat_aaddisplayname"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserDisplayName);
                     ConversationKpi["cat_sessionsdetails"] = JsonConvert.SerializeObject(processDetails.SessionDetails);
                     ConversationKpi["cat_ambiguousutterances"] = JsonConvert.SerializeObject(processDetails.AmbiguousUtterances);
                     ConversationKpi["cat_unrecognizedutterances"] = JsonConvert.SerializeObject(processDetails.UnrecognizedUtterances);
@@ -346,6 +358,251 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
             return entityCollection;
         }
+
+        private string BuildConversationTurnsJson(string transcriptContent, string conversationId, string agentId)
+        {
+            var conversationTurns = new List<ConversationTurn>();
+
+            if (string.IsNullOrWhiteSpace(transcriptContent))
+            {
+                return JsonConvert.SerializeObject(conversationTurns);
+            }
+
+            try
+            {
+                var transcript = JsonConvert.DeserializeObject<TranscriptModel>(transcriptContent);
+                if (transcript?.activities == null)
+                {
+                    return JsonConvert.SerializeObject(conversationTurns);
+                }
+
+                var sessionInfoActivities = transcript.activities
+                    .Select((activity, index) => new { activity, index })
+                    .Where(item => item.activity != null && item.activity.valueType == "SessionInfo")
+                    .ToList();
+
+                for (var index = 0; index < transcript.activities.Count; index++)
+                {
+                    var activity = transcript.activities[index];
+                    if (activity == null || !string.Equals(activity.type, "message", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var speaker = GetSpeaker(activity.from);
+                    if (string.IsNullOrWhiteSpace(speaker))
+                    {
+                        continue;
+                    }
+
+                    var message = GetMessageContent(activity);
+                    var adaptiveCardAttachments = GetAdaptiveCardAttachments(activity.attachments);
+                    if (string.IsNullOrWhiteSpace(message) && (adaptiveCardAttachments == null || !adaptiveCardAttachments.Any()))
+                    {
+                        continue;
+                    }
+
+                    var nextSession = sessionInfoActivities.FirstOrDefault(item => item.index > index);
+
+                    conversationTurns.Add(new ConversationTurn
+                    {
+                        SessionID = nextSession == null ? null : $"{agentId}-{conversationId}-{nextSession.activity.timestamp}-{nextSession.activity.id}",
+                        Speaker = speaker,
+                        Message = message,
+                        Attachments = adaptiveCardAttachments
+                    });
+                }
+            }
+            catch
+            {
+                return JsonConvert.SerializeObject(conversationTurns);
+            }
+
+            return JsonConvert.SerializeObject(conversationTurns);
+        }
+
+        private Dictionary<string, string> BuildUserDisplayNameDictionary(IPluginExecutionContext context)
+        {
+            Dictionary<string, string> userDisplayNameDictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (context == null || context.InputParameters == null || context.InputParameters.Count == 0)
+            {
+                return userDisplayNameDictionary;
+            }
+
+            if (!context.InputParameters.Contains("cat_UserDisplayNames"))
+            {
+                return userDisplayNameDictionary;
+            }
+
+            object displayNameInput = context.InputParameters["cat_UserDisplayNames"];
+
+            foreach (string row in GetDisplayNameRows(displayNameInput))
+            {
+                if (string.IsNullOrWhiteSpace(row))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    JArray displayNameEntries = JsonConvert.DeserializeObject<JArray>(row);
+                    if (displayNameEntries == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (JToken entry in displayNameEntries)
+                    {
+                        JObject displayNameObject = entry as JObject;
+                        if (displayNameObject == null)
+                        {
+                            continue;
+                        }
+
+                        string id = GetPropertyValue(displayNameObject, "id");
+                        string displayName = GetPropertyValue(displayNameObject, "DisplayName");
+
+                        if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(displayName))
+                        {
+                            userDisplayNameDictionary[id] = displayName;
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _tracingService.Trace($"Failed to parse display name input row. Details: {ex.Message}");
+                }
+            }
+
+            return userDisplayNameDictionary;
+        }
+
+        private IEnumerable<string> GetDisplayNameRows(object displayNameInput)
+        {
+            string displayNameInputString = displayNameInput as string;
+            if (!string.IsNullOrWhiteSpace(displayNameInputString))
+            {
+                try
+                {
+                    List<string> displayNameRows = JsonConvert.DeserializeObject<List<string>>(displayNameInputString);
+                    if (displayNameRows != null)
+                    {
+                        return displayNameRows;
+                    }
+                }
+                catch (JsonException)
+                {
+                }
+
+                return new List<string> { displayNameInputString };
+            }
+
+            string[] displayNameArray = displayNameInput as string[];
+            if (displayNameArray != null)
+            {
+                return displayNameArray;
+            }
+
+            IEnumerable displayNameEnumerable = displayNameInput as IEnumerable;
+            if (displayNameEnumerable == null)
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            List<string> displayNameList = new List<string>();
+            foreach (object item in displayNameEnumerable)
+            {
+                if (item != null)
+                {
+                    displayNameList.Add(item.ToString());
+                }
+            }
+
+            return displayNameList;
+        }
+
+        private string GetPropertyValue(JObject jsonObject, string propertyName)
+        {
+            JProperty property = jsonObject.Properties()
+                .FirstOrDefault(p => string.Equals(p.Name.Trim(), propertyName, StringComparison.OrdinalIgnoreCase));
+
+            return property?.Value?.ToString()?.Trim();
+        }
+
+        private string ResolveUserDisplayName(ConversationInfoDetail conversationInfoDetails, Dictionary<string, string> userDisplayNameDictionary)
+        {
+            if (conversationInfoDetails == null || userDisplayNameDictionary == null || userDisplayNameDictionary.Count == 0)
+            {
+                return null;
+            }
+
+            string userDisplayName;
+            if (!string.IsNullOrWhiteSpace(conversationInfoDetails.UserId) &&
+                userDisplayNameDictionary.TryGetValue(conversationInfoDetails.UserId, out userDisplayName))
+            {
+                return userDisplayName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(conversationInfoDetails.AadObjectId) &&
+                userDisplayNameDictionary.TryGetValue(conversationInfoDetails.AadObjectId, out userDisplayName))
+            {
+                return userDisplayName;
+            }
+
+            return null;
+        }
+
+        private string GetSpeaker(From from)
+        {
+            if (from == null)
+            {
+                return null;
+            }
+
+            if (from.IsBot)
+            {
+                return "agent";
+            }
+
+            if (from.IsUser)
+            {
+                return "user";
+            }
+
+            if (string.Equals(from.id, "bot", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(from.id, "agent", StringComparison.OrdinalIgnoreCase))
+            {
+                return "agent";
+            }
+
+            if (string.Equals(from.id, "user", StringComparison.OrdinalIgnoreCase))
+            {
+                return "user";
+            }
+
+            return null;
+        }
+
+        private string GetMessageContent(Activity activity)
+        {
+            return string.IsNullOrWhiteSpace(activity.text) ? null : activity.text.Trim();
+        }
+
+        private List<Attachment> GetAdaptiveCardAttachments(List<Attachment> attachments)
+        {
+            if (attachments == null || !attachments.Any())
+            {
+                return null;
+            }
+
+            return attachments
+                .Where(attachment => attachment != null &&
+                    string.Equals(attachment.contentType, "application/vnd.microsoft.card.adaptive", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+       
 
         /// <summary>
         /// Common method for ExecuteMultipleRequests
