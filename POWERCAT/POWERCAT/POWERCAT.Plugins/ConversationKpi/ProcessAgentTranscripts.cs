@@ -94,7 +94,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
                     ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
-                    ProcessKnowledgeSourceUsage processKnowledgeSourceUsage = new ProcessKnowledgeSourceUsage();
+                    ProcessKnowledgeSources processKnowledgeSources = new ProcessKnowledgeSources();
+                    ProcessUserPrompts processUserPrompts = new ProcessUserPrompts();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -173,7 +174,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ConversationId = conversationId,
                                 ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                                 TranscriptContent = transcript,
-                                ConversationTurnsJson = BuildConversationTurnsJson(transcript, conversationId, agentId),
+                                UserPrompts = processUserPrompts.ProcessForUserPrompts(transcript, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
@@ -184,7 +185,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                                 FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
-                                KnowledgeSourceUsageList = processKnowledgeSourceUsage.ProcessForKnowledgeSourceUsage(indexedModels, conversationId, agentId),
+                                KnowledgeSourcesList = processKnowledgeSources.ProcessForKnowledgeSources(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -337,12 +338,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                     if (processDetails.CopyFullTranscript) {
                         ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
                     }
-                    ConversationKpi["cat_conversationturnsjson"] = processDetails.ConversationTurnsJson;
+                    ConversationKpi["cat_userprompts"] = processDetails.UserPrompts;
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
                     ConversationKpi["cat_aadobjectid"] = Convert.ToString(processDetails.ConversationInfoDetails?.AadObjectId);
-                    ConversationKpi["cat_aaddisplayname"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserDisplayName);
+                    ConversationKpi["cat_username"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserDisplayName);
                     ConversationKpi["cat_sessionsdetails"] = JsonConvert.SerializeObject(processDetails.SessionDetails);
                     ConversationKpi["cat_ambiguousutterances"] = JsonConvert.SerializeObject(processDetails.AmbiguousUtterances);
                     ConversationKpi["cat_unrecognizedutterances"] = JsonConvert.SerializeObject(processDetails.UnrecognizedUtterances);
@@ -350,7 +351,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_trackedvariables"] = JsonConvert.SerializeObject(processDetails.TrackedVariables);
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
                     ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
-                    ConversationKpi["cat_knowledgesourceusage"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourceUsageList);
+                    ConversationKpi["cat_knowledgesources"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourcesList);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }
@@ -360,68 +361,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                 throw ex;
             }
             return entityCollection;
-        }
-
-        private string BuildConversationTurnsJson(string transcriptContent, string conversationId, string agentId)
-        {
-            var conversationTurns = new List<ConversationTurn>();
-
-            if (string.IsNullOrWhiteSpace(transcriptContent))
-            {
-                return JsonConvert.SerializeObject(conversationTurns);
-            }
-
-            try
-            {
-                var transcript = JsonConvert.DeserializeObject<TranscriptModel>(transcriptContent);
-                if (transcript?.activities == null)
-                {
-                    return JsonConvert.SerializeObject(conversationTurns);
-                }
-
-                var sessionInfoActivities = transcript.activities
-                    .Select((activity, index) => new { activity, index })
-                    .Where(item => item.activity != null && item.activity.valueType == "SessionInfo")
-                    .ToList();
-
-                for (var index = 0; index < transcript.activities.Count; index++)
-                {
-                    var activity = transcript.activities[index];
-                    if (activity == null || !string.Equals(activity.type, "message", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    var speaker = GetSpeaker(activity.from);
-                    if (string.IsNullOrWhiteSpace(speaker))
-                    {
-                        continue;
-                    }
-
-                    var message = GetMessageContent(activity);
-                    var adaptiveCardAttachments = GetAdaptiveCardAttachments(activity.attachments);
-                    if (string.IsNullOrWhiteSpace(message) && (adaptiveCardAttachments == null || !adaptiveCardAttachments.Any()))
-                    {
-                        continue;
-                    }
-
-                    var nextSession = sessionInfoActivities.FirstOrDefault(item => item.index > index);
-
-                    conversationTurns.Add(new ConversationTurn
-                    {
-                        SessionID = nextSession == null ? null : $"{agentId}-{conversationId}-{nextSession.activity.timestamp}-{nextSession.activity.id}",
-                        Speaker = speaker,
-                        Message = message,
-                        Attachments = adaptiveCardAttachments
-                    });
-                }
-            }
-            catch
-            {
-                return JsonConvert.SerializeObject(conversationTurns);
-            }
-
-            return JsonConvert.SerializeObject(conversationTurns);
         }
 
         private Dictionary<string, string> BuildUserDisplayNameDictionary(IPluginExecutionContext context)
@@ -555,57 +494,6 @@ namespace POWERCAT.Plugins.ConversationKpi
 
             return null;
         }
-
-        private string GetSpeaker(From from)
-        {
-            if (from == null)
-            {
-                return null;
-            }
-
-            if (from.IsBot)
-            {
-                return "agent";
-            }
-
-            if (from.IsUser)
-            {
-                return "user";
-            }
-
-            if (string.Equals(from.id, "bot", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(from.id, "agent", StringComparison.OrdinalIgnoreCase))
-            {
-                return "agent";
-            }
-
-            if (string.Equals(from.id, "user", StringComparison.OrdinalIgnoreCase))
-            {
-                return "user";
-            }
-
-            return null;
-        }
-
-        private string GetMessageContent(Activity activity)
-        {
-            return string.IsNullOrWhiteSpace(activity.text) ? null : activity.text.Trim();
-        }
-
-        private List<Attachment> GetAdaptiveCardAttachments(List<Attachment> attachments)
-        {
-            if (attachments == null || !attachments.Any())
-            {
-                return null;
-            }
-
-            return attachments
-                .Where(attachment => attachment != null &&
-                    string.Equals(attachment.contentType, "application/vnd.microsoft.card.adaptive", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-        }
-
-       
 
         /// <summary>
         /// Common method for ExecuteMultipleRequests

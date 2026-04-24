@@ -17,14 +17,14 @@ namespace POWERCAT.Plugins.ConversationKpi
         public List<TraversedComponents> TraversedComponentsList { get; set; } = new List<TraversedComponents>();
         public List<GenerativeAnswers> GenerativeAnswersList { get; set; } = new List<GenerativeAnswers>();
         public List<FeedbackDetails> FeedbackDetails { get; set; } = new List<FeedbackDetails>();
-        public List<KnowledgeSourceUsage> KnowledgeSourceUsageList { get; set; } = new List<KnowledgeSourceUsage>();
+        public List<KnowledgeSource> KnowledgeSourcesList { get; set; } = new List<KnowledgeSource>();
         public ConversationInfoDetail ConversationInfoDetails { get; set; }
         public string AgentConfigurationId { get; set; }
         public string AgentId { get; set; }
         public string ConversationId { get; set; }
         public DateTime ConversationDate { get; set; }
         public string TranscriptContent { get; set; }
-        public string ConversationTurnsJson { get; set; }
+        public string UserPrompts { get; set; }
         public string ConversationTranscriptId { get; set; }
         public bool CopyFullTranscript { get; set; }
     }
@@ -177,7 +177,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string FeedbackReaction { get; set; }
     }
 
-    public class KnowledgeSourceUsage
+    public class KnowledgeSource
     {
         [JsonProperty("Session ID")]
         public string SessionID { get; set; }
