@@ -138,6 +138,7 @@
     <Compile Include="DirectLineApi\InvokeDirectLineApi.cs" />
     <Compile Include="DirectLineApi\TokenResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ShareAppWithAdminUsers\ShareAppOnRoleAssociatePlugin.cs" />
     <Compile Include="TranscriptMetrics\AggregateAgentKPIs.cs" />
     <Compile Include="TranscriptMetrics\AggregateKpiModels.cs" />
     <Compile Include="TranscriptMetrics\ProcessConversationTranscriptsBatch.cs" />
