@@ -116,39 +116,21 @@ namespace POWERCAT.Plugins.AgentInventory
         }
 
         /// <summary>
-        /// Represents Agent Uage Data
-        /// </summary>
-        public class AgentTenantUsageData
-        {
-            public string EnvironmentID { get; set; }
-            public string EnvironmentName { get; set; }
-            public string AgentName { get; set; }
-            public string AgentID { get; set; }
-            public string Feature { get; set; }
-            public decimal BilledMessages { get; set; }
-            public decimal NonBilledMessages { get; set; }
-            public DateTime UsageDate { get; set; }
-        }
-
-        /// <summary>
-        /// Represents Agent Usage Data Output
-        /// </summary>
-        public class AgentUsageOutput
-        {
-            public string ID { get; set; }
-            public List<UsageRecord> Usage { get; set; }
-            public string UsageJson { get; set; }
-        }
-
-        /// <summary>
         /// Usages details that represents the object you would create in the usage history table
         /// </summary>
         public class UsageRecord
         {
-            public string Feature { get; set; }
+            public string EnvId { get; set; }
+            public string AgentId { get; set; }
             public decimal Billed { get; set; }
             public decimal NonBilled { get; set; }
-            public DateTime Date { get; set; }
+            public string Feature { get; set; }
+            public DateTime AsOfDate { get; set; }
+            public string Tool { get; set; }
+            public string Channel { get; set; }
+            public string Knowledge { get; set; }
+            public string LLM { get; set; }
+            public int Users { get; set; }
         }
 
         /// <summary>
@@ -156,9 +138,8 @@ namespace POWERCAT.Plugins.AgentInventory
         /// </summary>
         public class AgentUsageInput
         {
-            public string AgentID { get; set; }
-            public string EnvironmentID { get; set; }
-            public Guid AgentDetailsID { get; set; }
+            public DateTime ToDate { get; set; }
+            public DateTime FromDate { get; set; }
             public List<UsageRecord> Usages { get; set; }
         }
     }

@@ -73,21 +73,6 @@ namespace POWERCAT.Plugins.AgentInventory
                         }
                         break;
 
-                    case "cat_ProcessTenantUsageReport":
-                        string base64EncodedUsageData = (string)context.InputParameters["cat_UsageData"];
-
-                        //Decode the data
-                        byte[] decodedBytes = Convert.FromBase64String(base64EncodedUsageData);
-                        string decodedUsageCsv = Encoding.UTF8.GetString(decodedBytes);
-
-                        AgentUsageData usageDataOperation = new AgentUsageData(organizationService, tracingService);
-
-                        //Process usage data
-                        string processedResult = usageDataOperation.ProcessUsageData(decodedUsageCsv);
-
-                        context.OutputParameters["cat_UsageJsonOutput"] = processedResult;
-                        break;
-
                     case "cat_GenerateTenantUsageReport":
                         string usageJson = (string)context.InputParameters["cat_UsageInput"];
 
