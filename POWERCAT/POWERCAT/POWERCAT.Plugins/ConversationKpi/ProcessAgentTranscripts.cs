@@ -174,7 +174,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ConversationId = conversationId,
                                 ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                                 TranscriptContent = transcript,
-                                UserPrompts = processUserPrompts.ProcessForUserPrompts(transcript, conversationId, agentId),
+                                UserPrompts = processUserPrompts.ProcessForUserPrompts(indexedModels, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),

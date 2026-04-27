@@ -56,6 +56,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 .ToList();
         }
 
+        /// <summary>
+        /// Builds the ordered search query contexts used to associate knowledge sources with user queries.
+        /// </summary>
+        /// <param name="model">The transcript activities to inspect.</param>
+        /// <returns>A list of search query contexts ordered by activity index.</returns>
         private static List<SearchQueryContext> BuildSearchQueryContexts(List<Activity> model)
         {
             return model
@@ -72,6 +77,19 @@ namespace POWERCAT.Plugins.ConversationKpi
                 .ToList();
         }
 
+        /// <summary>
+        /// Adds or updates knowledge source entries for the specified activity and usage state.
+        /// </summary>
+        /// <param name="knowledgeSourceMap">The lookup of merged knowledge source records.</param>
+        /// <param name="sessionInfoActivities">The session info activities used to determine session boundaries.</param>
+        /// <param name="searchQueryContexts">The available search query contexts.</param>
+        /// <param name="activity">The activity containing knowledge source data.</param>
+        /// <param name="agentId">The agent identifier.</param>
+        /// <param name="conversationId">The conversation identifier.</param>
+        /// <param name="available">Indicates whether the knowledge source was available.</param>
+        /// <param name="used">Indicates whether the knowledge source was used.</param>
+        /// <param name="cited">Indicates whether the knowledge source was cited.</param>
+        /// <param name="propertyName">The property name containing the knowledge sources.</param>
         private static void UpsertKnowledgeSources(
             Dictionary<string, KnowledgeSource> knowledgeSourceMap,
             List<Activity> sessionInfoActivities,
@@ -109,6 +127,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
         }
 
+        /// <summary>
+        /// Resolves the user query that most closely matches the specified activity.
+        /// </summary>
+        /// <param name="searchQueryContexts">The known search query contexts.</param>
+        /// <param name="activity">The activity for which to resolve the user query.</param>
+        /// <returns>The resolved user query, or <see langword="null"/> when none is found.</returns>
         private static string ResolveUserQuery(List<SearchQueryContext> searchQueryContexts, Activity activity)
         {
             var queryContext = searchQueryContexts
@@ -127,6 +151,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 .LastOrDefault();
         }
 
+        /// <summary>
+        /// Extracts the search query from the activity payload.
+        /// </summary>
+        /// <param name="activity">The activity containing search query data.</param>
+        /// <returns>The extracted search query, or <see langword="null"/> when none is present.</returns>
         private static string GetSearchQuery(Activity activity)
         {
             var argumentsToken = GetPropertyToken(activity.valueToken, "arguments");
@@ -141,6 +170,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 ?? GetPropertyValue(activity.valueToken, "query");
         }
 
+        /// <summary>
+        /// Gets the logical knowledge source identifiers from the specified property.
+        /// </summary>
+        /// <param name="token">The token that contains the property to inspect.</param>
+        /// <param name="propertyName">The property name containing the knowledge sources.</param>
+        /// <returns>A sequence of logical knowledge source identifiers.</returns>
         private static IEnumerable<string> GetKnowledgeSourceIds(JToken token, string propertyName)
         {
             var propertyValue = GetPropertyToken(token, propertyName);
@@ -154,6 +189,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             return sourceIds;
         }
 
+        /// <summary>
+        /// Recursively collects logical knowledge source identifiers from the specified token.
+        /// </summary>
+        /// <param name="token">The token to inspect.</param>
+        /// <param name="sourceIds">The set that receives collected source identifiers.</param>
         private static void CollectKnowledgeSourceIds(JToken token, HashSet<string> sourceIds)
         {
             if (token == null)
@@ -191,6 +231,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
         }
 
+        /// <summary>
+        /// Determines whether the specified identifier represents a logical knowledge source.
+        /// </summary>
+        /// <param name="sourceId">The source identifier to evaluate.</param>
+        /// <returns><see langword="true"/> when the identifier is a logical knowledge source; otherwise, <see langword="false"/>.</returns>
         private static bool IsLogicalKnowledgeSource(string sourceId)
         {
             if (string.IsNullOrWhiteSpace(sourceId))
@@ -222,6 +267,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 || sourceId.IndexOf(".knowledge.", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        /// <summary>
+        /// Gets the knowledge source type from the source identifier.
+        /// </summary>
+        /// <param name="sourceId">The source identifier to classify.</param>
+        /// <returns>The knowledge source type, or an empty string when no type matches.</returns>
         private static string GetKnowledgeSourceType(string sourceId)
         {
             if (sourceId.IndexOf(".topic.", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -242,6 +292,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return string.Empty;
         }
 
+        /// <summary>
+        /// Determines whether the activity matches the specified value across supported discriminator fields.
+        /// </summary>
+        /// <param name="activity">The activity to evaluate.</param>
+        /// <param name="value">The value to compare against.</param>
+        /// <returns><see langword="true"/> when the activity matches; otherwise, <see langword="false"/>.</returns>
         private static bool IsActivityMatch(Activity activity, string value)
         {
             return string.Equals(activity?.valueType, value, StringComparison.OrdinalIgnoreCase)
@@ -249,6 +305,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 || string.Equals(activity?.type, value, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Gets a property value from the specified token using a case-insensitive property name.
+        /// </summary>
+        /// <param name="token">The token that contains the property.</param>
+        /// <param name="propertyPath">The property name to retrieve.</param>
+        /// <returns>The property value as a string, or <see langword="null"/> when the property is missing or null.</returns>
         private static string GetPropertyValue(JToken token, string propertyPath)
         {
             var propertyValue = GetPropertyToken(token, propertyPath);
@@ -257,6 +319,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 : propertyValue.ToString();
         }
 
+        /// <summary>
+        /// Gets a property token from the specified token using a case-insensitive property name.
+        /// </summary>
+        /// <param name="token">The token that contains the property.</param>
+        /// <param name="propertyName">The property name to retrieve.</param>
+        /// <returns>The matching property token, or <see langword="null"/> when no match is found.</returns>
         private static JToken GetPropertyToken(JToken token, string propertyName)
         {
             if (token == null || token.Type != JTokenType.Object || string.IsNullOrWhiteSpace(propertyName))
