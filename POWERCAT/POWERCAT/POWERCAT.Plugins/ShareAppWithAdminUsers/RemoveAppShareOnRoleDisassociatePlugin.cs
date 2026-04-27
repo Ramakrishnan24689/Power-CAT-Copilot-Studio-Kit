@@ -9,10 +9,10 @@ using Microsoft.Xrm.Sdk.Query;
 namespace POWERCAT.Plugins.ShareAppWithAdminUsers
 {
     /// <summary>
-    /// Fires when a security role is assigned to a user or team.
+    /// Fires when a security role is removed from a user or team.
     ///
     /// Plugin registration:
-    ///   Message:           Associate
+    ///   Message:           Disassociate
     ///   Primary entity:    (blank)
     ///   Secondary entity:  (blank)
     ///   Stage:             PostOperation
@@ -21,19 +21,20 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
     /// Behavior:
     ///   - Listens to systemuserroles_association (user ↔ role)
     ///     and teamroles_association (team ↔ role).
-    ///   - If at least one of the associated roles is in the AllowedRoleNames
+    ///   - If at least one of the removed roles is in the AllowedRoleNames
     ///     list, calls the custom API cat_ShareAppWithAdminsandMakers with
-    ///     cat_Operation = "Share". The downstream cloud flow shares the
-    ///     Admin / Maker canvas apps with the principal.
+    ///     cat_Operation = "Unshare". The downstream cloud flow then evaluates
+    ///     whether the principal still has any allow-listed role; if not, it
+    ///     removes the principal's permissions on the Admin / Maker apps.
     /// </summary>
-    public sealed class ShareAppOnRoleAssociatePlugin : IPlugin
+    public sealed class RemoveAppShareOnRoleDisassociatePlugin : IPlugin
     {
         // Message this plugin is registered against.
-        private const string MessageName = "Associate";
+        private const string MessageName = "Disassociate";
 
         // Operation value forwarded to the custom API. The same API also
-        // handles "Unshare" (called by the Disassociate plugin).
-        private const string OperationName = "Share";
+        // handles "Share" (called by the Associate plugin).
+        private const string OperationName = "Unshare";
 
         private const string UserRoleRelationshipName = "systemuserroles_association";
         private const string TeamRoleRelationshipName = "teamroles_association";
@@ -51,7 +52,7 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
         private const string PrincipalTypeUser = "User";
         private const string PrincipalTypeGroup = "Group";
 
-        // Only role assignments matching one of these names trigger sharing.
+        // Only role removals matching one of these names trigger unshare logic.
         // Comparison is case-insensitive.
         private static readonly HashSet<string> AllowedRoleNames =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -75,14 +76,14 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                 if (!string.Equals(context.MessageName, MessageName, StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // The Associate message exposes the relationship being modified.
+                // The Disassociate message exposes the relationship being modified.
                 var relationship = context.InputParameters.Contains("Relationship")
                     ? context.InputParameters["Relationship"] as Relationship
                     : null;
                 if (relationship == null)
                     return;
 
-                // Decide whether the role is being assigned to a user or to a team.
+                // Decide whether the role is being removed from a user or from a team.
                 // expectedPrincipal = expected logical name of the Target entity.
                 // principalType    = value forwarded to the custom API.
                 string expectedPrincipal;
@@ -99,11 +100,11 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                 }
                 else
                 {
-                    // Some other association (e.g. role ↔ privilege). Not our concern.
+                    // Some other association we don't care about.
                     return;
                 }
 
-                // Target = the principal (user or team) the role is being assigned to.
+                // Target = the principal (user or team) the role is being removed from.
                 var target = context.InputParameters.Contains("Target")
                     ? context.InputParameters["Target"] as EntityReference
                     : null;
@@ -113,15 +114,14 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                     return;
                 }
 
-                // RelatedEntities = the role(s) being associated to the target.
+                // RelatedEntities = the role(s) being removed from the target.
                 var related = context.InputParameters.Contains("RelatedEntities")
                     ? context.InputParameters["RelatedEntities"] as EntityReferenceCollection
                     : null;
                 if (related == null || related.Count == 0)
                     return;
 
-                // Collect just the role ids (the relationship can in theory contain
-                // other entity references; we only care about role).
+                // Keep only role references.
                 var roleIds = new List<Guid>();
                 foreach (var er in related)
                 {
@@ -137,6 +137,8 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                 var service = serviceFactory.CreateOrganizationService(context.UserId);
 
                 // Look up role names and keep only those in the allow-list.
+                // Note: Retrieve still works here because the role row itself isn't deleted —
+                // only the link between the principal and the role is removed.
                 var matchedRoleNames = new List<string>();
                 foreach (var roleId in roleIds)
                 {
@@ -146,7 +148,7 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                         matchedRoleNames.Add(roleName);
                 }
 
-                // Nothing to do unless at least one allow-listed role was assigned.
+                // Nothing to do unless at least one allow-listed role was removed.
                 if (matchedRoleNames.Count == 0)
                     return;
 
@@ -155,12 +157,13 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
                     CustomActionName, OperationName, principalType, target.Id);
 
                 // Build and execute the custom API request. The cloud flow bound
-                // to this API performs the actual app sharing.
+                // to this API performs the actual app un-sharing (after first
+                // checking whether the principal still has any allow-listed role).
                 //
                 // Parameters (all prefixed with the publisher 'cat_'):
-                //   cat_Operation         "Share"
+                //   cat_Operation         "Unshare"
                 //   cat_PrincipalType     "User" or "Group"
-                //   cat_AffectedRoleNames CSV of allow-listed roles that were just assigned
+                //   cat_AffectedRoleNames CSV of allow-listed roles that were just removed
                 //   cat_SystemUserId      Target user id   (empty when principal is a team)
                 //   cat_TeamId            Target team id   (empty when principal is a user)
                 var request = new OrganizationRequest(CustomActionName);
@@ -184,7 +187,7 @@ namespace POWERCAT.Plugins.ShareAppWithAdminUsers
             }
             catch (Exception ex)
             {
-                tracingService?.Trace("Unhandled exception in {0}: {1}", nameof(ShareAppOnRoleAssociatePlugin), ex);
+                tracingService?.Trace("Unhandled exception in {0}: {1}", nameof(RemoveAppShareOnRoleDisassociatePlugin), ex);
                 throw new InvalidPluginExecutionException(
                     string.Format("An error occurred while invoking {0}: {1}", CustomActionName, ex.Message), ex);
             }
