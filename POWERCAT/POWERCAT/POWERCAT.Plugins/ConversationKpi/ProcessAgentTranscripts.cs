@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using static POWERCAT.Plugins.ConversationKpi.ConversationKpiMain;
 using System.IdentityModel.Metadata;
-using System.Collections;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
@@ -81,7 +80,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                 
                 // Track duplicate agent transcript IDs to update them as completed
                 List<Guid> duplicateAgentTranscriptIds = new List<Guid>();
-
                 if (agentTranscriptList.Entities.Count > 0)
                 {
                     // Process transcripts
@@ -93,6 +91,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessTraversedComponents processTraversedComponents = new ProcessTraversedComponents();
                     ProcessGenerativeAnswersArray processGenerativeAnswersArray = new ProcessGenerativeAnswersArray();
                     ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
+                    ProcessKnowledgeSources processKnowledgeSources = new ProcessKnowledgeSources();
+                    ProcessUserPrompts processUserPrompts = new ProcessUserPrompts();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -103,6 +103,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                             string transcript = agentTranscript.GetAttributeValue<string>("cat_transcriptcontent");
                             string trackedVaribales = agentTranscript.GetAttributeValue<string>("cat_trackedvariables");
                             string agentId = agentTranscript.GetAttributeValue<string>("cat_agentid");
+                            string agentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString();
                             TranscriptModel transcriptModel = JsonConvert.DeserializeObject<TranscriptModel>(transcript);
 
                             Guid conversationTranscriptId = new Guid((string)agentTranscript["cat_conversationtranscriptid"]);
@@ -159,11 +160,12 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                             ProcessDetails processDetails = new ProcessDetails
                             {
-                                AgentConfigurationId = ((EntityReference)agentTranscript["cat_agentconfiguration"]).Id.ToString(),
+                                AgentConfigurationId = agentConfigurationId,
                                 AgentId = agentId,
                                 ConversationId = conversationId,
                                 ConversationDate = (DateTime)agentTranscript["cat_conversationdate"],
                                 TranscriptContent = transcript,
+                                UserPrompts = processUserPrompts.ProcessForUserPrompts(indexedModels, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
@@ -174,6 +176,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 TraversedComponentsList = processTraversedComponents.ProcessForTraversedComponents(indexedModels, conversationId, agentId),
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                                 FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
+                                KnowledgeSourcesList = processKnowledgeSources.ProcessForKnowledgeSources(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -325,10 +328,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
                     if (processDetails.CopyFullTranscript) {
                         ConversationKpi["cat_transcriptcontent"] = processDetails.TranscriptContent;
-                    }                    
+                    }
+                    ConversationKpi["cat_userprompts"] = processDetails.UserPrompts;
                     ConversationKpi["cat_sessions"] = processDetails.GlobalSessionDetail?.SessionCount;
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
+                    ConversationKpi["cat_aadobjectid"] = Convert.ToString(processDetails.ConversationInfoDetails?.AadObjectId);
                     ConversationKpi["cat_sessionsdetails"] = JsonConvert.SerializeObject(processDetails.SessionDetails);
                     ConversationKpi["cat_ambiguousutterances"] = JsonConvert.SerializeObject(processDetails.AmbiguousUtterances);
                     ConversationKpi["cat_unrecognizedutterances"] = JsonConvert.SerializeObject(processDetails.UnrecognizedUtterances);
@@ -336,6 +341,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_trackedvariables"] = JsonConvert.SerializeObject(processDetails.TrackedVariables);
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
                     ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
+                    ConversationKpi["cat_knowledgesources"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourcesList);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }

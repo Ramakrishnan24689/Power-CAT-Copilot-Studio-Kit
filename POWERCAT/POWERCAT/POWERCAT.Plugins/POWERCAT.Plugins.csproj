@@ -128,10 +128,12 @@
     <Compile Include="ConversationKpi\ProcessAmbiguousUtterances.cs" />
     <Compile Include="ConversationKpi\ProcessFeedbackDetails.cs" />
     <Compile Include="ConversationKpi\ProcessGenerativeAnswersArray.cs" />
+    <Compile Include="ConversationKpi\ProcessKnowledgeSources.cs" />
     <Compile Include="ConversationKpi\ProcessSessionInsight.cs" />
     <Compile Include="ConversationKpi\ProcessTrackedVariables.cs" />
     <Compile Include="ConversationKpi\ProcessTraversedComponents.cs" />
     <Compile Include="ConversationKpi\ProcessUnrecognizedUtterances.cs" />
+    <Compile Include="ConversationKpi\ProcessUserPrompts.cs" />
     <Compile Include="ConversationKpi\TranscriptModel.cs" />
     <Compile Include="ConversationKpi\ValueConverter.cs" />
     <Compile Include="CopilotTestRun\CalculateRollupField.cs" />
