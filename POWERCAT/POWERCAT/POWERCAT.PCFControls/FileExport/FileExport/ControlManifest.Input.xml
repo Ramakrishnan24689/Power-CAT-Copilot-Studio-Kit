@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="PowerCAT" constructor="FileExport" version="0.0.2" display-name-key="FileExport_Display_Key" description-key="FileExport_Desc" control-type="virtual" >
+    <external-service-usage enabled="false">
+    </external-service-usage>
+    
+    <!-- INPUT: CSV content to download (bound to a field) -->
+    <property name="content"
+              display-name-key="FileExport_Content_Display_Key"
+              description-key="FileExport_Content_Desc"
+              of-type="SingleLine.Text" usage="bound" required="false" />
+
+    <!-- INPUT: Download file name -->
+    <property name="fileName"
+              display-name-key="FileExport_FileName_Display_Key"
+              description-key="FileExport_FileName_Desc"
+              default-value="export"
+              of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!-- INPUT: Button label text -->
+    <property name="buttonLabel"
+              display-name-key="FileExport_ButtonLabel_Display_Key"
+              description-key="FileExport_ButtonLabel_Desc"
+              default-value="Export"
+              of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!-- OUTPUT: "success" or "error" after export -->
+    <property name="exportStatus"
+              display-name-key="FileExport_ExportStatus_Display_Key"
+              description-key="FileExport_ExportStatus_Desc"
+              of-type="SingleLine.Text" usage="output" />
+
+    <!-- OUTPUT: Human-readable result message -->
+    <property name="exportMessage"
+              display-name-key="FileExport_ExportMessage_Display_Key"
+              description-key="FileExport_ExportMessage_Desc"
+              of-type="SingleLine.Text" usage="output" />
+              
+    <resources>
+      <code path="index.ts" order="1"/>
+      <platform-library name="React" version="16.14.0" />
+      <platform-library name="Fluent" version="9.46.2" />
+      <resx path="strings/FileExport.1033.resx" version="1.0.0" />
+    </resources>
+  </control>
+</manifest>
