@@ -2,13 +2,11 @@
 using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using static POWERCAT.Plugins.ConversationKpi.ConversationKpiMain;
 using System.IdentityModel.Metadata;
-using System.Collections;
 
 namespace POWERCAT.Plugins.ConversationKpi
 {
@@ -79,7 +77,6 @@ namespace POWERCAT.Plugins.ConversationKpi
 
                 //Dictionary to update agent status
                 Dictionary<Guid, Guid> idDictionary = new Dictionary<Guid, Guid>();
-                Dictionary<string, string> userDisplayNameDictionary = BuildUserDisplayNameDictionary(context);
                 
                 // Track duplicate agent transcript IDs to update them as completed
                 List<Guid> duplicateAgentTranscriptIds = new List<Guid>();
@@ -161,12 +158,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 return model;
                             }).ToList();
 
-                            ConversationInfoDetail conversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel);
-                            if (conversationInfoDetails != null)
-                            {
-                                conversationInfoDetails.UserDisplayName = ResolveUserDisplayName(conversationInfoDetails, userDisplayNameDictionary);
-                            }
-
                             ProcessDetails processDetails = new ProcessDetails
                             {
                                 AgentConfigurationId = agentConfigurationId,
@@ -178,7 +169,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
-                                ConversationInfoDetails = conversationInfoDetails,
+                                ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
                                 TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
                                 UnrecognizedUtterances = processUnrecognizedUtterances.ProcessForUnrecognizedUtterances(indexedModels, conversationId, agentId),
                                 AmbiguousUtterances = processAmbiguousUtterances.ProcessForAmbiguousUtterances(indexedModels, conversationId, agentId),
@@ -343,7 +334,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_turns"] = processDetails.GlobalSessionDetail?.TotalTurnCount;
                     ConversationKpi["cat_userid"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserId);
                     ConversationKpi["cat_aadobjectid"] = Convert.ToString(processDetails.ConversationInfoDetails?.AadObjectId);
-                    ConversationKpi["cat_username"] = Convert.ToString(processDetails.ConversationInfoDetails?.UserDisplayName);
                     ConversationKpi["cat_sessionsdetails"] = JsonConvert.SerializeObject(processDetails.SessionDetails);
                     ConversationKpi["cat_ambiguousutterances"] = JsonConvert.SerializeObject(processDetails.AmbiguousUtterances);
                     ConversationKpi["cat_unrecognizedutterances"] = JsonConvert.SerializeObject(processDetails.UnrecognizedUtterances);
@@ -361,138 +351,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                 throw ex;
             }
             return entityCollection;
-        }
-
-        private Dictionary<string, string> BuildUserDisplayNameDictionary(IPluginExecutionContext context)
-        {
-            Dictionary<string, string> userDisplayNameDictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            if (context == null || context.InputParameters == null || context.InputParameters.Count == 0)
-            {
-                return userDisplayNameDictionary;
-            }
-
-            if (!context.InputParameters.Contains("cat_UserDisplayNames"))
-            {
-                return userDisplayNameDictionary;
-            }
-
-            object displayNameInput = context.InputParameters["cat_UserDisplayNames"];
-
-            foreach (string row in GetDisplayNameRows(displayNameInput))
-            {
-                if (string.IsNullOrWhiteSpace(row))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    JArray displayNameEntries = JsonConvert.DeserializeObject<JArray>(row);
-                    if (displayNameEntries == null)
-                    {
-                        continue;
-                    }
-
-                    foreach (JToken entry in displayNameEntries)
-                    {
-                        JObject displayNameObject = entry as JObject;
-                        if (displayNameObject == null)
-                        {
-                            continue;
-                        }
-
-                        string id = GetPropertyValue(displayNameObject, "id");
-                        string displayName = GetPropertyValue(displayNameObject, "DisplayName");
-
-                        if (!string.IsNullOrWhiteSpace(id) && !string.IsNullOrWhiteSpace(displayName))
-                        {
-                            userDisplayNameDictionary[id] = displayName;
-                        }
-                    }
-                }
-                catch (JsonException ex)
-                {
-                    _tracingService.Trace($"Failed to parse display name input row. Details: {ex.Message}");
-                }
-            }
-
-            return userDisplayNameDictionary;
-        }
-
-        private IEnumerable<string> GetDisplayNameRows(object displayNameInput)
-        {
-            string displayNameInputString = displayNameInput as string;
-            if (!string.IsNullOrWhiteSpace(displayNameInputString))
-            {
-                try
-                {
-                    List<string> displayNameRows = JsonConvert.DeserializeObject<List<string>>(displayNameInputString);
-                    if (displayNameRows != null)
-                    {
-                        return displayNameRows;
-                    }
-                }
-                catch (JsonException)
-                {
-                }
-
-                return new List<string> { displayNameInputString };
-            }
-
-            string[] displayNameArray = displayNameInput as string[];
-            if (displayNameArray != null)
-            {
-                return displayNameArray;
-            }
-
-            IEnumerable displayNameEnumerable = displayNameInput as IEnumerable;
-            if (displayNameEnumerable == null)
-            {
-                return Enumerable.Empty<string>();
-            }
-
-            List<string> displayNameList = new List<string>();
-            foreach (object item in displayNameEnumerable)
-            {
-                if (item != null)
-                {
-                    displayNameList.Add(item.ToString());
-                }
-            }
-
-            return displayNameList;
-        }
-
-        private string GetPropertyValue(JObject jsonObject, string propertyName)
-        {
-            JProperty property = jsonObject.Properties()
-                .FirstOrDefault(p => string.Equals(p.Name.Trim(), propertyName, StringComparison.OrdinalIgnoreCase));
-
-            return property?.Value?.ToString()?.Trim();
-        }
-
-        private string ResolveUserDisplayName(ConversationInfoDetail conversationInfoDetails, Dictionary<string, string> userDisplayNameDictionary)
-        {
-            if (conversationInfoDetails == null || userDisplayNameDictionary == null || userDisplayNameDictionary.Count == 0)
-            {
-                return null;
-            }
-
-            string userDisplayName;
-            if (!string.IsNullOrWhiteSpace(conversationInfoDetails.UserId) &&
-                userDisplayNameDictionary.TryGetValue(conversationInfoDetails.UserId, out userDisplayName))
-            {
-                return userDisplayName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(conversationInfoDetails.AadObjectId) &&
-                userDisplayNameDictionary.TryGetValue(conversationInfoDetails.AadObjectId, out userDisplayName))
-            {
-                return userDisplayName;
-            }
-
-            return null;
         }
 
         /// <summary>
