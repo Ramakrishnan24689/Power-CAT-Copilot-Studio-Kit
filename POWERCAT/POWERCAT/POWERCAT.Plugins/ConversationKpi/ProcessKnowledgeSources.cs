@@ -59,12 +59,13 @@ namespace POWERCAT.Plugins.ConversationKpi
         private static List<SearchQueryContext> BuildSearchQueryContexts(List<Activity> model)
         {
             return model
-                .Where(activity => IsActivityMatch(activity, "DynamicPlanStepBindUpdate"))
+                .Where(activity => IsActivityMatch(activity, "DynamicPlanStepBindUpdate")
+                    && string.Equals(GetPropertyValue(activity.valueToken, "taskDialogId"), "P:UniversalSearchTool", StringComparison.OrdinalIgnoreCase))
                 .Select(activity => new SearchQueryContext
                 {
                     Index = activity.index,
-                    SearchQuery = GetSearchQuery(activity),
-                    StepKeys = GetActivityStepKeys(activity)
+                    ReplyToId = activity.replyToId,
+                    SearchQuery = GetSearchQuery(activity)
                 })
                 .Where(context => !string.IsNullOrWhiteSpace(context.SearchQuery))
                 .OrderBy(context => context.Index)
@@ -110,11 +111,10 @@ namespace POWERCAT.Plugins.ConversationKpi
 
         private static string ResolveUserQuery(List<SearchQueryContext> searchQueryContexts, Activity activity)
         {
-            var activityStepKeys = GetActivityStepKeys(activity);
-
             var queryContext = searchQueryContexts
                 .Where(context => context.Index <= activity.index)
-                .LastOrDefault(context => activityStepKeys.Count > 0 && context.StepKeys.Overlaps(activityStepKeys));
+                .LastOrDefault(context => !string.IsNullOrWhiteSpace(context.ReplyToId)
+                    && string.Equals(context.ReplyToId, activity.replyToId, StringComparison.OrdinalIgnoreCase));
 
             if (queryContext != null)
             {
@@ -129,43 +129,21 @@ namespace POWERCAT.Plugins.ConversationKpi
 
         private static string GetSearchQuery(Activity activity)
         {
-            return GetPropertyValue(activity.valueToken, "search_query")
+            var argumentsToken = GetPropertyToken(activity.valueToken, "arguments");
+
+            return GetPropertyValue(argumentsToken, "search_query")
+                ?? GetPropertyValue(argumentsToken, "searchQuery")
+                ?? GetPropertyValue(argumentsToken, "userQuery")
+                ?? GetPropertyValue(argumentsToken, "query")
+                ?? GetPropertyValue(activity.valueToken, "search_query")
                 ?? GetPropertyValue(activity.valueToken, "searchQuery")
                 ?? GetPropertyValue(activity.valueToken, "userQuery")
                 ?? GetPropertyValue(activity.valueToken, "query");
         }
 
-        private static HashSet<string> GetActivityStepKeys(Activity activity)
-        {
-            var stepKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            AddStepKey(stepKeys, activity.id);
-            AddStepKey(stepKeys, activity.replyToId);
-            AddStepKey(stepKeys, activity.value?.id);
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "id"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "stepId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "planStepId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "dynamicPlanStepId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "toolCallId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "activityId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "parentActivityId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "relatedActivityId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "step.id"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "step.stepId"));
-            AddStepKey(stepKeys, GetPropertyValue(activity.valueToken, "step.activityId"));
-            return stepKeys;
-        }
-
-        private static void AddStepKey(HashSet<string> stepKeys, string candidate)
-        {
-            if (!string.IsNullOrWhiteSpace(candidate))
-            {
-                stepKeys.Add(candidate);
-            }
-        }
-
         private static IEnumerable<string> GetKnowledgeSourceIds(JToken token, string propertyName)
         {
-            var propertyValue = FindPropertyValue(token, propertyName);
+            var propertyValue = GetPropertyToken(token, propertyName);
             if (propertyValue == null)
             {
                 return Enumerable.Empty<string>();
@@ -273,65 +251,24 @@ namespace POWERCAT.Plugins.ConversationKpi
 
         private static string GetPropertyValue(JToken token, string propertyPath)
         {
-            var propertyValue = FindPropertyValue(token, propertyPath);
+            var propertyValue = GetPropertyToken(token, propertyPath);
             return propertyValue == null || propertyValue.Type == JTokenType.Null
                 ? null
                 : propertyValue.ToString();
         }
 
-        private static JToken FindPropertyValue(JToken token, string propertyPath)
+        private static JToken GetPropertyToken(JToken token, string propertyName)
         {
-            if (token == null || string.IsNullOrWhiteSpace(propertyPath))
+            if (token == null || token.Type != JTokenType.Object || string.IsNullOrWhiteSpace(propertyName))
             {
                 return null;
             }
 
-            var pathSegments = propertyPath.Split('.');
-            return FindPropertyValue(token, pathSegments, 0);
-        }
-
-        private static JToken FindPropertyValue(JToken token, string[] pathSegments, int depth)
-        {
-            if (token == null)
+            foreach (var property in token.Children<JProperty>())
             {
-                return null;
-            }
-
-            if (depth >= pathSegments.Length)
-            {
-                return token;
-            }
-
-            if (token.Type == JTokenType.Object)
-            {
-                var currentSegment = pathSegments[depth];
-                foreach (var property in token.Children<JProperty>())
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(property.Name, currentSegment, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var matchedValue = FindPropertyValue(property.Value, pathSegments, depth + 1);
-                        if (matchedValue != null)
-                        {
-                            return matchedValue;
-                        }
-                    }
-
-                    var nestedValue = FindPropertyValue(property.Value, pathSegments, depth);
-                    if (nestedValue != null)
-                    {
-                        return nestedValue;
-                    }
-                }
-            }
-            else if (token.Type == JTokenType.Array)
-            {
-                foreach (var child in token.Children())
-                {
-                    var nestedValue = FindPropertyValue(child, pathSegments, depth);
-                    if (nestedValue != null)
-                    {
-                        return nestedValue;
-                    }
+                    return property.Value;
                 }
             }
 
@@ -341,8 +278,8 @@ namespace POWERCAT.Plugins.ConversationKpi
         private class SearchQueryContext
         {
             public int Index { get; set; }
+            public string ReplyToId { get; set; }
             public string SearchQuery { get; set; }
-            public HashSet<string> StepKeys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
     }
 }

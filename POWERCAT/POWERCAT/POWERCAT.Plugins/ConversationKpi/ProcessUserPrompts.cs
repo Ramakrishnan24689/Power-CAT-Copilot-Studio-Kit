@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -91,86 +90,33 @@ namespace POWERCAT.Plugins.ConversationKpi
                 return null;
             }
 
-            if (HasAgentIdentity(from))
+            if (from.IsBot)
             {
                 return "agent";
             }
 
-            if (HasUserIdentity(from))
+            if (from.IsUser)
             {
                 return "user";
             }
 
-            int? roleValue = GetRoleValue(from);
-            if (roleValue == 0)
+            if (HasIdentityValue(from.id, "bot", "agent") || HasIdentityValue(from.name, "bot", "agent"))
             {
                 return "agent";
             }
 
-            if (roleValue == 1)
+            if (HasIdentityValue(from.id, "user") || HasIdentityValue(from.name, "user"))
             {
-                if (!string.IsNullOrWhiteSpace(from.aadObjectId) ||
-                    string.Equals(activity.name, "startConnectedAgent", StringComparison.OrdinalIgnoreCase))
-                {
-                    return "user";
-                }
-
-                if (!string.IsNullOrWhiteSpace(activity.replyToId))
-                {
-                    return "agent";
-                }
-
                 return "user";
             }
 
             return null;
         }
 
-        private static bool HasAgentIdentity(From from)
-        {
-            return HasIdentityValue(from?.id, "bot", "agent") ||
-                HasIdentityValue(from?.name, "bot", "agent") ||
-                HasRoleName(from, "bot", "agent");
-        }
-
-        private static bool HasUserIdentity(From from)
-        {
-            return HasIdentityValue(from?.id, "user") ||
-                HasIdentityValue(from?.name, "user") ||
-                HasRoleName(from, "user");
-        }
-
         private static bool HasIdentityValue(string value, params string[] candidates)
         {
             return !string.IsNullOrWhiteSpace(value) &&
                 candidates.Any(candidate => string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static bool HasRoleName(From from, params string[] candidates)
-        {
-            string roleName = from?.roleToken?.Type == JTokenType.String
-                ? from.roleToken.ToString()
-                : null;
-
-            return HasIdentityValue(roleName, candidates);
-        }
-
-        private static int? GetRoleValue(From from)
-        {
-            if (from?.roleToken == null)
-            {
-                return null;
-            }
-
-            if (from.roleToken.Type == JTokenType.Integer)
-            {
-                return from.roleToken.Value<int>();
-            }
-
-            int parsedRole;
-            return int.TryParse(from.roleToken.ToString(), out parsedRole)
-                ? parsedRole
-                : (int?)null;
         }
 
         private static string GetMessageContent(Activity activity)
