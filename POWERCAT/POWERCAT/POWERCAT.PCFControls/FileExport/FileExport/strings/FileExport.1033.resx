@@ -106,4 +106,20 @@
     <value>Returns a human-readable message describing the export result.</value>
     <comment>Description of the export message output property.</comment>
   </data>
+  <data name="FileExport_ButtonAppearance_Display_Key" xml:space="preserve">
+    <value>Button Appearance</value>
+    <comment>Name of the property that specifies the button style.</comment>
+  </data>
+  <data name="FileExport_ButtonAppearance_Desc" xml:space="preserve">
+    <value>Button style: primary, secondary, subtle, transparent, or outline.</value>
+    <comment>Description of the button appearance property.</comment>
+  </data>
+  <data name="FileExport_FontSize_Display_Key" xml:space="preserve">
+    <value>Font Size</value>
+    <comment>Name of the property that specifies the button font size.</comment>
+  </data>
+  <data name="FileExport_FontSize_Desc" xml:space="preserve">
+    <value>Font size in pixels for the button text.</value>
+    <comment>Description of the font size property.</comment>
+  </data>
 </root>

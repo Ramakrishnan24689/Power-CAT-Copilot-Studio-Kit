@@ -6,10 +6,17 @@ export interface FileExportControlProps {
   content: string;
   fileName: string;
   buttonLabel: string;
+  buttonAppearance: string;
+  fontSize?: number;
   onExportResult: (status: "success" | "error", message: string) => void;
 }
 
-export const FileExportControl: React.FC<FileExportControlProps> = ({ content, fileName, buttonLabel, onExportResult }) => {
+const validAppearances = ["primary", "secondary", "subtle", "transparent", "outline"] as const;
+type ButtonAppearance = typeof validAppearances[number];
+
+export const FileExportControl: React.FC<FileExportControlProps> = ({
+  content, fileName, buttonLabel, buttonAppearance, fontSize, onExportResult,
+}) => {
   const handleExport = React.useCallback(() => {
     if (!content) {
       onExportResult("error", "No data available to export.");
@@ -32,8 +39,22 @@ export const FileExportControl: React.FC<FileExportControlProps> = ({ content, f
       onExportResult("error", "Export failed. Please try again.");
     }
   }, [content, fileName, onExportResult]);
+
+  const IconComponent = ArrowDownloadRegular;
+  const appearance: ButtonAppearance = validAppearances.includes(buttonAppearance as ButtonAppearance)
+    ? (buttonAppearance as ButtonAppearance)
+    : "primary";
+  const style: React.CSSProperties | undefined = fontSize && fontSize > 0
+    ? { fontSize: `${fontSize}px` }
+    : undefined;
+
   return (
-    <Button appearance="primary" icon={<ArrowDownloadRegular />} onClick={handleExport}>
+    <Button
+      appearance={appearance}
+      icon={<IconComponent />}
+      onClick={handleExport}
+      style={style}
+    >
       {buttonLabel || "Export"}
     </Button>
   );

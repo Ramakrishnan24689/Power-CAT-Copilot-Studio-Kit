@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PowerCAT" constructor="FileExport" version="0.0.2" display-name-key="FileExport_Display_Key" description-key="FileExport_Desc" control-type="virtual" >
+  <control namespace="PowerCAT" constructor="FileExport" version="0.0.3" display-name-key="FileExport_Display_Key" description-key="FileExport_Desc" control-type="virtual" >
     <external-service-usage enabled="false">
     </external-service-usage>
     
@@ -23,6 +23,19 @@
               description-key="FileExport_ButtonLabel_Desc"
               default-value="Export"
               of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!-- INPUT: Button appearance style (primary, secondary, subtle, transparent, outline) -->
+    <property name="buttonAppearance"
+              display-name-key="FileExport_ButtonAppearance_Display_Key"
+              description-key="FileExport_ButtonAppearance_Desc"
+              default-value="primary"
+              of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!-- INPUT: Font size in pixels for the button text -->
+    <property name="fontSize"
+              display-name-key="FileExport_FontSize_Display_Key"
+              description-key="FileExport_FontSize_Desc"
+              of-type="Whole.None" usage="input" required="false" />
 
     <!-- OUTPUT: "success" or "error" after export -->
     <property name="exportStatus"
