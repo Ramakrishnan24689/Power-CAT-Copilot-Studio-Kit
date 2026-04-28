@@ -134,6 +134,16 @@ namespace POWERCAT.Plugins.AgentInventory
         }
 
         /// <summary>
+        /// Agent details that represents the agent record in the agent details table
+        /// </summary>
+        public class AgentDetailsRecord
+        {
+            public string Id { get; set; }
+            public string EnvId { get; set; }
+            public string AgentDetailsId { get; set; }
+        }
+
+        /// <summary>
         /// Represents Agent Usage Data Input for creation
         /// </summary>
         public class AgentUsageInput
@@ -141,6 +151,7 @@ namespace POWERCAT.Plugins.AgentInventory
             public DateTime ToDate { get; set; }
             public DateTime FromDate { get; set; }
             public List<UsageRecord> Usages { get; set; }
+            public List<AgentDetailsRecord> Agents { get; set; }
         }
     }
 }

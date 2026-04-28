@@ -33,11 +33,15 @@ export class FileExport implements ComponentFramework.ReactControl<IInputs, IOut
         const content = context.parameters.content?.raw ?? "";
         const fileName = context.parameters.fileName?.raw ?? "export";
         const buttonLabel = context.parameters.buttonLabel?.raw ?? "Export";
+        const buttonAppearance = context.parameters.buttonAppearance?.raw ?? "primary";
+        const fontSize = context.parameters.fontSize?.raw ?? undefined;
 
         return React.createElement(FileExportControl, {
             content,
             fileName,
             buttonLabel,
+            buttonAppearance,
+            fontSize,
             onExportResult: this._onExportResult,
         });
     }

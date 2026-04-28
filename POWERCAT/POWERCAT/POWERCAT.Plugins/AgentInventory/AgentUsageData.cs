@@ -63,8 +63,9 @@ namespace POWERCAT.Plugins.AgentInventory
                 DateTime fromDate = usageData.FromDate;
                 DateTime toDate = usageData.ToDate;
                 List<UsageRecord> usages = usageData.Usages;
+                List<AgentDetailsRecord> agents = usageData.Agents;
 
-                var requests = GenerateUsageEntity(usages, fromDate, toDate);
+                var requests = GenerateUsageEntity(usages, fromDate, toDate, agents);
 
                 // Execute in batch
                 if (requests.Entities.Any())
@@ -108,7 +109,7 @@ namespace POWERCAT.Plugins.AgentInventory
         /// </summary>
         /// <param name="usageData">Usage data.</param>
         /// <returns>Entity collection usage records.</returns>
-        public EntityCollection GenerateUsageEntity(List<UsageRecord> usageData, DateTime fromDate, DateTime toDate)
+        public EntityCollection GenerateUsageEntity(List<UsageRecord> usageData, DateTime fromDate, DateTime toDate, List<AgentDetailsRecord> agents)
         {
             try
             {
@@ -125,6 +126,25 @@ namespace POWERCAT.Plugins.AgentInventory
                     entity["cat_environmentid"] = usage.EnvId;
                     entity["cat_usagedate"] = usage.AsOfDate;
                     entity["cat_featurename"] = usage.Feature;
+
+                    // Determine parent agent details lookup by matching EnvId and AgentId
+                    Guid agentDetailsId = Guid.Empty;
+                    if (agents != null && agents.Any())
+                    {
+                        var matched = agents.FirstOrDefault(a =>
+                            string.Equals(a.EnvId, usage.EnvId, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(a.Id, usage.AgentId, StringComparison.OrdinalIgnoreCase));
+
+                        if (matched != null && !string.IsNullOrWhiteSpace(matched.AgentDetailsId))
+                        {
+                            Guid.TryParse(matched.AgentDetailsId, out agentDetailsId);
+                        }
+                    }
+                    // Set lookup to parent agent details if exists
+                    if (agentDetailsId != Guid.Empty)
+                    {
+                        entity["cat_agent"] = new EntityReference(_tableName, agentDetailsId);
+                    }
 
                     // Set the usage data in the new schema columns
                     entity["cat_billedcopilotcredits"] = usage.Billed;
