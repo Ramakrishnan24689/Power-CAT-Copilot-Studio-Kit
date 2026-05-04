@@ -1,0 +1,109 @@
+# ============================================================================
+# Pipeline: CopilotStudioKit-Deploy-Evergreen-Kit
+# Description: Deploys the managed solution from the latest Export pipeline run
+#              to multiple target environments in parallel.
+#
+# Usage: Just click "Run pipeline" — no parameters needed.
+#
+# Scaling Environments:
+#   - To ADD an environment: Add a new entry to the 'environments' parameter below
+#   - To REMOVE an environment: Delete the entry from the list
+#   - Service Connection Name must match the environment URL exactly
+#     (create service connection in Azure DevOps > Project Settings > Service connections)
+# ============================================================================
+
+trigger: none  # Manual trigger only
+
+# ============================================================================
+# TARGET ENVIRONMENTS
+# Each entry needs a matching service connection in Azure DevOps with the
+# same name as the URL. To add/remove environments, edit this list.
+#
+# NOTE: This parameter has defaults pre-filled. The person running the pipeline
+#       just clicks "Run pipeline" → "Run" without changing anything.
+# ============================================================================
+parameters:
+  - name: environments
+    displayName: 'Target Environments'
+    type: object
+    default:
+      - url: 'https://pctools-prod.crm.dynamics.com/'
+      - url: 'https://pctools-test.crm.dynamics.com/'
+
+pool:
+  vmImage: windows-latest
+
+# ============================================================================
+# Pipeline Resource: Reference the Export pipeline (definitionId=2487)
+# Downloads artifacts from the latest successful run automatically.
+# ============================================================================
+resources:
+  pipelines:
+    - pipeline: ExportPipeline
+      source: CopilotStudioKit-Master-No-Unpack
+      trigger: none
+
+stages:
+# ============================================================================
+# STAGE: Deploy to All Environments (Parallel)
+# ============================================================================
+- stage: Deploy
+  displayName: 'Deploy Managed Solution'
+  jobs:
+  - ${{ each env in parameters.environments }}:
+    - job: Deploy_${{ replace(replace(replace(env.url, 'https://', ''), '.crm.dynamics.com/', ''), '.', '_') }}
+      displayName: 'Deploy to ${{ env.url }}'
+      steps:
+
+      # ======================================================================
+      # Step 1: Download artifacts from Export pipeline
+      # ======================================================================
+      - download: ExportPipeline
+        artifact: drop
+        displayName: 'Download Solution Artifacts'
+
+      # ======================================================================
+      # Step 2: Install Power Platform Build Tools
+      # ======================================================================
+      - task: PowerPlatformToolInstaller@2
+        displayName: 'Install Power Platform Build Tools'
+
+      # ======================================================================
+      # Step 3: Find the managed solution file
+      # ======================================================================
+      - powershell: |
+          $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
+
+          # Find CopilotStudioKit_*_managed.zip
+          $pattern = "CopilotStudioKit_*_managed.zip"
+          $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
+
+          if ($managedFiles.Count -eq 0) {
+              Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $pattern"
+              Write-Host "Available files in download path:"
+              Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $($_.Name)" }
+              exit 1
+          }
+
+          $solutionFile = $managedFiles[0].FullName
+          Write-Host "##[section]Found managed solution: $($managedFiles[0].Name)"
+          Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
+        displayName: 'Find Managed Solution File'
+
+      # ======================================================================
+      # Step 4: Import solution to target environment
+      # ======================================================================
+      - task: PowerPlatformImportSolution@2
+        displayName: 'Import Solution to ${{ env.url }}'
+        inputs:
+          authenticationType: 'PowerPlatformSPN'
+          PowerPlatformSPN: '${{ env.url }}'
+          Environment: '${{ env.url }}'
+          SolutionInputFile: '$(SolutionFilePath)'
+          AsyncOperation: true
+          MaxAsyncWaitTime: 60
+          UseDeploymentSettingsFile: false
+          OverwriteUnmanagedCustomizations: false
+          SkipProductUpdateDependencies: false
+          ConvertToManaged: false
+          HoldingSolution: false
