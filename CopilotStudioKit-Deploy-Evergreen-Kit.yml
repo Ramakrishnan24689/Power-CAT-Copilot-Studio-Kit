@@ -27,8 +27,9 @@ parameters:
     displayName: 'Target Environments'
     type: object
     default:
-      - url: 'https://pctools-prod.crm.dynamics.com/'
-      - url: 'https://pctools-test.crm.dynamics.com/'
+      - url: 'https://org12216681.crm.dynamics.com/'
+      - url: 'https://org51fc4abc.crm.dynamics.com/'
+      - url: 'https://mcs-kit.crm.dynamics.com/'
 
 pool:
   vmImage: windows-latest
