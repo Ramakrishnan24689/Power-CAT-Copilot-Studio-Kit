@@ -51,7 +51,7 @@ stages:
   displayName: 'Deploy Managed Solution'
   jobs:
   - ${{ each env in parameters.environments }}:
-    - job: Deploy_${{ replace(replace(replace(env.url, 'https://', ''), '.crm.dynamics.com/', ''), '.', '_') }}
+    - job: Deploy_${{ replace(replace(replace(replace(env.url, 'https://', ''), '.crm.dynamics.com/', ''), '.', '_'), '-', '_') }}
       displayName: 'Deploy to ${{ env.url }}'
       steps:
 
