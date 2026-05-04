@@ -3,6 +3,8 @@
 # Description: Orchestrates Export, Deploy, and Release workflows
 # ============================================================================
 
+name: $(Date:yyyyMMdd).$(Rev:r)
+
 trigger: none  # Manual trigger only
 
 pool:
@@ -24,6 +26,8 @@ variables:
     value: $(Build.ArtifactStagingDirectory)/solutions
   - name: ComponentCollectionsSolutionOutputFolder
     value: $(Build.ArtifactStagingDirectory)/component-collections
+  - name: SolutionVersion
+    value: $(Build.BuildNumber)
 
 # ==================== Main Solution Export Variables ====================
 # - varSourceEnvironmentURL: Source Power Platform environment URL for main solution
@@ -81,6 +85,18 @@ stages:
       displayName: 'Install Power Platform Build Tools'
     
     # ========================================================================
+    # Set Solution Version - Main Solution
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version ($(varSolutionName)) to $(SolutionVersion)'
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varSourceServiceConnection)'
+        Environment: '$(varSourceEnvironmentURL)'
+        SolutionName: '$(varSolutionName)'
+        SolutionVersionNumber: '$(SolutionVersion)'
+    
+    # ========================================================================
     # Export Unmanaged Solution
     # ========================================================================
     - task: PowerPlatformExportSolution@2
@@ -107,30 +123,43 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename Managed Solution with Date Stamp
+    # Rename Managed Solution with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "$(varOutputSolutionName)"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(SolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(SolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename Managed Solution with Date Stamp ($(varOutputSolutionName))'
+      displayName: 'Rename Managed Solution with Version Stamp ($(varOutputSolutionName))'
     
     # ========================================================================
     # COMPONENT COLLECTIONS EXPORT
     # ========================================================================
+    
+    # ========================================================================
+    # Set Solution Version - CopilotStudioKit_ContentSynth_Component
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version (CopilotStudioKit_ContentSynth_Component) to $(SolutionVersion)'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
+        Environment: '$(varComponentCollectionsSourceEnvironmentURL)'
+        SolutionName: 'CopilotStudioKit_ContentSynth_Component'
+        SolutionVersionNumber: '$(SolutionVersion)'
     
     # ========================================================================
     # Export CopilotStudioKit_ContentSynth_Component - Unmanaged
@@ -161,27 +190,40 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename CopilotStudioKit_ContentSynth_Component Managed with Date Stamp
+    # Rename CopilotStudioKit_ContentSynth_Component Managed with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "CopilotStudioKit_ContentSynth_Component"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(ComponentCollectionsSolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(ComponentCollectionsSolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename CopilotStudioKit_ContentSynth_Component Managed with Date Stamp'
+      displayName: 'Rename CopilotStudioKit_ContentSynth_Component Managed with Version Stamp'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
+    
+    # ========================================================================
+    # Set Solution Version - CopilotStudioKit_Research_Component
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version (CopilotStudioKit_Research_Component) to $(SolutionVersion)'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
+        Environment: '$(varComponentCollectionsSourceEnvironmentURL)'
+        SolutionName: 'CopilotStudioKit_Research_Component'
+        SolutionVersionNumber: '$(SolutionVersion)'
     
     # ========================================================================
     # Export CopilotStudioKit_Research_Component - Unmanaged
@@ -212,27 +254,40 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename CopilotStudioKit_Research_Component Managed with Date Stamp
+    # Rename CopilotStudioKit_Research_Component Managed with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "CopilotStudioKit_Research_Component"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(ComponentCollectionsSolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(ComponentCollectionsSolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename CopilotStudioKit_Research_Component Managed with Date Stamp'
+      displayName: 'Rename CopilotStudioKit_Research_Component Managed with Version Stamp'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
+    
+    # ========================================================================
+    # Set Solution Version - CopilotStudioKit_ExecBrief_Component
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version (CopilotStudioKit_ExecBrief_Component) to $(SolutionVersion)'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
+        Environment: '$(varComponentCollectionsSourceEnvironmentURL)'
+        SolutionName: 'CopilotStudioKit_ExecBrief_Component'
+        SolutionVersionNumber: '$(SolutionVersion)'
     
     # ========================================================================
     # Export CopilotStudioKit_ExecBrief_Component - Unmanaged
@@ -263,27 +318,40 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename CopilotStudioKit_ExecBrief_Component Managed with Date Stamp
+    # Rename CopilotStudioKit_ExecBrief_Component Managed with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "CopilotStudioKit_ExecBrief_Component"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(ComponentCollectionsSolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(ComponentCollectionsSolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename CopilotStudioKit_ExecBrief_Component Managed with Date Stamp'
+      displayName: 'Rename CopilotStudioKit_ExecBrief_Component Managed with Version Stamp'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
+    
+    # ========================================================================
+    # Set Solution Version - CopilotStudioKit_DocumentExtraction_Component
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version (CopilotStudioKit_DocumentExtraction_Component) to $(SolutionVersion)'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
+        Environment: '$(varComponentCollectionsSourceEnvironmentURL)'
+        SolutionName: 'CopilotStudioKit_DocumentExtraction_Component'
+        SolutionVersionNumber: '$(SolutionVersion)'
     
     # ========================================================================
     # Export CopilotStudioKit_DocumentExtraction_Component - Unmanaged
@@ -314,27 +382,40 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename CopilotStudioKit_DocumentExtraction_Component Managed with Date Stamp
+    # Rename CopilotStudioKit_DocumentExtraction_Component Managed with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "CopilotStudioKit_DocumentExtraction_Component"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(ComponentCollectionsSolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(ComponentCollectionsSolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename CopilotStudioKit_DocumentExtraction_Component Managed with Date Stamp'
+      displayName: 'Rename CopilotStudioKit_DocumentExtraction_Component Managed with Version Stamp'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
+    
+    # ========================================================================
+    # Set Solution Version - CopilotStudioKit_ServiceNow_Components
+    # ========================================================================
+    - task: PowerPlatformSetSolutionVersion@2
+      displayName: 'Set Solution Version (CopilotStudioKit_ServiceNow_Components) to $(SolutionVersion)'
+      condition: eq(variables['varRunComponentsSolutions'], 'true')
+      inputs:
+        authenticationType: 'PowerPlatformSPN'
+        PowerPlatformSPN: '$(varComponentCollectionsSourceServiceConnection)'
+        Environment: '$(varComponentCollectionsSourceEnvironmentURL)'
+        SolutionName: 'CopilotStudioKit_ServiceNow_Components'
+        SolutionVersionNumber: '$(SolutionVersion)'
     
     # ========================================================================
     # Export CopilotStudioKit_ServiceNow_Components - Unmanaged
@@ -365,26 +446,26 @@ stages:
         Managed: true
     
     # ========================================================================
-    # Rename CopilotStudioKit_ServiceNow_Components Managed with Date Stamp
+    # Rename CopilotStudioKit_ServiceNow_Components Managed with Version Stamp
     # ========================================================================
     - powershell: |
         $outputSolutionName = "CopilotStudioKit_ServiceNow_Components"
-        $dateStamp = Get-Date -Format "yyyyMMdd"
+        $version = "$(SolutionVersion)"
         
         $originalFile = "$(ComponentCollectionsSolutionOutputFolder)/${outputSolutionName}_managed.zip"
-        $newFileName = "${outputSolutionName}_${dateStamp}_managed.zip"
+        $newFileName = "${outputSolutionName}_${version}_managed.zip"
         $newFile = "$(ComponentCollectionsSolutionOutputFolder)/${newFileName}"
         
         if (Test-Path $originalFile) {
             Rename-Item -Path $originalFile -NewName $newFileName
-            Write-Host "##[section]Renamed managed solution with date stamp:"
+            Write-Host "##[section]Renamed managed solution with version stamp:"
             Write-Host "  From: ${outputSolutionName}_managed.zip"
             Write-Host "  To:   ${newFileName}"
         } else {
             Write-Host "##vso[task.logissue type=error]Managed solution file not found: $originalFile"
             exit 1
         }
-      displayName: 'Rename CopilotStudioKit_ServiceNow_Components Managed with Date Stamp'
+      displayName: 'Rename CopilotStudioKit_ServiceNow_Components Managed with Version Stamp'
       condition: eq(variables['varRunComponentsSolutions'], 'true')
     
     # ========================================================================
