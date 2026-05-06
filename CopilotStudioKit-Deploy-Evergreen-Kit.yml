@@ -27,9 +27,34 @@ parameters:
     displayName: 'Target Environments'
     type: object
     default:
-      - url: 'https://org12216681.crm.dynamics.com/'
-      - url: 'https://org51fc4abc.crm.dynamics.com/'
-      - url: 'https://mcs-kit.crm.dynamics.com/'
+      - url: https://org12216681.crm.dynamics.com/
+      - url: https://org51fc4abc.crm.dynamics.com/
+      - url: https://mcs-kit.crm.dynamics.com/
+
+  - name: shareWithUsers
+    displayName: 'Share Code Apps with Users (comma-separated Azure AD Object IDs)'
+    type: string
+    default: ''
+
+  - name: shareWithSecurityGroups
+    displayName: 'Share Code Apps with Security Groups (comma-separated Azure AD Object IDs)'
+    type: string
+    default: ''
+
+  - name: spnClientId
+    displayName: 'Service Principal Client ID (for app sharing)'
+    type: string
+    default: ''
+
+  - name: spnClientSecret
+    displayName: 'Service Principal Client Secret (for app sharing)'
+    type: string
+    default: ''
+
+  - name: spnTenantId
+    displayName: 'Azure AD Tenant ID (for app sharing)'
+    type: string
+    default: ''
 
 pool:
   vmImage: windows-latest
@@ -108,3 +133,15 @@ stages:
           SkipProductUpdateDependencies: false
           ConvertToManaged: false
           HoldingSolution: false
+
+      # ======================================================================
+      # Step 5: Share Code Apps with Users/Security Groups (post-import)
+      # ======================================================================
+      - template: share-code-apps-template.yml
+        parameters:
+          environmentURL: '${{ env.url }}'
+          clientId: '${{ parameters.spnClientId }}'
+          clientSecret: '${{ parameters.spnClientSecret }}'
+          tenantId: '${{ parameters.spnTenantId }}'
+          shareWithUsers: '${{ parameters.shareWithUsers }}'
+          shareWithSecurityGroups: '${{ parameters.shareWithSecurityGroups }}'
