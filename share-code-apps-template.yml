@@ -44,12 +44,12 @@ parameters:
   - name: shareWithUsers
     type: string
     displayName: 'User Object IDs (comma-separated, optional)'
-    default: ''
+    default: 'NA'
 
   - name: shareWithSecurityGroups
     type: string
     displayName: 'Security Group Object IDs (comma-separated, optional)'
-    default: ''
+    default: 'NA'
 
 steps:
 # ============================================================================
@@ -59,6 +59,10 @@ steps:
     $shareWithUsers = ($env:SHARE_WITH_USERS).Trim()
     $shareWithSecurityGroups = ($env:SHARE_WITH_SECURITY_GROUPS).Trim()
     $envUrl = ($env:ENVIRONMENT_URL).TrimEnd('/')
+
+    # Treat 'NA' sentinel value as empty (used to make Azure DevOps parameters optional in UI)
+    if ($shareWithUsers -eq 'NA') { $shareWithUsers = '' }
+    if ($shareWithSecurityGroups -eq 'NA') { $shareWithSecurityGroups = '' }
 
     # -------------------------------------------------------------------
     # Skip if no sharing targets are specified
@@ -96,6 +100,11 @@ steps:
     $clientId = $env:SPN_CLIENT_ID
     $clientSecret = $env:SPN_CLIENT_SECRET
     $tenantId = $env:SPN_TENANT_ID
+
+    # Treat 'NA' sentinel value as empty
+    if ($clientId -eq 'NA') { $clientId = '' }
+    if ($clientSecret -eq 'NA') { $clientSecret = '' }
+    if ($tenantId -eq 'NA') { $tenantId = '' }
 
     if ([string]::IsNullOrWhiteSpace($clientId) -or
         [string]::IsNullOrWhiteSpace($clientSecret) -or
