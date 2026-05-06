@@ -124,70 +124,59 @@ steps:
     Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
-    # Step 3: Resolve Environment ID from URL
-    # -------------------------------------------------------------------
-    Write-Host "##[group]Resolving Environment"
-
-    $environments = Get-AdminPowerAppEnvironment
-    $matchedEnvs = @($environments | Where-Object {
-        $instanceUrl = ($_.Internal.properties.linkedEnvironmentMetadata.instanceUrl -replace '/$', '')
-        $instanceApiUrl = ($_.Internal.properties.linkedEnvironmentMetadata.instanceApiUrl -replace '/$', '')
-        ($instanceUrl -ieq $envUrl) -or ($instanceApiUrl -ieq $envUrl)
-    })
-
-    if ($matchedEnvs.Count -eq 0) {
-        # Fallback: match by org name extracted from URL
-        $orgName = ($envUrl -replace 'https://', '') -replace '\.crm.*\.dynamics\.com', ''
-        $matchedEnvs = @($environments | Where-Object {
-            $instanceUrl = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl
-            $instanceUrl -like "*$orgName*"
-        })
-    }
-
-    if ($matchedEnvs.Count -eq 0) {
-        Write-Host "##vso[task.logissue type=error]Could not resolve environment for URL: $envUrl"
-        Write-Host "Available environments:"
-        $environments | ForEach-Object {
-            $url = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl
-            Write-Host "  $($_.DisplayName) | $url | ID: $($_.EnvironmentName)"
-        }
-        exit 1
-    }
-
-    if ($matchedEnvs.Count -gt 1) {
-        Write-Host "##vso[task.logissue type=error]Multiple environments matched URL: $envUrl"
-        $matchedEnvs | ForEach-Object { Write-Host "  $($_.DisplayName) - $($_.EnvironmentName)" }
-        exit 1
-    }
-
-    $targetEnv = $matchedEnvs[0]
-    $environmentId = $targetEnv.EnvironmentName
-    Write-Host "Resolved environment: $($targetEnv.DisplayName) (ID: $environmentId)"
-    Write-Host "##[endgroup]"
-
-    # -------------------------------------------------------------------
-    # Step 4: Find Code Apps
+    # Step 3: Find Code Apps and resolve Environment
     # -------------------------------------------------------------------
     Write-Host "##[group]Discovering Code Apps"
 
-    $allApps = Get-AdminPowerApp -EnvironmentName $environmentId
+    # Get all apps visible to this SPN (avoids needing Get-AdminPowerAppEnvironment
+    # which requires tenant-level Power Platform Admin role)
+    $allApps = Get-AdminPowerApp
 
-    # Target the two known Code Apps by display name
+    # Filter by display name for the known Code Apps
     $codeApps = @($allApps | Where-Object {
-        $_.DisplayName -eq "Copilot Studio Kit for Admins" -or
-        $_.DisplayName -eq "Copilot Studio Kit for Makers"
+        ($_.DisplayName -eq "Copilot Studio Kit for Admins" -or
+         $_.DisplayName -eq "Copilot Studio Kit for Makers") -and
+        $_.Internal.properties.environment.name
     })
 
-    if ($codeApps.Count -eq 0) {
-        Write-Host "##vso[task.logissue type=error]Code Apps not found in environment."
-        Write-Host "Available apps:"
+    # Further filter to only apps in the target environment (match by URL)
+    $targetApps = @($codeApps | Where-Object {
+        $appEnvUrl = $_.Internal.properties.environment.id
+        $linkedUrl = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl -replace '/$', ''
+        ($linkedUrl -ieq $envUrl) -or ($appEnvUrl -like "*$envUrl*")
+    })
+
+    # If URL-based filter yields nothing, try matching by org name from URL
+    if ($targetApps.Count -eq 0) {
+        $orgName = ($envUrl -replace 'https://', '') -replace '\.crm.*\.dynamics\.com', ''
+        $targetApps = @($codeApps | Where-Object {
+            $_.Internal.properties.environment.name -like "*$orgName*" -or
+            $_.Internal.name -like "*$orgName*"
+        })
+    }
+
+    # If still nothing, use all matching Code Apps (likely single-environment SPN)
+    if ($targetApps.Count -eq 0 -and $codeApps.Count -gt 0) {
+        Write-Host "##vso[task.logissue type=warning]Could not filter by environment URL. Using all matching Code Apps found."
+        $targetApps = $codeApps
+    }
+
+    if ($targetApps.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]Code Apps not found."
+        Write-Host "All apps visible to this SPN:"
         $allApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (ID: $($_.AppName))" }
         exit 1
     }
 
-    Write-Host "Found $($codeApps.Count) Code App(s):"
-    $codeApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
+    # Get the environment ID from the first matched app
+    $environmentId = $targetApps[0].EnvironmentName
+    Write-Host "Environment ID (from app): $environmentId"
+    Write-Host "Found $($targetApps.Count) Code App(s):"
+    $targetApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
     Write-Host "##[endgroup]"
+
+    # Use $targetApps as $codeApps for sharing
+    $codeApps = $targetApps
 
     # -------------------------------------------------------------------
     # Step 5: Share Code Apps with Users
