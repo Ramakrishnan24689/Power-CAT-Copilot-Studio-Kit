@@ -1,0 +1,293 @@
+# ============================================================================
+# Template: Share Code Apps
+# Description: Reusable step template that shares Code Apps in a Power Platform
+#              environment with specified users and/or security groups.
+#              Call this template AFTER importing a solution that contains Code Apps.
+#
+# Usage:
+#   - template: share-code-apps-template.yml
+#     parameters:
+#       environmentURL: 'https://org.crm.dynamics.com/'
+#       clientId: '$(SpnClientId)'
+#       clientSecret: '$(SpnClientSecret)'
+#       tenantId: '$(SpnTenantId)'
+#       shareWithUsers: 'objectId1,objectId2'           # Optional
+#       shareWithSecurityGroups: 'groupObjectId1'       # Optional
+#
+# Prerequisites:
+#   - Service Principal must have System Administrator role in target environment
+#   - SPN credentials stored in pipeline variable group or Azure Key Vault
+#   - Users/Groups must be specified as Azure AD Object IDs (GUIDs)
+#
+# Microsoft Docs References:
+#   - Set-AdminPowerAppRoleAssignment: https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/set-adminpowerapproleassignment
+#   - Share a canvas app: https://learn.microsoft.com/power-apps/maker/canvas-apps/share-app
+# ============================================================================
+
+parameters:
+  - name: environmentURL
+    type: string
+    displayName: 'Target Environment URL'
+
+  - name: clientId
+    type: string
+    displayName: 'Service Principal Client/Application ID'
+
+  - name: clientSecret
+    type: string
+    displayName: 'Service Principal Client Secret'
+
+  - name: tenantId
+    type: string
+    displayName: 'Azure AD Tenant ID'
+
+  - name: shareWithUsers
+    type: string
+    displayName: 'User Object IDs (comma-separated, optional)'
+    default: ''
+
+  - name: shareWithSecurityGroups
+    type: string
+    displayName: 'Security Group Object IDs (comma-separated, optional)'
+    default: ''
+
+steps:
+# ============================================================================
+# Share Code Apps with specified users and security groups
+# ============================================================================
+- powershell: |
+    $shareWithUsers = ($env:SHARE_WITH_USERS).Trim()
+    $shareWithSecurityGroups = ($env:SHARE_WITH_SECURITY_GROUPS).Trim()
+    $envUrl = ($env:ENVIRONMENT_URL).TrimEnd('/')
+
+    # -------------------------------------------------------------------
+    # Skip if no sharing targets are specified
+    # -------------------------------------------------------------------
+    if ([string]::IsNullOrWhiteSpace($shareWithUsers) -and [string]::IsNullOrWhiteSpace($shareWithSecurityGroups)) {
+        Write-Host "##[section]No sharing targets specified. Skipping Code App sharing step."
+        Write-Host "To share Code Apps, provide 'shareWithUsers' and/or 'shareWithSecurityGroups' parameter values."
+        exit 0
+    }
+
+    Write-Host "##[section]Starting Code App Sharing Process"
+    Write-Host "Environment URL: $envUrl"
+
+    # -------------------------------------------------------------------
+    # Helper: Validate GUID format
+    # -------------------------------------------------------------------
+    function Test-IsGuid {
+        param([string]$Value)
+        $guid = [guid]::Empty
+        return [guid]::TryParse($Value, [ref]$guid)
+    }
+
+    # -------------------------------------------------------------------
+    # Step 1: Install Power Apps Administration PowerShell module
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Installing PowerApps Admin Module"
+    Install-Module -Name Microsoft.PowerApps.Administration.PowerShell -Force -AllowClobber -Scope CurrentUser
+    Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 2: Authenticate using Service Principal credentials
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Authenticating with Service Principal"
+
+    $clientId = $env:SPN_CLIENT_ID
+    $clientSecret = $env:SPN_CLIENT_SECRET
+    $tenantId = $env:SPN_TENANT_ID
+
+    if ([string]::IsNullOrWhiteSpace($clientId) -or
+        [string]::IsNullOrWhiteSpace($clientSecret) -or
+        [string]::IsNullOrWhiteSpace($tenantId)) {
+        Write-Host "##vso[task.logissue type=error]Missing SPN credentials. Ensure clientId, clientSecret, and tenantId parameters are provided (from variable group or Key Vault)."
+        exit 1
+    }
+
+    Add-PowerAppsAccount -ApplicationId $clientId -ClientSecret $clientSecret -TenantId $tenantId
+
+    Write-Host "Successfully authenticated as Service Principal (ClientId: $clientId)"
+    Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 3: Resolve Environment ID from URL
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Resolving Environment"
+
+    $environments = Get-AdminPowerAppEnvironment
+    $matchedEnvs = @($environments | Where-Object {
+        $instanceUrl = ($_.Internal.properties.linkedEnvironmentMetadata.instanceUrl -replace '/$', '')
+        $instanceApiUrl = ($_.Internal.properties.linkedEnvironmentMetadata.instanceApiUrl -replace '/$', '')
+        ($instanceUrl -ieq $envUrl) -or ($instanceApiUrl -ieq $envUrl)
+    })
+
+    if ($matchedEnvs.Count -eq 0) {
+        # Fallback: match by org name extracted from URL
+        $orgName = ($envUrl -replace 'https://', '') -replace '\.crm.*\.dynamics\.com', ''
+        $matchedEnvs = @($environments | Where-Object {
+            $instanceUrl = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl
+            $instanceUrl -like "*$orgName*"
+        })
+    }
+
+    if ($matchedEnvs.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]Could not resolve environment for URL: $envUrl"
+        Write-Host "Available environments:"
+        $environments | ForEach-Object {
+            $url = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl
+            Write-Host "  $($_.DisplayName) | $url | ID: $($_.EnvironmentName)"
+        }
+        exit 1
+    }
+
+    if ($matchedEnvs.Count -gt 1) {
+        Write-Host "##vso[task.logissue type=error]Multiple environments matched URL: $envUrl"
+        $matchedEnvs | ForEach-Object { Write-Host "  $($_.DisplayName) - $($_.EnvironmentName)" }
+        exit 1
+    }
+
+    $targetEnv = $matchedEnvs[0]
+    $environmentId = $targetEnv.EnvironmentName
+    Write-Host "Resolved environment: $($targetEnv.DisplayName) (ID: $environmentId)"
+    Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 4: Find Code Apps by Type
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Discovering Code Apps"
+
+    $allApps = Get-AdminPowerApp -EnvironmentName $environmentId
+
+    # Code Apps are identified by their internal appType property.
+    # Known type values: "CanvasClassic" (Canvas App), "AppComponentCustomPage" or
+    # "CodeApp" (Code App). We check multiple known property paths.
+    $codeApps = @($allApps | Where-Object {
+        $props = $_.Internal.properties
+        $props.appType -eq "CodeApp" -or
+        $props.appType -eq "AppComponentCustomPage" -or
+        $props.appComponentType -eq "codeApp" -or
+        $props.canvasAppType -eq "codeApp"
+    })
+
+    # If no apps found by type, show diagnostic output for troubleshooting
+    if ($codeApps.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=warning]No Code Apps found using known type filters."
+        Write-Host ""
+        Write-Host "=== DIAGNOSTIC: All apps and their type properties ==="
+        Write-Host "(Use this output to identify the correct type value for your environment)"
+        Write-Host ""
+        $allApps | ForEach-Object {
+            $props = $_.Internal.properties
+            Write-Host "  App: $($_.DisplayName)"
+            Write-Host "    AppName (ID): $($_.AppName)"
+            Write-Host "    appType: $($props.appType)"
+            Write-Host "    appComponentType: $($props.appComponentType)"
+            Write-Host "    canvasAppType: $($props.canvasAppType)"
+            Write-Host "    creationType: $($props.creationType)"
+            Write-Host ""
+        }
+        Write-Host "=== END DIAGNOSTIC ==="
+        Write-Host ""
+        Write-Host "##vso[task.logissue type=error]Code Apps not found. Review diagnostic output above to identify the correct appType value, then update the filter in share-code-apps-template.yml."
+        exit 1
+    }
+
+    Write-Host "Found $($codeApps.Count) Code App(s):"
+    $codeApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
+    Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 5: Share Code Apps with Users
+    # -------------------------------------------------------------------
+    $failedAssignments = 0
+
+    if (-not [string]::IsNullOrWhiteSpace($shareWithUsers)) {
+        Write-Host "##[group]Sharing with Users"
+        $userIds = $shareWithUsers -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+
+        foreach ($userId in $userIds) {
+            if (-not (Test-IsGuid $userId)) {
+                Write-Host "##vso[task.logissue type=error]Invalid User Object ID (not a GUID): '$userId'"
+                $failedAssignments++
+                continue
+            }
+        }
+
+        $validUserIds = $userIds | Where-Object { Test-IsGuid $_ }
+
+        foreach ($app in $codeApps) {
+            foreach ($userId in $validUserIds) {
+                Write-Host "  Sharing '$($app.DisplayName)' with user: $userId"
+                try {
+                    Set-AdminPowerAppRoleAssignment `
+                        -PrincipalType User `
+                        -PrincipalObjectId $userId `
+                        -RoleName CanEdit `
+                        -AppName $app.AppName `
+                        -EnvironmentName $environmentId
+                    Write-Host "    ✓ Successfully shared"
+                }
+                catch {
+                    $failedAssignments++
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with user $userId : $_"
+                }
+            }
+        }
+        Write-Host "##[endgroup]"
+    }
+
+    # -------------------------------------------------------------------
+    # Step 6: Share Code Apps with Security Groups
+    # -------------------------------------------------------------------
+    if (-not [string]::IsNullOrWhiteSpace($shareWithSecurityGroups)) {
+        Write-Host "##[group]Sharing with Security Groups"
+        $groupIds = $shareWithSecurityGroups -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+
+        foreach ($groupId in $groupIds) {
+            if (-not (Test-IsGuid $groupId)) {
+                Write-Host "##vso[task.logissue type=error]Invalid Security Group Object ID (not a GUID): '$groupId'"
+                $failedAssignments++
+                continue
+            }
+        }
+
+        $validGroupIds = $groupIds | Where-Object { Test-IsGuid $_ }
+
+        foreach ($app in $codeApps) {
+            foreach ($groupId in $validGroupIds) {
+                Write-Host "  Sharing '$($app.DisplayName)' with group: $groupId"
+                try {
+                    Set-AdminPowerAppRoleAssignment `
+                        -PrincipalType Group `
+                        -PrincipalObjectId $groupId `
+                        -RoleName CanEdit `
+                        -AppName $app.AppName `
+                        -EnvironmentName $environmentId
+                    Write-Host "    ✓ Successfully shared"
+                }
+                catch {
+                    $failedAssignments++
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with group $groupId : $_"
+                }
+            }
+        }
+        Write-Host "##[endgroup]"
+    }
+
+    # -------------------------------------------------------------------
+    # Final status
+    # -------------------------------------------------------------------
+    if ($failedAssignments -gt 0) {
+        Write-Host "##vso[task.logissue type=error]$failedAssignments sharing assignment(s) failed. Review errors above."
+        exit 1
+    }
+
+    Write-Host "##[section]Code App sharing complete! All assignments succeeded."
+  displayName: 'Share Code Apps with Users/Groups'
+  env:
+    SHARE_WITH_USERS: ${{ parameters.shareWithUsers }}
+    SHARE_WITH_SECURITY_GROUPS: ${{ parameters.shareWithSecurityGroups }}
+    ENVIRONMENT_URL: ${{ parameters.environmentURL }}
+    SPN_CLIENT_ID: ${{ parameters.clientId }}
+    SPN_CLIENT_SECRET: ${{ parameters.clientSecret }}
+    SPN_TENANT_ID: ${{ parameters.tenantId }}
