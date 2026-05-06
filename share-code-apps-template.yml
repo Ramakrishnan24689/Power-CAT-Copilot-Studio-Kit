@@ -58,7 +58,9 @@ steps:
 - powershell: |
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'
-    $MaximumFunctionCount = 32768
+    # Must set at Global scope — Microsoft.Graph sub-modules register thousands
+    # of functions when Set-AdminPowerAppRoleAssignment triggers lazy loading
+    $Global:MaximumFunctionCount = 32768
 
     $shareWithUsers = ($env:SHARE_WITH_USERS).Trim()
     $shareWithSecurityGroups = ($env:SHARE_WITH_SECURITY_GROUPS).Trim()
