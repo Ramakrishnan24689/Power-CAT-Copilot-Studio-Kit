@@ -56,6 +56,10 @@ steps:
 # Share Code Apps with specified users and security groups
 # ============================================================================
 - powershell: |
+    $ErrorActionPreference = 'Stop'
+    $ProgressPreference = 'SilentlyContinue'
+    $MaximumFunctionCount = 32768
+
     $shareWithUsers = ($env:SHARE_WITH_USERS).Trim()
     $shareWithSecurityGroups = ($env:SHARE_WITH_SECURITY_GROUPS).Trim()
     $envUrl = ($env:ENVIRONMENT_URL).TrimEnd('/')
@@ -89,12 +93,8 @@ steps:
     # Step 1: Install Power Apps Administration PowerShell module
     # -------------------------------------------------------------------
     Write-Host "##[group]Installing PowerApps Admin Module"
-
-    # Increase function limit to avoid "function capacity 4096 exceeded" errors
-    # caused by Microsoft.Graph sub-modules being loaded as dependencies
-    $MaximumFunctionCount = 32768
-
-    Install-Module -Name Microsoft.PowerApps.Administration.PowerShell -Force -AllowClobber -Scope CurrentUser
+    Install-Module -Name Microsoft.PowerApps.Administration.PowerShell -Force -AllowClobber -Scope CurrentUser -ErrorAction Stop
+    Import-Module Microsoft.PowerApps.Administration.PowerShell -Force -ErrorAction Stop
     Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
@@ -124,59 +124,114 @@ steps:
     Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
-    # Step 3: Find Code Apps and resolve Environment
+    # Step 3: Get Power Platform Environment ID via Global Discovery Service
     # -------------------------------------------------------------------
-    Write-Host "##[group]Discovering Code Apps"
+    Write-Host "##[group]Resolving Environment"
 
-    # Get all apps visible to this SPN (avoids needing Get-AdminPowerAppEnvironment
-    # which requires tenant-level Power Platform Admin role)
-    $allApps = Get-AdminPowerApp
-
-    # Filter by display name for the known Code Apps
-    $codeApps = @($allApps | Where-Object {
-        ($_.DisplayName -eq "Copilot Studio Kit for Admins" -or
-         $_.DisplayName -eq "Copilot Studio Kit for Makers") -and
-        $_.Internal.properties.environment.name
-    })
-
-    # Further filter to only apps in the target environment (match by URL)
-    $targetApps = @($codeApps | Where-Object {
-        $appEnvUrl = $_.Internal.properties.environment.id
-        $linkedUrl = $_.Internal.properties.linkedEnvironmentMetadata.instanceUrl -replace '/$', ''
-        ($linkedUrl -ieq $envUrl) -or ($appEnvUrl -like "*$envUrl*")
-    })
-
-    # If URL-based filter yields nothing, try matching by org name from URL
-    if ($targetApps.Count -eq 0) {
-        $orgName = ($envUrl -replace 'https://', '') -replace '\.crm.*\.dynamics\.com', ''
-        $targetApps = @($codeApps | Where-Object {
-            $_.Internal.properties.environment.name -like "*$orgName*" -or
-            $_.Internal.name -like "*$orgName*"
-        })
+    # Get OAuth token for Global Discovery Service
+    $discoTokenBody = @{
+        grant_type    = "client_credentials"
+        client_id     = $clientId
+        client_secret = $clientSecret
+        scope         = "https://globaldisco.crm.dynamics.com/.default"
     }
+    $discoTokenResponse = Invoke-RestMethod -Method Post `
+        -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
+        -ContentType "application/x-www-form-urlencoded" `
+        -Body $discoTokenBody `
+        -ErrorAction Stop
 
-    # If still nothing, use all matching Code Apps (likely single-environment SPN)
-    if ($targetApps.Count -eq 0 -and $codeApps.Count -gt 0) {
-        Write-Host "##vso[task.logissue type=warning]Could not filter by environment URL. Using all matching Code Apps found."
-        $targetApps = $codeApps
-    }
+    $discoHeaders = @{ Authorization = "Bearer $($discoTokenResponse.access_token)" }
 
-    if ($targetApps.Count -eq 0) {
-        Write-Host "##vso[task.logissue type=error]Code Apps not found."
-        Write-Host "All apps visible to this SPN:"
-        $allApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (ID: $($_.AppName))" }
+    # Query Global Discovery Service for all instances the SPN can access
+    $discoResponse = Invoke-RestMethod -Method Get `
+        -Uri "https://globaldisco.crm.dynamics.com/api/discovery/v2.0/Instances?`$select=ApiUrl,EnvironmentId,FriendlyName,Url,UniqueName,IsUserSysAdmin" `
+        -Headers $discoHeaders `
+        -ErrorAction Stop
+
+    if (-not $discoResponse.value -or $discoResponse.value.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]Global Discovery Service returned no instances for this SPN."
+        Write-Host "##[endgroup]"
         exit 1
     }
 
-    # Get the environment ID from the first matched app
-    $environmentId = $targetApps[0].EnvironmentName
-    Write-Host "Environment ID (from app): $environmentId"
-    Write-Host "Found $($targetApps.Count) Code App(s):"
-    $targetApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
+    # Match by environment URL (compare hostname only for robustness)
+    function Get-NormalizedHost {
+        param([string]$Url)
+        if ([string]::IsNullOrWhiteSpace($Url)) { return '' }
+        try {
+            $uri = [Uri]($Url.Trim().TrimEnd('/'))
+            return $uri.Host.ToLowerInvariant()
+        } catch { return $Url.Trim().ToLowerInvariant() }
+    }
+
+    $targetHost = Get-NormalizedHost $envUrl
+    $matchedInstances = @($discoResponse.value | Where-Object {
+        (Get-NormalizedHost $_.Url) -eq $targetHost -or
+        (Get-NormalizedHost $_.ApiUrl) -eq $targetHost
+    })
+
+    if ($matchedInstances.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]Could not find environment matching URL: $envUrl"
+        Write-Host "Available instances from Global Discovery:"
+        $discoResponse.value | ForEach-Object {
+            Write-Host "  $($_.FriendlyName) | URL: $($_.Url) | EnvironmentId: $($_.EnvironmentId)"
+        }
+        Write-Host "##[endgroup]"
+        exit 1
+    }
+
+    if ($matchedInstances.Count -gt 1) {
+        Write-Host "##vso[task.logissue type=error]Multiple environments matched URL: $envUrl"
+        $matchedInstances | ForEach-Object {
+            Write-Host "  $($_.FriendlyName) | URL: $($_.Url) | EnvironmentId: $($_.EnvironmentId)"
+        }
+        Write-Host "##[endgroup]"
+        exit 1
+    }
+
+    $targetInstance = $matchedInstances[0]
+    # Use EnvironmentId, not Id. Id is the Dataverse OrganizationId.
+    $environmentId = $targetInstance.EnvironmentId
+    Write-Host "Environment: $($targetInstance.FriendlyName)"
+    Write-Host "Environment ID: $environmentId"
+    Write-Host "IsUserSysAdmin: $($targetInstance.IsUserSysAdmin)"
     Write-Host "##[endgroup]"
 
-    # Use $targetApps as $codeApps for sharing
-    $codeApps = $targetApps
+    # -------------------------------------------------------------------
+    # Step 4: Find Code Apps
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Discovering Code Apps"
+
+    $allApps = Get-AdminPowerApp -EnvironmentName $environmentId -ErrorAction Stop
+
+    # Filter by display name for the known Code Apps
+    $codeApps = @($allApps | Where-Object {
+        $_.DisplayName -eq "Copilot Studio Kit for Admins" -or
+        $_.DisplayName -eq "Copilot Studio Kit for Makers"
+    })
+
+    # Validate both expected apps are found
+    $expectedAppNames = @("Copilot Studio Kit for Admins", "Copilot Studio Kit for Makers")
+    $missingApps = $expectedAppNames | Where-Object {
+        $name = $_
+        -not ($codeApps | Where-Object { $_.DisplayName -eq $name })
+    }
+    if ($missingApps.Count -gt 0) {
+        Write-Host "##vso[task.logissue type=warning]Missing expected Code App(s): $($missingApps -join ', ')"
+    }
+
+    if ($codeApps.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]No Code Apps found in environment."
+        Write-Host "Available apps:"
+        $allApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (ID: $($_.AppName))" }
+        Write-Host "##[endgroup]"
+        exit 1
+    }
+
+    Write-Host "Found $($codeApps.Count) Code App(s):"
+    $codeApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
+    Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
     # Step 5: Share Code Apps with Users
@@ -206,12 +261,13 @@ steps:
                         -PrincipalObjectId $userId `
                         -RoleName CanEdit `
                         -AppName $app.AppName `
-                        -EnvironmentName $environmentId
+                        -EnvironmentName $environmentId `
+                        -ErrorAction Stop
                     Write-Host "    ✓ Successfully shared"
                 }
                 catch {
                     $failedAssignments++
-                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with user $userId : $_"
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with user $userId : $($_.Exception.Message)"
                 }
             }
         }
@@ -244,12 +300,13 @@ steps:
                         -PrincipalObjectId $groupId `
                         -RoleName CanEdit `
                         -AppName $app.AppName `
-                        -EnvironmentName $environmentId
+                        -EnvironmentName $environmentId `
+                        -ErrorAction Stop
                     Write-Host "    ✓ Successfully shared"
                 }
                 catch {
                     $failedAssignments++
-                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with group $groupId : $_"
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with group $groupId : $($_.Exception.Message)"
                 }
             }
         }
