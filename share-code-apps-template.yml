@@ -161,43 +161,22 @@ steps:
     Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
-    # Step 4: Find Code Apps by Type
+    # Step 4: Find Code Apps
     # -------------------------------------------------------------------
     Write-Host "##[group]Discovering Code Apps"
 
     $allApps = Get-AdminPowerApp -EnvironmentName $environmentId
 
-    # Code Apps are identified by their internal appType property.
-    # Known type values: "CanvasClassic" (Canvas App), "AppComponentCustomPage" or
-    # "CodeApp" (Code App). We check multiple known property paths.
+    # Target the two known Code Apps by display name
     $codeApps = @($allApps | Where-Object {
-        $props = $_.Internal.properties
-        $props.appType -eq "CodeApp" -or
-        $props.appType -eq "AppComponentCustomPage" -or
-        $props.appComponentType -eq "codeApp" -or
-        $props.canvasAppType -eq "codeApp"
+        $_.DisplayName -eq "Copilot Studio Kit for Admins" -or
+        $_.DisplayName -eq "Copilot Studio Kit for Makers"
     })
 
-    # If no apps found by type, show diagnostic output for troubleshooting
     if ($codeApps.Count -eq 0) {
-        Write-Host "##vso[task.logissue type=warning]No Code Apps found using known type filters."
-        Write-Host ""
-        Write-Host "=== DIAGNOSTIC: All apps and their type properties ==="
-        Write-Host "(Use this output to identify the correct type value for your environment)"
-        Write-Host ""
-        $allApps | ForEach-Object {
-            $props = $_.Internal.properties
-            Write-Host "  App: $($_.DisplayName)"
-            Write-Host "    AppName (ID): $($_.AppName)"
-            Write-Host "    appType: $($props.appType)"
-            Write-Host "    appComponentType: $($props.appComponentType)"
-            Write-Host "    canvasAppType: $($props.canvasAppType)"
-            Write-Host "    creationType: $($props.creationType)"
-            Write-Host ""
-        }
-        Write-Host "=== END DIAGNOSTIC ==="
-        Write-Host ""
-        Write-Host "##vso[task.logissue type=error]Code Apps not found. Review diagnostic output above to identify the correct appType value, then update the filter in share-code-apps-template.yml."
+        Write-Host "##vso[task.logissue type=error]Code Apps not found in environment."
+        Write-Host "Available apps:"
+        $allApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (ID: $($_.AppName))" }
         exit 1
     }
 
