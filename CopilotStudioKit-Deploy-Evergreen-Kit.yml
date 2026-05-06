@@ -34,27 +34,27 @@ parameters:
   - name: shareWithUsers
     displayName: 'Share Code Apps with Users (comma-separated Azure AD Object IDs)'
     type: string
-    default: ''
+    default: 'NA'
 
   - name: shareWithSecurityGroups
     displayName: 'Share Code Apps with Security Groups (comma-separated Azure AD Object IDs)'
     type: string
-    default: ''
+    default: 'NA'
 
   - name: spnClientId
     displayName: 'Service Principal Client ID (for app sharing)'
     type: string
-    default: ''
+    default: 'NA'
 
   - name: spnClientSecret
     displayName: 'Service Principal Client Secret (for app sharing)'
     type: string
-    default: ''
+    default: 'NA'
 
   - name: spnTenantId
     displayName: 'Azure AD Tenant ID (for app sharing)'
     type: string
-    default: ''
+    default: 'NA'
 
 pool:
   vmImage: windows-latest
