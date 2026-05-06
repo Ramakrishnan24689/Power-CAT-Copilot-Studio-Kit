@@ -89,6 +89,11 @@ steps:
     # Step 1: Install Power Apps Administration PowerShell module
     # -------------------------------------------------------------------
     Write-Host "##[group]Installing PowerApps Admin Module"
+
+    # Increase function limit to avoid "function capacity 4096 exceeded" errors
+    # caused by Microsoft.Graph sub-modules being loaded as dependencies
+    $MaximumFunctionCount = 32768
+
     Install-Module -Name Microsoft.PowerApps.Administration.PowerShell -Force -AllowClobber -Scope CurrentUser
     Write-Host "##[endgroup]"
 
