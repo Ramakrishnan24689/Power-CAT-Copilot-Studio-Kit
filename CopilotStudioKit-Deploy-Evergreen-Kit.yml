@@ -62,12 +62,13 @@ pool:
 # ============================================================================
 # Pipeline Resource: Reference the Export pipeline (definitionId=2487)
 # Downloads artifacts from the latest successful run automatically.
+# (TEMPORARILY COMMENTED FOR TESTING)
 # ============================================================================
-resources:
-  pipelines:
-    - pipeline: ExportPipeline
-      source: CopilotStudioKit-Master-No-Unpack
-      trigger: none
+# resources:
+#   pipelines:
+#     - pipeline: ExportPipeline
+#       source: CopilotStudioKit-Master-No-Unpack
+#       trigger: none
 
 stages:
 # ============================================================================
@@ -82,57 +83,57 @@ stages:
       steps:
 
       # ======================================================================
-      # Step 1: Download artifacts from Export pipeline
+      # Step 1: Download artifacts from Export pipeline (TEMPORARILY COMMENTED FOR TESTING)
       # ======================================================================
-      - download: ExportPipeline
-        artifact: drop
-        displayName: 'Download Solution Artifacts'
+      # - download: ExportPipeline
+      #   artifact: drop
+      #   displayName: 'Download Solution Artifacts'
 
       # ======================================================================
-      # Step 2: Install Power Platform Build Tools
+      # Step 2: Install Power Platform Build Tools (TEMPORARILY COMMENTED FOR TESTING)
       # ======================================================================
-      - task: PowerPlatformToolInstaller@2
-        displayName: 'Install Power Platform Build Tools'
+      # - task: PowerPlatformToolInstaller@2
+      #   displayName: 'Install Power Platform Build Tools'
 
       # ======================================================================
-      # Step 3: Find the managed solution file
+      # Step 3: Find the managed solution file (TEMPORARILY COMMENTED FOR TESTING)
       # ======================================================================
-      - powershell: |
-          $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
-
-          # Find CopilotStudioKit_*_managed.zip
-          $pattern = "CopilotStudioKit_*_managed.zip"
-          $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
-
-          if ($managedFiles.Count -eq 0) {
-              Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $pattern"
-              Write-Host "Available files in download path:"
-              Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $($_.Name)" }
-              exit 1
-          }
-
-          $solutionFile = $managedFiles[0].FullName
-          Write-Host "##[section]Found managed solution: $($managedFiles[0].Name)"
-          Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
-        displayName: 'Find Managed Solution File'
+      # - powershell: |
+      #     $downloadPath = "$(Pipeline.Workspace)/ExportPipeline/drop"
+      #
+      #     # Find CopilotStudioKit_*_managed.zip
+      #     $pattern = "CopilotStudioKit_*_managed.zip"
+      #     $managedFiles = Get-ChildItem -Path $downloadPath -Filter $pattern
+      #
+      #     if ($managedFiles.Count -eq 0) {
+      #         Write-Host "##vso[task.logissue type=error]Managed solution not found with pattern: $pattern"
+      #         Write-Host "Available files in download path:"
+      #         Get-ChildItem -Path $downloadPath | ForEach-Object { Write-Host "  $($_.Name)" }
+      #         exit 1
+      #     }
+      #
+      #     $solutionFile = $managedFiles[0].FullName
+      #     Write-Host "##[section]Found managed solution: $($managedFiles[0].Name)"
+      #     Write-Host "##vso[task.setvariable variable=SolutionFilePath]$solutionFile"
+      #   displayName: 'Find Managed Solution File'
 
       # ======================================================================
-      # Step 4: Import solution to target environment
+      # Step 4: Import solution to target environment (TEMPORARILY COMMENTED FOR TESTING)
       # ======================================================================
-      - task: PowerPlatformImportSolution@2
-        displayName: 'Import Solution to ${{ env.url }}'
-        inputs:
-          authenticationType: 'PowerPlatformSPN'
-          PowerPlatformSPN: '${{ env.url }}'
-          Environment: '${{ env.url }}'
-          SolutionInputFile: '$(SolutionFilePath)'
-          AsyncOperation: true
-          MaxAsyncWaitTime: 60
-          UseDeploymentSettingsFile: false
-          OverwriteUnmanagedCustomizations: false
-          SkipProductUpdateDependencies: false
-          ConvertToManaged: false
-          HoldingSolution: false
+      # - task: PowerPlatformImportSolution@2
+      #   displayName: 'Import Solution to ${{ env.url }}'
+      #   inputs:
+      #     authenticationType: 'PowerPlatformSPN'
+      #     PowerPlatformSPN: '${{ env.url }}'
+      #     Environment: '${{ env.url }}'
+      #     SolutionInputFile: '$(SolutionFilePath)'
+      #     AsyncOperation: true
+      #     MaxAsyncWaitTime: 60
+      #     UseDeploymentSettingsFile: false
+      #     OverwriteUnmanagedCustomizations: false
+      #     SkipProductUpdateDependencies: false
+      #     ConvertToManaged: false
+      #     HoldingSolution: false
 
       # ======================================================================
       # Step 5: Share Code Apps with Users/Security Groups (post-import)
