@@ -281,7 +281,7 @@ steps:
         } | ConvertTo-Json -Depth 10
 
         $response = Invoke-RestMethod -Method Post -Uri $shareUri -Headers $Headers -Body $body -ErrorAction Stop
-        return $response
+        return $null
     }
 
     # -------------------------------------------------------------------
