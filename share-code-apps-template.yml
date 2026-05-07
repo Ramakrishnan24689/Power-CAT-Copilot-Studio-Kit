@@ -89,72 +89,26 @@ steps:
     }
 
     # -------------------------------------------------------------------
-    # Step 1: Install Power Apps Administration PowerShell module
+    # Helper: Get OAuth token via client_credentials
     # -------------------------------------------------------------------
-    Write-Host "##[group]Installing PowerApps Admin Module"
-    Install-Module -Name Microsoft.PowerApps.Administration.PowerShell -Force -AllowClobber -Scope CurrentUser -ErrorAction Stop
-    Import-Module Microsoft.PowerApps.Administration.PowerShell -Force -ErrorAction Stop
-    Write-Host "##[endgroup]"
-
-    # -------------------------------------------------------------------
-    # Step 2: Authenticate using Service Principal credentials
-    # -------------------------------------------------------------------
-    Write-Host "##[group]Authenticating with Service Principal"
-
-    $clientId = $env:SPN_CLIENT_ID
-    $clientSecret = $env:SPN_CLIENT_SECRET
-    $tenantId = $env:SPN_TENANT_ID
-
-    # Treat 'NA' sentinel value as empty
-    if ($clientId -eq 'NA') { $clientId = '' }
-    if ($clientSecret -eq 'NA') { $clientSecret = '' }
-    if ($tenantId -eq 'NA') { $tenantId = '' }
-
-    if ([string]::IsNullOrWhiteSpace($clientId) -or
-        [string]::IsNullOrWhiteSpace($clientSecret) -or
-        [string]::IsNullOrWhiteSpace($tenantId)) {
-        Write-Host "##vso[task.logissue type=error]Missing SPN credentials. Ensure clientId, clientSecret, and tenantId parameters are provided (from variable group or Key Vault)."
-        exit 1
+    function Get-OAuthToken {
+        param([string]$TenantId, [string]$ClientId, [string]$ClientSecret, [string]$Scope)
+        $body = @{
+            grant_type    = "client_credentials"
+            client_id     = $ClientId
+            client_secret = $ClientSecret
+            scope         = $Scope
+        }
+        $response = Invoke-RestMethod -Method Post `
+            -Uri "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" `
+            -ContentType "application/x-www-form-urlencoded" `
+            -Body $body -ErrorAction Stop
+        return $response.access_token
     }
 
-    Add-PowerAppsAccount -ApplicationId $clientId -ClientSecret $clientSecret -TenantId $tenantId
-
-    Write-Host "Successfully authenticated as Service Principal (ClientId: $clientId)"
-    Write-Host "##[endgroup]"
-
     # -------------------------------------------------------------------
-    # Step 3: Get Power Platform Environment ID via Global Discovery Service
+    # Helper: Normalize URL to hostname for comparison
     # -------------------------------------------------------------------
-    Write-Host "##[group]Resolving Environment"
-
-    # Get OAuth token for Global Discovery Service
-    $discoTokenBody = @{
-        grant_type    = "client_credentials"
-        client_id     = $clientId
-        client_secret = $clientSecret
-        scope         = "https://globaldisco.crm.dynamics.com/.default"
-    }
-    $discoTokenResponse = Invoke-RestMethod -Method Post `
-        -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" `
-        -ContentType "application/x-www-form-urlencoded" `
-        -Body $discoTokenBody `
-        -ErrorAction Stop
-
-    $discoHeaders = @{ Authorization = "Bearer $($discoTokenResponse.access_token)" }
-
-    # Query Global Discovery Service for all instances the SPN can access
-    $discoResponse = Invoke-RestMethod -Method Get `
-        -Uri "https://globaldisco.crm.dynamics.com/api/discovery/v2.0/Instances?`$select=ApiUrl,EnvironmentId,FriendlyName,Url,UniqueName,IsUserSysAdmin" `
-        -Headers $discoHeaders `
-        -ErrorAction Stop
-
-    if (-not $discoResponse.value -or $discoResponse.value.Count -eq 0) {
-        Write-Host "##vso[task.logissue type=error]Global Discovery Service returned no instances for this SPN."
-        Write-Host "##[endgroup]"
-        exit 1
-    }
-
-    # Match by environment URL (compare hostname only for robustness)
     function Get-NormalizedHost {
         param([string]$Url)
         if ([string]::IsNullOrWhiteSpace($Url)) { return '' }
@@ -162,6 +116,50 @@ steps:
             $uri = [Uri]($Url.Trim().TrimEnd('/'))
             return $uri.Host.ToLowerInvariant()
         } catch { return $Url.Trim().ToLowerInvariant() }
+    }
+
+    # -------------------------------------------------------------------
+    # Step 1: Validate SPN credentials
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Validating Credentials"
+
+    $clientId = $env:SPN_CLIENT_ID
+    $clientSecret = $env:SPN_CLIENT_SECRET
+    $tenantId = $env:SPN_TENANT_ID
+
+    if ($clientId -eq 'NA') { $clientId = '' }
+    if ($clientSecret -eq 'NA') { $clientSecret = '' }
+    if ($tenantId -eq 'NA') { $tenantId = '' }
+
+    if ([string]::IsNullOrWhiteSpace($clientId) -or
+        [string]::IsNullOrWhiteSpace($clientSecret) -or
+        [string]::IsNullOrWhiteSpace($tenantId)) {
+        Write-Host "##vso[task.logissue type=error]Missing SPN credentials. Ensure clientId, clientSecret, and tenantId parameters are provided."
+        Write-Host "##[endgroup]"
+        exit 1
+    }
+
+    Write-Host "Tenant ID: $tenantId"
+    Write-Host "Client ID: $clientId"
+    Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 2: Get Power Platform Environment ID via Global Discovery Service
+    # -------------------------------------------------------------------
+    Write-Host "##[group]Resolving Environment"
+
+    $discoToken = Get-OAuthToken -TenantId $tenantId -ClientId $clientId -ClientSecret $clientSecret `
+        -Scope "https://globaldisco.crm.dynamics.com/.default"
+    $discoHeaders = @{ Authorization = "Bearer $discoToken" }
+
+    $discoResponse = Invoke-RestMethod -Method Get `
+        -Uri "https://globaldisco.crm.dynamics.com/api/discovery/v2.0/Instances?`$select=ApiUrl,EnvironmentId,FriendlyName,Url,UniqueName,IsUserSysAdmin" `
+        -Headers $discoHeaders -ErrorAction Stop
+
+    if (-not $discoResponse.value -or $discoResponse.value.Count -eq 0) {
+        Write-Host "##vso[task.logissue type=error]Global Discovery Service returned no instances for this SPN."
+        Write-Host "##[endgroup]"
+        exit 1
     }
 
     $targetHost = Get-NormalizedHost $envUrl
@@ -198,23 +196,38 @@ steps:
     Write-Host "##[endgroup]"
 
     # -------------------------------------------------------------------
-    # Step 4: Find Code Apps
+    # Step 3: Get Power Apps API token and discover Code Apps via REST
     # -------------------------------------------------------------------
     Write-Host "##[group]Discovering Code Apps"
 
-    $allApps = Get-AdminPowerApp -EnvironmentName $environmentId -ErrorAction Stop
+    # Token scope for Power Apps API (note: double slash is intentional)
+    $appsToken = Get-OAuthToken -TenantId $tenantId -ClientId $clientId -ClientSecret $clientSecret `
+        -Scope "https://service.powerapps.com//.default"
+    $appsHeaders = @{
+        Authorization  = "Bearer $appsToken"
+        "Content-Type" = "application/json"
+    }
+
+    # List apps in the environment via Power Apps Admin REST API
+    $appsUri = "https://api.powerapps.com/providers/Microsoft.PowerApps/scopes/admin/environments/$environmentId/apps?api-version=2016-11-01&`$top=250"
+    $appsResponse = Invoke-RestMethod -Method Get -Uri $appsUri -Headers $appsHeaders -ErrorAction Stop
+
+    if (-not $appsResponse.value) {
+        Write-Host "##vso[task.logissue type=error]No apps returned from Power Apps API for environment: $environmentId"
+        Write-Host "##[endgroup]"
+        exit 1
+    }
 
     # Filter by display name for the known Code Apps
-    $codeApps = @($allApps | Where-Object {
-        $_.DisplayName -eq "Copilot Studio Kit for Admins" -or
-        $_.DisplayName -eq "Copilot Studio Kit for Makers"
+    $expectedAppNames = @("Copilot Studio Kit for Admins", "Copilot Studio Kit for Makers")
+    $codeApps = @($appsResponse.value | Where-Object {
+        $_.properties.displayName -in $expectedAppNames
     })
 
     # Validate both expected apps are found
-    $expectedAppNames = @("Copilot Studio Kit for Admins", "Copilot Studio Kit for Makers")
     $missingApps = $expectedAppNames | Where-Object {
         $name = $_
-        -not ($codeApps | Where-Object { $_.DisplayName -eq $name })
+        -not ($codeApps | Where-Object { $_.properties.displayName -eq $name })
     }
     if ($missingApps.Count -gt 0) {
         Write-Host "##vso[task.logissue type=warning]Missing expected Code App(s): $($missingApps -join ', ')"
@@ -222,21 +235,58 @@ steps:
 
     if ($codeApps.Count -eq 0) {
         Write-Host "##vso[task.logissue type=error]No Code Apps found in environment."
-        Write-Host "Available apps:"
-        $allApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (ID: $($_.AppName))" }
+        Write-Host "Available apps (first 20):"
+        $appsResponse.value | Select-Object -First 20 | ForEach-Object {
+            Write-Host "  - $($_.properties.displayName) (ID: $($_.name))"
+        }
         Write-Host "##[endgroup]"
         exit 1
     }
 
     Write-Host "Found $($codeApps.Count) Code App(s):"
-    $codeApps | ForEach-Object { Write-Host "  - $($_.DisplayName) (AppId: $($_.AppName))" }
+    $codeApps | ForEach-Object { Write-Host "  - $($_.properties.displayName) (AppId: $($_.name))" }
     Write-Host "##[endgroup]"
+
+    # -------------------------------------------------------------------
+    # Step 4: Share Code Apps via REST API (modifyPermissions)
+    # -------------------------------------------------------------------
+    $failedAssignments = 0
+
+    function Share-PowerApp {
+        param(
+            [string]$AppId,
+            [string]$AppDisplayName,
+            [string]$EnvironmentId,
+            [string]$PrincipalId,
+            [string]$PrincipalType,
+            [hashtable]$Headers
+        )
+
+        $shareUri = "https://api.powerapps.com/providers/Microsoft.PowerApps/scopes/admin/environments/$EnvironmentId/apps/$AppId/modifyPermissions?api-version=2016-11-01"
+
+        $body = @{
+            put = @(
+                @{
+                    properties = @{
+                        roleName = "CanEdit"
+                        NotifyShareTargetOption = "DoNotNotify"
+                        principal = @{
+                            id       = $PrincipalId
+                            type     = $PrincipalType
+                            tenantId = "null"
+                        }
+                    }
+                }
+            )
+        } | ConvertTo-Json -Depth 10
+
+        $response = Invoke-RestMethod -Method Post -Uri $shareUri -Headers $Headers -Body $body -ErrorAction Stop
+        return $response
+    }
 
     # -------------------------------------------------------------------
     # Step 5: Share Code Apps with Users
     # -------------------------------------------------------------------
-    $failedAssignments = 0
-
     if (-not [string]::IsNullOrWhiteSpace($shareWithUsers)) {
         Write-Host "##[group]Sharing with Users"
         $userIds = $shareWithUsers -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
@@ -253,20 +303,16 @@ steps:
 
         foreach ($app in $codeApps) {
             foreach ($userId in $validUserIds) {
-                Write-Host "  Sharing '$($app.DisplayName)' with user: $userId"
+                Write-Host "  Sharing '$($app.properties.displayName)' with user: $userId"
                 try {
-                    Set-AdminPowerAppRoleAssignment `
-                        -PrincipalType User `
-                        -PrincipalObjectId $userId `
-                        -RoleName CanEdit `
-                        -AppName $app.AppName `
-                        -EnvironmentName $environmentId `
-                        -ErrorAction Stop
+                    Share-PowerApp -AppId $app.name -AppDisplayName $app.properties.displayName `
+                        -EnvironmentId $environmentId -PrincipalId $userId `
+                        -PrincipalType "User" -Headers $appsHeaders
                     Write-Host "    ✓ Successfully shared"
                 }
                 catch {
                     $failedAssignments++
-                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with user $userId : $($_.Exception.Message)"
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.properties.displayName)' with user $userId : $($_.Exception.Message)"
                 }
             }
         }
@@ -292,20 +338,16 @@ steps:
 
         foreach ($app in $codeApps) {
             foreach ($groupId in $validGroupIds) {
-                Write-Host "  Sharing '$($app.DisplayName)' with group: $groupId"
+                Write-Host "  Sharing '$($app.properties.displayName)' with group: $groupId"
                 try {
-                    Set-AdminPowerAppRoleAssignment `
-                        -PrincipalType Group `
-                        -PrincipalObjectId $groupId `
-                        -RoleName CanEdit `
-                        -AppName $app.AppName `
-                        -EnvironmentName $environmentId `
-                        -ErrorAction Stop
+                    Share-PowerApp -AppId $app.name -AppDisplayName $app.properties.displayName `
+                        -EnvironmentId $environmentId -PrincipalId $groupId `
+                        -PrincipalType "Group" -Headers $appsHeaders
                     Write-Host "    ✓ Successfully shared"
                 }
                 catch {
                     $failedAssignments++
-                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.DisplayName)' with group $groupId : $($_.Exception.Message)"
+                    Write-Host "##vso[task.logissue type=error]Failed to share '$($app.properties.displayName)' with group $groupId : $($_.Exception.Message)"
                 }
             }
         }
