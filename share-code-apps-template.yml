@@ -55,12 +55,9 @@ steps:
 # ============================================================================
 # Share Code Apps with specified users and security groups
 # ============================================================================
-- powershell: |
+- pwsh: |
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'
-    # Must set at Global scope — Microsoft.Graph sub-modules register thousands
-    # of functions when Set-AdminPowerAppRoleAssignment triggers lazy loading
-    $Global:MaximumFunctionCount = 32768
 
     $shareWithUsers = ($env:SHARE_WITH_USERS).Trim()
     $shareWithSecurityGroups = ($env:SHARE_WITH_SECURITY_GROUPS).Trim()
