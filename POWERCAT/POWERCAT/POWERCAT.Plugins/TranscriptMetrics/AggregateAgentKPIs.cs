@@ -48,6 +48,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 string agentId = GetInputParameter<string>(context, "agentId");
                 string agentConfigurationDetailsJson = GetInputParameter<string>(context, "agentConfigurationDetails");
                 DateTime conversationDate = GetInputParameter<DateTime>(context, "conversationDate");
+                string connectedAgentDefinitionsJson = GetInputParameter<string>(context, "connectedAgentDefinitions");
+                var connectedAgentNameMap = GetConnectedAgentNameMap(connectedAgentDefinitionsJson);
 
                 // 2. Validate inputs
                 if (string.IsNullOrWhiteSpace(agentId))
@@ -96,7 +98,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 _tracingService.Trace($"{methodName}: Processing {conversations.Count} conversations");
 
                 // 5. Group and aggregate KPIs
-                List<KpiGroup> kpiGroups = AggregateKpis(conversations, agentConfigurationDetails);
+                List<KpiGroup> kpiGroups = AggregateKpis(conversations, agentConfigurationDetails, connectedAgentNameMap);
 
                 _tracingService.Trace($"{methodName}: Aggregated into {kpiGroups.Count} groups");
 
@@ -144,6 +146,47 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             return default;
         }
 
+        private Dictionary<string, string> GetConnectedAgentNameMap(string connectedAgentDefinitionsJson)
+        {
+            const string methodName = nameof(GetConnectedAgentNameMap);
+            var connectedAgentNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(connectedAgentDefinitionsJson))
+            {
+                _tracingService.Trace($"{methodName}: No connected agent definitions input parameter found");
+                return connectedAgentNameMap;
+            }
+
+            try
+            {
+                var definitions = JsonConvert.DeserializeObject<List<ConnectedAgentDefinitionInput>>(connectedAgentDefinitionsJson);
+                if (definitions == null)
+                {
+                    return connectedAgentNameMap;
+                }
+
+                foreach (var definition in definitions)
+                {
+                    if (string.IsNullOrWhiteSpace(definition?.SchemaName))
+                    {
+                        continue;
+                    }
+
+                    connectedAgentNameMap[definition.SchemaName.Trim()] = string.IsNullOrWhiteSpace(definition.Name)
+                        ? definition.SchemaName.Trim()
+                        : definition.Name.Trim();
+                }
+
+                _tracingService.Trace($"{methodName}: Loaded {connectedAgentNameMap.Count} connected agent definitions from input parameter");
+            }
+            catch (Exception ex)
+            {
+                _tracingService.Trace($"{methodName}: Failed to parse connected agent definitions input parameter: {ex.Message}");
+            }
+
+            return connectedAgentNameMap;
+        }
+
         /// <summary>
         /// Fetches unprocessed conversation records from the cat_agentinsightstranscriptstaging table.
         /// Handles paging to retrieve all matching records.
@@ -166,7 +209,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     "cat_datasourcecode",
                     "cat_channelid",
                     "cat_sessioninfo",
-                    "cat_feedbackdetails"
+                    "cat_feedbackdetails",
+                    "cat_connectedagentdetails",
+                    "cat_runcount",
+                    "cat_successfulruncount",
+                    "cat_totaldurationseconds"
                 ),
                 PageInfo = new PagingInfo
                 {
@@ -200,7 +247,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ConversationId = entity.GetAttributeValue<string>("cat_conversationid"),
                         ConversationDate = dateValue.Value.Date.ToString("yyyy-MM-dd"),
                         DataSourceCode = entity.GetAttributeValue<OptionSetValue>("cat_datasourcecode")?.Value ?? 1,
-                        ChannelId = entity.GetAttributeValue<string>("cat_channelid")
+                        ChannelId = entity.GetAttributeValue<string>("cat_channelid"),
+                        RunCount = entity.GetAttributeValue<int>("cat_runcount"),
+                        SuccessfulRunCount = entity.GetAttributeValue<int>("cat_successfulruncount"),
+                        TotalDurationSeconds = entity.GetAttributeValue<int>("cat_totaldurationseconds")
                     };
 
                     // Parse JSON columns
@@ -230,6 +280,19 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         }
                     }
 
+                    string connectedAgentDetailsJson = entity.GetAttributeValue<string>("cat_connectedagentdetails");
+                    if (!string.IsNullOrEmpty(connectedAgentDetailsJson))
+                    {
+                        try
+                        {
+                            record.ConnectedAgentDetails = JsonConvert.DeserializeObject<List<ConnectedAgentDetailRecord>>(connectedAgentDetailsJson);
+                        }
+                        catch (Exception ex)
+                        {
+                            _tracingService.Trace($"{methodName}: Failed to parse ConnectedAgentDetails for {record.ConversationId}: {ex.Message}");
+                        }
+                    }
+
                     conversations.Add(record);
                 }
 
@@ -255,7 +318,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// <param name="conversations">The list of conversation records to aggregate.</param>
         /// <param name="agentConfigurationDetails">The agent configuration details.</param>
         /// <returns>A list of KPI groups with aggregated metrics.</returns>
-        private List<KpiGroup> AggregateKpis(List<ConversationRecord> conversations, AgentConfigurationDetails agentConfigurationDetails)
+        private List<KpiGroup> AggregateKpis(
+            List<ConversationRecord> conversations,
+            AgentConfigurationDetails agentConfigurationDetails,
+            Dictionary<string, string> connectedAgentNameMap)
         {
             const string methodName = nameof(AggregateKpis);
             var groups = conversations
@@ -278,14 +344,20 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ChannelId = g.Key.ChannelId ?? "Unknown",
                         AgentName = firstConversation.AgentName,
                         DataSourceCode = dataSourceCode,
-                        TotalConversations = g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
+                        TotalConversations = string.Equals(g.Key.ChannelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase)
+                            ? 0
+                            : g.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n)).Distinct().Count(),
                         SourceConversationIds = g.Select(c => c.EntityId).ToList()
                     };
 
                     foreach (var conversation in g)
                     {
                         // Process all SessionInfo items
-                        ProcessSessionInfoItems(conversation.SessionInfo, kpi);
+                        ProcessSessionInfoItems(conversation.SessionInfo, kpi, string.Equals(kpi.ChannelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase));
+                        kpi.RunCount += conversation.RunCount;
+                        kpi.SuccessfulRunCount += conversation.SuccessfulRunCount;
+                        kpi.TotalDurationSeconds += conversation.TotalDurationSeconds;
+                        AggregateConnectedAgentDetails(conversation.ConnectedAgentDetails, kpi, connectedAgentNameMap);
                         // Aggregate pre-processed feedback details
                         if (conversation.FeedbackDetails != null)
                         {
@@ -299,6 +371,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                                 kpi.FeedbackDetails.Add(feedbackDetail);
                             }
                         }
+                    }
+
+                    if (kpi.RunCount > 0)
+                    {
+                        kpi.AverageDurationSeconds = (int)Math.Floor((double)kpi.TotalDurationSeconds / kpi.RunCount);
                     }
 
                     return kpi;
@@ -372,6 +449,12 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity["cat_feedbackdislikecount"] = kpi.FeedbackDislikeCount;
                 entity["cat_csatscore"] = kpi.CsatScore;
                 entity["cat_csatcount"] = kpi.CsatCount;
+                entity["cat_runs"] = kpi.RunCount;
+                entity["cat_successfulruns"] = kpi.SuccessfulRunCount;
+                entity["cat_averagedurationseconds"] = kpi.AverageDurationSeconds;
+                entity["cat_connectedagentdetails"] = kpi.ConnectedAgentSummaries.Count > 0
+                    ? JsonConvert.SerializeObject(kpi.ConnectedAgentSummaries)
+                    : null;
 
                 // Note: Feedback details file upload happens after upsert in UploadFeedbackDetailsFile()
 
@@ -453,6 +536,47 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             return groupResults;
         }
 
+        private void AggregateConnectedAgentDetails(
+            List<ConnectedAgentDetailRecord> connectedAgentDetails,
+            KpiGroup kpi,
+            Dictionary<string, string> connectedAgentNameMap)
+        {
+            if (connectedAgentDetails == null || connectedAgentDetails.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var connectedAgentDetail in connectedAgentDetails)
+            {
+                if (string.IsNullOrWhiteSpace(connectedAgentDetail?.TaskDialogId))
+                {
+                    continue;
+                }
+
+                string agentName;
+                if (!connectedAgentNameMap.TryGetValue(connectedAgentDetail.TaskDialogId, out agentName) || string.IsNullOrWhiteSpace(agentName))
+                {
+                    agentName = connectedAgentDetail.TaskDialogId;
+                }
+
+                var summary = kpi.ConnectedAgentSummaries.FirstOrDefault(s => string.Equals(s.AgentName, agentName, StringComparison.OrdinalIgnoreCase));
+                if (summary == null)
+                {
+                    summary = new ConnectedAgentSummaryRecord
+                    {
+                        AgentName = agentName
+                    };
+                    kpi.ConnectedAgentSummaries.Add(summary);
+                }
+
+                summary.TotalCount++;
+                if (connectedAgentDetail.IsSuccess)
+                {
+                    summary.SuccessCount++;
+                }
+            }
+        }
+
         /// <summary>
         /// Sets error response output parameters.
         /// </summary>
@@ -508,7 +632,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// </summary>
         /// <param name="sessionInfoList">The list of session info items to process.</param>
         /// <param name="kpi">The KPI group to update.</param>
-        private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi)
+        private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi, bool excludeSessionCount)
         {
             if (sessionInfoList == null)
             {
@@ -521,7 +645,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 if (sessionValue != null)
                 {
                     // Increment session count
-                    kpi.SessionCount++;
+                    if (!excludeSessionCount)
+                    {
+                        kpi.SessionCount++;
+                    }
 
                     // Session type counts
                     if (string.Equals(sessionValue.Type, "Engaged", StringComparison.OrdinalIgnoreCase))
