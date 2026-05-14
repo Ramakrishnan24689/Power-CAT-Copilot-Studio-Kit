@@ -27,6 +27,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string UserPrompts { get; set; }
         public string ConversationTranscriptId { get; set; }
         public bool CopyFullTranscript { get; set; }
+        public string ChannelId { get; set; }
     }
 
     public class GlobalSessionDetail
