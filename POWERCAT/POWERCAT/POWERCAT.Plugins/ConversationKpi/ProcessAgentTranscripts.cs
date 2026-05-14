@@ -93,6 +93,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
                     ProcessKnowledgeSources processKnowledgeSources = new ProcessKnowledgeSources();
                     ProcessUserPrompts processUserPrompts = new ProcessUserPrompts();
+                    ProcessToolExecutions processToolExecutions = new ProcessToolExecutions();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -177,6 +178,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                                 FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
                                 KnowledgeSourcesList = processKnowledgeSources.ProcessForKnowledgeSources(indexedModels, conversationId, agentId),
+                                ToolExecutionsList = processToolExecutions.ProcessForToolExecutions(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -342,6 +344,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
                     ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
                     ConversationKpi["cat_knowledgesources"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourcesList);
+                    ConversationKpi["cat_toolexecutions"] = JsonConvert.SerializeObject(processDetails.ToolExecutionsList);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }
