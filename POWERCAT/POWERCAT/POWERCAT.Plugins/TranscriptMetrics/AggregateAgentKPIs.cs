@@ -336,7 +336,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     {
                         throw new InvalidPluginExecutionException($"{methodName}: Invalid or empty ConversationDate for conversation {firstConversation.ConversationId}.");
                     }
-                    // Use DataSourceCode directly from the grouped key
+                    // Use DataSourceCode from the grouped key
                     int dataSourceCode = g.Key.DataSourceCode;
                     var kpi = new KpiGroup
                     {
@@ -559,12 +559,15 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     agentName = connectedAgentDetail.TaskDialogId;
                 }
 
-                var summary = kpi.ConnectedAgentSummaries.FirstOrDefault(s => string.Equals(s.AgentName, agentName, StringComparison.OrdinalIgnoreCase));
+                var summary = kpi.ConnectedAgentSummaries.FirstOrDefault(s => 
+                    string.Equals(s.AgentName, agentName, StringComparison.OrdinalIgnoreCase) && 
+                    string.Equals(s.Type, connectedAgentDetail.Type, StringComparison.OrdinalIgnoreCase));
                 if (summary == null)
                 {
                     summary = new ConnectedAgentSummaryRecord
                     {
-                        AgentName = agentName
+                        AgentName = agentName,
+                        Type = connectedAgentDetail.Type ?? "Unknown"
                     };
                     kpi.ConnectedAgentSummaries.Add(summary);
                 }

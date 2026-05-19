@@ -310,17 +310,23 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [JsonProperty("IsSuccess")]
         public bool IsSuccess { get; set; }
+
+        [JsonProperty("Type")]
+        public string Type { get; set; }
     }
 
     public class ConnectedAgentSummaryRecord
     {
-        [JsonProperty("Agent Name")]
+        [JsonProperty("Agent")]
         public string AgentName { get; set; }
 
-        [JsonProperty("Total Count")]
+        [JsonProperty("Type")]
+        public string Type { get; set; }
+
+        [JsonProperty("Count")]
         public int TotalCount { get; set; }
 
-        [JsonProperty("Success Count")]
+        [JsonProperty("Success")]
         public int SuccessCount { get; set; }
     }
 

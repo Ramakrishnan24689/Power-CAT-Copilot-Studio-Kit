@@ -537,7 +537,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 if (string.Equals(valueType, "DynamicPlanStepTriggered", StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(activityName, "DynamicPlanStepTriggered", StringComparison.OrdinalIgnoreCase) &&
                     !string.IsNullOrEmpty(taskDialogId) &&
-                    taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) >= 0)
+                    IsConnectedAgentTaskDialogId(taskDialogId))
                 {
                     int pendingCount;
                     pendingConnectedAgentCalls.TryGetValue(taskDialogId, out pendingCount);
@@ -547,7 +547,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
                 if (!string.Equals(activityName, "DynamicPlanStepFinished", StringComparison.OrdinalIgnoreCase) ||
                     string.IsNullOrEmpty(taskDialogId) ||
-                    taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) < 0)
+                    !IsConnectedAgentTaskDialogId(taskDialogId))
                 {
                     continue;
                 }
@@ -571,7 +571,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 connectedAgentDetails.Add(new ConnectedAgentDetailRecord
                 {
                     TaskDialogId = taskDialogId,
-                    IsSuccess = string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase)
+                    IsSuccess = string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase),
+                    Type = GetConnectedAgentType(taskDialogId)
                 });
             }
 
@@ -582,7 +583,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     connectedAgentDetails.Add(new ConnectedAgentDetailRecord
                     {
                         TaskDialogId = pendingConnectedAgentCall.Key,
-                        IsSuccess = false
+                        IsSuccess = false,
+                        Type = GetConnectedAgentType(pendingConnectedAgentCall.Key)
                     });
                 }
             }
@@ -591,11 +593,39 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             return connectedAgentDetails;
         }
 
+        private static bool IsConnectedAgentTaskDialogId(string taskDialogId)
+        {
+            return taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                taskDialogId.IndexOf(".agent.", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string GetConnectedAgentType(string taskDialogId)
+        {
+            if (string.IsNullOrEmpty(taskDialogId))
+            {
+                return "Unknown";
+            }
+
+            if (taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Copilot Studio";
+            }
+
+            if (taskDialogId.IndexOf(".agent.", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return "Child";
+            }
+
+            return "Unknown";
+        }
+
         private class ConnectedAgentDetailRecord
         {
             public string TaskDialogId { get; set; }
 
             public bool IsSuccess { get; set; }
+
+            public string Type { get; set; }
         }
 
         /// <summary>
