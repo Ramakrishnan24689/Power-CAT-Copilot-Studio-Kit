@@ -10,6 +10,13 @@ namespace POWERCAT.Plugins.ConversationKpi
 {
     public class ProcessToolExecutions
     {
+        /// <summary>
+        /// Processes transcript activities and returns tool execution records for the conversation.
+        /// </summary>
+        /// <param name="model">The transcript activities to process.</param>
+        /// <param name="conversationId">The conversation identifier used to build session ids.</param>
+        /// <param name="agentId">The agent identifier used to build session ids.</param>
+        /// <returns>The tool executions found in the transcript.</returns>
         public List<ToolExecution> ProcessForToolExecutions(List<Activity> model, string conversationId, string agentId)
         {
             if (model == null || model.Count == 0)
@@ -87,6 +94,8 @@ namespace POWERCAT.Plugins.ConversationKpi
                         SessionEndIndex = sessionContext.SessionEndIndex,
                         PlanIdentifier = GetPropertyValue(activity.valueToken, "planIdentifier"),
                         StepId = GetStepId(activity.valueToken),
+                        TaskDialogId = GetPropertyValue(activity.valueToken, "taskDialogId"),
+                        RawStepType = GetPropertyValue(activity.valueToken, "type"),
                         State = GetPropertyValue(activity.valueToken, "state"),
                         ExecutionTime = GetPropertyValue(activity.valueToken, "executionTime"),
                         Observation = GetPropertyToken(activity.valueToken, "observation"),
@@ -110,7 +119,7 @@ namespace POWERCAT.Plugins.ConversationKpi
 
             foreach (var triggeredStep in triggeredSteps.OrderBy(step => step.Index))
             {
-                if (ShouldSkipToolExecution(triggeredStep))
+                if (IsSkippedTaskDialogId(triggeredStep.TaskDialogId))
                 {
                     continue;
                 }
@@ -135,7 +144,7 @@ namespace POWERCAT.Plugins.ConversationKpi
             foreach (var receivedStep in receivedSteps.OrderBy(step => step.Index))
             {
                 if (!HasIdentifyingMetadata(receivedStep)
-                    || ShouldSkipToolExecution(receivedStep)
+                    || IsSkippedTaskDialogId(receivedStep.TaskDialogId)
                     || HasMatchingTriggeredStep(receivedStep, triggeredSteps))
                 {
                     continue;
@@ -161,6 +170,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 .ToList();
         }
 
+        /// <summary>
+        /// Enriches a plan step with metadata from a matching bind update.
+        /// </summary>
+        /// <param name="planStep">The plan step to enrich.</param>
+        /// <param name="bindUpdates">The bind updates available in the transcript.</param>
         private static void EnrichPlanStepContext(PlanStepContext planStep, List<PlanStepContext> bindUpdates)
         {
             var matchingBindUpdate = bindUpdates
@@ -173,6 +187,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             ApplyMetadata(planStep, matchingBindUpdate);
         }
 
+        /// <summary>
+        /// Enriches a triggered step with metadata from matching bind updates and received plan steps.
+        /// </summary>
+        /// <param name="triggeredStep">The triggered step to enrich.</param>
+        /// <param name="bindUpdates">The bind updates available in the transcript.</param>
+        /// <param name="receivedSteps">The received plan steps available in the transcript.</param>
         private static void EnrichPlanStepContext(TriggeredStepContext triggeredStep, List<PlanStepContext> bindUpdates, List<PlanStepContext> receivedSteps)
         {
             var matchingBindUpdate = bindUpdates
@@ -194,6 +214,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             ApplyMetadata(triggeredStep, matchingReceivedStep);
         }
 
+        /// <summary>
+        /// Copies missing plan step metadata from the source context to the target context.
+        /// </summary>
+        /// <param name="target">The plan step context to update.</param>
+        /// <param name="source">The plan step context containing metadata.</param>
         private static void ApplyMetadata(PlanStepContext target, PlanStepContext source)
         {
             if (source == null)
@@ -227,20 +252,26 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
         }
 
+        /// <summary>
+        /// Finds the finished step that matches the specified triggered step.
+        /// </summary>
+        /// <param name="triggeredStep">The triggered step to match.</param>
+        /// <param name="finishedSteps">The finished steps available in the transcript.</param>
+        /// <param name="matchedFinishIndexes">The finished step indexes already matched to triggered steps.</param>
+        /// <returns>The matching finished step, or null when no match is found.</returns>
         private static FinishedStepContext FindMatchingFinishedStep(
             TriggeredStepContext triggeredStep,
             List<FinishedStepContext> finishedSteps,
             HashSet<int> matchedFinishIndexes)
         {
-            var exactMatch = finishedSteps
+            var candidateFinishedSteps = finishedSteps
                 .Where(step => !matchedFinishIndexes.Contains(step.Index))
                 .Where(step => string.Equals(step.SessionID, triggeredStep.SessionID, StringComparison.OrdinalIgnoreCase))
-                .Where(step => step.Index > triggeredStep.Index && step.Index < triggeredStep.SessionEndIndex)
+                .Where(step => step.Index > triggeredStep.Index && step.Index < triggeredStep.SessionEndIndex);
+
+            var exactMatch = candidateFinishedSteps
                 .Where(step => !string.IsNullOrWhiteSpace(triggeredStep.StepId)
                     && string.Equals(step.StepId, triggeredStep.StepId, StringComparison.OrdinalIgnoreCase))
-                .Where(step => string.IsNullOrWhiteSpace(triggeredStep.PlanIdentifier)
-                    || string.IsNullOrWhiteSpace(step.PlanIdentifier)
-                    || string.Equals(step.PlanIdentifier, triggeredStep.PlanIdentifier, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(step => step.Index)
                 .FirstOrDefault();
 
@@ -250,23 +281,81 @@ namespace POWERCAT.Plugins.ConversationKpi
                 return exactMatch;
             }
 
-            var fallbackMatch = finishedSteps
-                .Where(step => !matchedFinishIndexes.Contains(step.Index))
-                .Where(step => string.Equals(step.SessionID, triggeredStep.SessionID, StringComparison.OrdinalIgnoreCase))
-                .Where(step => step.Index > triggeredStep.Index && step.Index < triggeredStep.SessionEndIndex)
-                .Where(step => !string.IsNullOrWhiteSpace(triggeredStep.PlanIdentifier)
-                    && string.Equals(step.PlanIdentifier, triggeredStep.PlanIdentifier, StringComparison.OrdinalIgnoreCase))
+            var taskDialogMatch = candidateFinishedSteps
+                .Where(step => IsSamePlan(triggeredStep, step))
+                .Where(step => !string.IsNullOrWhiteSpace(triggeredStep.TaskDialogId)
+                    && string.Equals(step.TaskDialogId, triggeredStep.TaskDialogId, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(step => step.Index)
                 .FirstOrDefault();
 
-            if (fallbackMatch != null)
+            if (taskDialogMatch != null)
             {
-                matchedFinishIndexes.Add(fallbackMatch.Index);
+                matchedFinishIndexes.Add(taskDialogMatch.Index);
+                return taskDialogMatch;
             }
 
-            return fallbackMatch;
+            var rawStepTypeMatch = candidateFinishedSteps
+                .Where(step => IsSamePlan(triggeredStep, step))
+                .Where(step => !string.IsNullOrWhiteSpace(triggeredStep.RawStepType)
+                    && string.Equals(step.RawStepType, triggeredStep.RawStepType, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(step => step.Index)
+                .FirstOrDefault();
+
+            if (rawStepTypeMatch != null)
+            {
+                matchedFinishIndexes.Add(rawStepTypeMatch.Index);
+                return rawStepTypeMatch;
+            }
+
+            if (!HasUsableCorrelationMetadata(triggeredStep))
+            {
+                var fallbackMatch = candidateFinishedSteps
+                    .Where(step => IsSamePlan(triggeredStep, step))
+                    .OrderBy(step => step.Index)
+                    .FirstOrDefault();
+
+                if (fallbackMatch != null)
+                {
+                    matchedFinishIndexes.Add(fallbackMatch.Index);
+                }
+
+                return fallbackMatch;
+            }
+
+            return null;
         }
 
+        /// <summary>
+        /// Determines whether a finished step is in the same plan as a triggered step.
+        /// </summary>
+        /// <param name="triggeredStep">The triggered step to compare.</param>
+        /// <param name="finishedStep">The finished step to compare.</param>
+        /// <returns>True when both steps have the same plan identifier; otherwise, false.</returns>
+        private static bool IsSamePlan(TriggeredStepContext triggeredStep, FinishedStepContext finishedStep)
+        {
+            return !string.IsNullOrWhiteSpace(triggeredStep.PlanIdentifier)
+                && !string.IsNullOrWhiteSpace(finishedStep.PlanIdentifier)
+                && string.Equals(finishedStep.PlanIdentifier, triggeredStep.PlanIdentifier, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Determines whether a triggered step has metadata that can safely correlate to a finished step.
+        /// </summary>
+        /// <param name="triggeredStep">The triggered step to evaluate.</param>
+        /// <returns>True when correlation metadata exists; otherwise, false.</returns>
+        private static bool HasUsableCorrelationMetadata(TriggeredStepContext triggeredStep)
+        {
+            return !string.IsNullOrWhiteSpace(triggeredStep.StepId)
+                || !string.IsNullOrWhiteSpace(triggeredStep.TaskDialogId)
+                || !string.IsNullOrWhiteSpace(triggeredStep.RawStepType);
+        }
+
+        /// <summary>
+        /// Determines whether a received plan step has a matching triggered step.
+        /// </summary>
+        /// <param name="receivedStep">The received plan step to check.</param>
+        /// <param name="triggeredSteps">The triggered steps available in the transcript.</param>
+        /// <returns>True when a matching triggered step exists; otherwise, false.</returns>
         private static bool HasMatchingTriggeredStep(PlanStepContext receivedStep, List<TriggeredStepContext> triggeredSteps)
         {
             return triggeredSteps.Any(triggeredStep =>
@@ -276,6 +365,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 && IsSameStep(receivedStep, triggeredStep));
         }
 
+        /// <summary>
+        /// Determines whether two plan step contexts refer to the same step.
+        /// </summary>
+        /// <param name="first">The first plan step context.</param>
+        /// <param name="second">The second plan step context.</param>
+        /// <returns>True when both contexts identify the same step; otherwise, false.</returns>
         private static bool IsSameStep(PlanStepContext first, PlanStepContext second)
         {
             if (first == null || second == null)
@@ -308,6 +403,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 && string.Equals(first.PlanIdentifier, second.PlanIdentifier, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Resolves the execution status for a finished step.
+        /// </summary>
+        /// <param name="finishedStep">The finished step to evaluate.</param>
+        /// <returns>The execution status value.</returns>
         private static string ResolveExecutionStatus(FinishedStepContext finishedStep)
         {
             if (finishedStep == null)
@@ -329,6 +429,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             return "Failed";
         }
 
+        /// <summary>
+        /// Determines whether a finished step contains failure signals.
+        /// </summary>
+        /// <param name="finishedStep">The finished step to evaluate.</param>
+        /// <returns>True when a failure signal exists; otherwise, false.</returns>
         private static bool HasFailureSignal(FinishedStepContext finishedStep)
         {
             if (finishedStep == null)
@@ -344,7 +449,8 @@ namespace POWERCAT.Plugins.ConversationKpi
             var observation = finishedStep.Observation;
             if (HasNonEmptyProperty(observation, "error")
                 || HasNonEmptyProperty(observation, "errors")
-                || HasNonEmptyProperty(observation, "exception"))
+                || HasNonEmptyProperty(observation, "exception")
+                || IsTrueProperty(observation, "isError"))
             {
                 return true;
             }
@@ -358,6 +464,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             return false;
         }
 
+        /// <summary>
+        /// Gets a failure message from a finished step.
+        /// </summary>
+        /// <param name="finishedStep">The finished step containing failure details.</param>
+        /// <returns>The failure message, or null when no message is found.</returns>
         private static string GetFailureMessage(FinishedStepContext finishedStep)
         {
             if (finishedStep == null)
@@ -366,23 +477,121 @@ namespace POWERCAT.Plugins.ConversationKpi
             }
 
             var observation = finishedStep.Observation;
-            return GetNestedPropertyValue(observation, "error", "message")
-                ?? GetPropertyValue(observation, "error")
-                ?? GetNestedPropertyValue(observation, "exception", "message")
-                ?? GetPropertyValue(observation, "exception")
-                ?? GetFirstArrayMessage(observation, "errors")
-                ?? GetPropertyValue(observation, "message")
-                ?? GetNestedPropertyValue(finishedStep.SourceToken, "error", "message")
-                ?? GetPropertyValue(finishedStep.SourceToken, "error")
-                ?? GetNestedPropertyValue(finishedStep.SourceToken, "exception", "message")
-                ?? GetPropertyValue(finishedStep.SourceToken, "exception")
-                ?? GetFirstArrayMessage(finishedStep.SourceToken, "errors")
-                ?? GetPropertyValue(finishedStep.SourceToken, "message")
+            return SanitizeFailureMessage(GetNestedPropertyValue(observation, "error", "message"))
+                ?? SanitizeFailureMessage(GetNestedPropertyValue(observation, "error", "innerError", "error", "message"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(observation, "error"))
+                ?? SanitizeFailureMessage(GetNestedPropertyValue(observation, "exception", "message"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(observation, "exception"))
+                ?? SanitizeFailureMessage(GetFirstArrayMessage(observation, "errors"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(observation, "message"))
+                ?? GetContentFailureMessage(observation)
+                ?? SanitizeFailureMessage(GetNestedPropertyValue(finishedStep.SourceToken, "error", "message"))
+                ?? SanitizeFailureMessage(GetNestedPropertyValue(finishedStep.SourceToken, "error", "innerError", "error", "message"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(finishedStep.SourceToken, "error"))
+                ?? SanitizeFailureMessage(GetNestedPropertyValue(finishedStep.SourceToken, "exception", "message"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(finishedStep.SourceToken, "exception"))
+                ?? SanitizeFailureMessage(GetFirstArrayMessage(finishedStep.SourceToken, "errors"))
+                ?? SanitizeFailureMessage(GetSimplePropertyValue(finishedStep.SourceToken, "message"))
                 ?? (!string.IsNullOrWhiteSpace(finishedStep.State) && !IsSuccessLike(finishedStep.State)
-                    ? finishedStep.State
+                    ? SanitizeFailureMessage(finishedStep.State)
                     : null);
         }
 
+        /// <summary>
+        /// Gets a compact failure message from MCP/tool content items.
+        /// </summary>
+        /// <param name="observation">The observation token to inspect.</param>
+        /// <returns>The failure message, or null when none is found.</returns>
+        private static string GetContentFailureMessage(JToken observation)
+        {
+            var contentArray = GetPropertyToken(observation, "content") as JArray;
+            if (contentArray == null)
+            {
+                return null;
+            }
+
+            foreach (var contentItem in contentArray)
+            {
+                var text = GetSimplePropertyValue(contentItem, "text");
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                var jsonMessage = GetMessageFromJsonText(text);
+                if (!string.IsNullOrWhiteSpace(jsonMessage))
+                {
+                    return SanitizeFailureMessage(jsonMessage);
+                }
+
+                var message = SanitizeFailureMessage(text);
+                if (!string.IsNullOrWhiteSpace(message))
+                {
+                    return message;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets a compact message from JSON encoded text.
+        /// </summary>
+        /// <param name="text">The text to parse.</param>
+        /// <returns>The message, or null when no known message property is found.</returns>
+        private static string GetMessageFromJsonText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return null;
+            }
+
+            try
+            {
+                var token = JToken.Parse(text);
+                return GetNestedPropertyValue(token, "error", "message")
+                    ?? GetNestedPropertyValue(token, "error", "innerError", "error", "message")
+                    ?? GetNestedPropertyValue(token, "innerError", "error", "message")
+                    ?? GetNestedPropertyValue(token, "exception", "message")
+                    ?? GetSimplePropertyValue(token, "message");
+            }
+            catch (Newtonsoft.Json.JsonException)
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Normalizes and limits a failure message for KPI storage.
+        /// </summary>
+        /// <param name="message">The failure message to sanitize.</param>
+        /// <returns>The sanitized failure message, or null when empty.</returns>
+        private static string SanitizeFailureMessage(string message)
+        {
+            const int maxFailureMessageLength = 500;
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return null;
+            }
+
+            var compactMessage = string.Join(" ", message
+                .Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Trim())
+                .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+            if (compactMessage.Length <= maxFailureMessageLength)
+            {
+                return compactMessage;
+            }
+
+            return compactMessage.Substring(0, maxFailureMessageLength) + "...";
+        }
+
+        /// <summary>
+        /// Parses an execution time value into seconds.
+        /// </summary>
+        /// <param name="executionTime">The execution time value to parse.</param>
+        /// <returns>The execution time in seconds, or null when the value cannot be parsed.</returns>
         private static double? ParseExecutionTimeSeconds(string executionTime)
         {
             if (string.IsNullOrWhiteSpace(executionTime))
@@ -399,6 +608,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return Math.Round(parsedTimeSpan.TotalSeconds, 3);
         }
 
+        /// <summary>
+        /// Resolves the normalized tool step type for a plan step.
+        /// </summary>
+        /// <param name="step">The plan step context to evaluate.</param>
+        /// <param name="finishedStep">The matching finished step, when available.</param>
+        /// <returns>The resolved step type.</returns>
         private static string ResolveStepType(PlanStepContext step, FinishedStepContext finishedStep)
         {
             var rawTaskDialogId = step?.TaskDialogId;
@@ -431,11 +646,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                 return "CustomPrompt";
             }
 
-            if (IsFlowStep(step))
-            {
-                return "Flow";
-            }
-
             if (string.Equals(step?.RawStepType, "Action", StringComparison.OrdinalIgnoreCase))
             {
                 return "Action";
@@ -444,6 +654,11 @@ namespace POWERCAT.Plugins.ConversationKpi
             return "Other";
         }
 
+        /// <summary>
+        /// Determines whether an observation represents a custom prompt result.
+        /// </summary>
+        /// <param name="observation">The observation token to evaluate.</param>
+        /// <returns>True when the observation represents a custom prompt result; otherwise, false.</returns>
         private static bool IsCustomPromptObservation(JToken observation)
         {
             return observation != null
@@ -451,40 +666,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                 && !string.IsNullOrWhiteSpace(GetPropertyValue(observation, "operationStatus"));
         }
 
-        private static bool IsFlowStep(PlanStepContext step)
-        {
-            if (step?.SourceToken == null)
-            {
-                return false;
-            }
-
-            var candidateValues = new[]
-            {
-                GetPropertyValue(step.SourceToken, "actionDefinitionType"),
-                GetPropertyValue(step.SourceToken, "actionType"),
-                GetPropertyValue(step.SourceToken, "definitionType"),
-                GetPropertyValue(step.SourceToken, "operationType"),
-                GetNestedPropertyValue(step.SourceToken, "actionDefinition", "type"),
-                GetNestedPropertyValue(step.SourceToken, "actionDefinition", "definitionType"),
-                GetNestedPropertyValue(step.SourceToken, "actionDefinition", "operationType")
-            };
-
-            return candidateValues.Any(value => IsFlowMetadataValue(value));
-        }
-
-        private static bool IsFlowMetadataValue(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return false;
-            }
-
-            return string.Equals(value, "Flow", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "CloudFlow", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "Cloud Flow", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "cloud-flow", StringComparison.OrdinalIgnoreCase);
-        }
-
+        /// <summary>
+        /// Normalizes known task dialog ids to display-friendly values.
+        /// </summary>
+        /// <param name="taskDialogId">The task dialog id to normalize.</param>
+        /// <returns>The normalized task dialog id.</returns>
         private static string NormalizeTaskDialogId(string taskDialogId)
         {
             if (string.Equals(taskDialogId, "P:UniversalSearchTool", StringComparison.OrdinalIgnoreCase))
@@ -505,6 +691,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return taskDialogId;
         }
 
+        /// <summary>
+        /// Determines whether an activity matches a transcript value type.
+        /// </summary>
+        /// <param name="activity">The activity to evaluate.</param>
+        /// <param name="valueType">The expected value type.</param>
+        /// <returns>True when the activity value type or name matches; otherwise, false.</returns>
         private static bool IsActivityMatch(Activity activity, string valueType)
         {
             return activity != null
@@ -512,6 +704,11 @@ namespace POWERCAT.Plugins.ConversationKpi
                     || string.Equals(activity.name, valueType, StringComparison.OrdinalIgnoreCase));
         }
 
+        /// <summary>
+        /// Determines whether a plan step has enough metadata to identify a tool execution.
+        /// </summary>
+        /// <param name="step">The plan step context to evaluate.</param>
+        /// <returns>True when identifying metadata exists; otherwise, false.</returns>
         private static bool HasIdentifyingMetadata(PlanStepContext step)
         {
             return step != null
@@ -519,20 +716,29 @@ namespace POWERCAT.Plugins.ConversationKpi
                     || !string.IsNullOrWhiteSpace(step.RawStepType));
         }
 
-        private static bool ShouldSkipToolExecution(PlanStepContext step)
+        /// <summary>
+        /// Determines whether a task dialog id should be skipped for tool execution metrics.
+        /// </summary>
+        /// <param name="taskDialogId">The task dialog id to evaluate.</param>
+        /// <returns>True when the task dialog id should be skipped; otherwise, false.</returns>
+        private static bool IsSkippedTaskDialogId(string taskDialogId)
         {
-            if (step == null || string.IsNullOrWhiteSpace(step.TaskDialogId))
+            if (string.IsNullOrWhiteSpace(taskDialogId))
             {
                 return false;
             }
 
-            var taskDialogId = step.TaskDialogId;
             return string.Equals(taskDialogId, "P:UniversalSearchTool", StringComparison.OrdinalIgnoreCase)
                 || taskDialogId.IndexOf(".topic.", StringComparison.OrdinalIgnoreCase) >= 0
                 || taskDialogId.IndexOf(".InvokeConnectedAgentTaskAction.", StringComparison.OrdinalIgnoreCase) >= 0
-                || taskDialogId.IndexOf("agent.Agent", StringComparison.OrdinalIgnoreCase) >= 0;
+                || taskDialogId.IndexOf(".agent.", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        /// <summary>
+        /// Determines whether a status value represents success.
+        /// </summary>
+        /// <param name="value">The status value to evaluate.</param>
+        /// <returns>True when the value represents success; otherwise, false.</returns>
         private static bool IsSuccessLike(string value)
         {
             return string.Equals(value, "completed", StringComparison.OrdinalIgnoreCase)
@@ -540,6 +746,12 @@ namespace POWERCAT.Plugins.ConversationKpi
                 || string.Equals(value, "succeeded", StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Determines whether a JSON token has a non-empty property value.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The property name to find.</param>
+        /// <returns>True when the property exists and is non-empty; otherwise, false.</returns>
         private static bool HasNonEmptyProperty(JToken token, string propertyName)
         {
             var propertyToken = GetPropertyToken(token, propertyName);
@@ -561,6 +773,59 @@ namespace POWERCAT.Plugins.ConversationKpi
             return true;
         }
 
+        /// <summary>
+        /// Determines whether a JSON token has a property set to true.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The property name to find.</param>
+        /// <returns>True when the property value is true; otherwise, false.</returns>
+        private static bool IsTrueProperty(JToken token, string propertyName)
+        {
+            var propertyToken = GetPropertyToken(token, propertyName);
+            if (propertyToken == null || propertyToken.Type == JTokenType.Null || propertyToken.Type == JTokenType.Undefined)
+            {
+                return false;
+            }
+
+            if (propertyToken.Type == JTokenType.Boolean)
+            {
+                return propertyToken.Value<bool>();
+            }
+
+            return string.Equals(propertyToken.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Gets a simple JSON property value as a string without serializing objects or arrays.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The property name to find.</param>
+        /// <returns>The simple property value, or null when the property is not simple.</returns>
+        private static string GetSimplePropertyValue(JToken token, string propertyName)
+        {
+            var propertyToken = GetPropertyToken(token, propertyName);
+            if (propertyToken == null || propertyToken.Type == JTokenType.Null || propertyToken.Type == JTokenType.Undefined)
+            {
+                return null;
+            }
+
+            if (propertyToken.Type == JTokenType.String
+                || propertyToken.Type == JTokenType.Integer
+                || propertyToken.Type == JTokenType.Float
+                || propertyToken.Type == JTokenType.Boolean)
+            {
+                return propertyToken.ToString();
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the first message from an array property.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The array property name to find.</param>
+        /// <returns>The first message value, or null when none is found.</returns>
         private static string GetFirstArrayMessage(JToken token, string propertyName)
         {
             var arrayToken = GetPropertyToken(token, propertyName) as JArray;
@@ -585,7 +850,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     }
                 }
 
-                var message = GetPropertyValue(child, "message");
+                var message = GetSimplePropertyValue(child, "message");
                 if (!string.IsNullOrWhiteSpace(message))
                 {
                     return message;
@@ -595,6 +860,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return null;
         }
 
+        /// <summary>
+        /// Gets a nested JSON property value as a string.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyNames">The nested property names to traverse.</param>
+        /// <returns>The nested property value, or null when the property is not found.</returns>
         private static string GetNestedPropertyValue(JToken token, params string[] propertyNames)
         {
             var nestedToken = GetNestedPropertyToken(token, propertyNames);
@@ -606,6 +877,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return nestedToken.Type == JTokenType.String ? nestedToken.ToString() : nestedToken.ToString(Newtonsoft.Json.Formatting.None);
         }
 
+        /// <summary>
+        /// Gets a nested JSON property token.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyNames">The nested property names to traverse.</param>
+        /// <returns>The nested property token, or null when the property is not found.</returns>
         private static JToken GetNestedPropertyToken(JToken token, params string[] propertyNames)
         {
             var currentToken = token;
@@ -621,12 +898,23 @@ namespace POWERCAT.Plugins.ConversationKpi
             return currentToken;
         }
 
+        /// <summary>
+        /// Gets a step id from a JSON token.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <returns>The step id, or null when no id is found.</returns>
         private static string GetStepId(JToken token)
         {
             return GetPropertyValue(token, "stepId")
                 ?? GetPropertyValue(token, "id");
         }
 
+        /// <summary>
+        /// Gets a JSON property value as a string.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The property name to find.</param>
+        /// <returns>The property value, or null when the property is not found.</returns>
         private static string GetPropertyValue(JToken token, string propertyName)
         {
             var propertyToken = GetPropertyToken(token, propertyName);
@@ -638,6 +926,12 @@ namespace POWERCAT.Plugins.ConversationKpi
             return propertyToken.Type == JTokenType.String ? propertyToken.ToString() : propertyToken.ToString(Newtonsoft.Json.Formatting.None);
         }
 
+        /// <summary>
+        /// Gets a JSON property token by name using case-insensitive matching.
+        /// </summary>
+        /// <param name="token">The JSON token to inspect.</param>
+        /// <param name="propertyName">The property name to find.</param>
+        /// <returns>The property token, or null when the property is not found.</returns>
         private static JToken GetPropertyToken(JToken token, string propertyName)
         {
             var jsonObject = token as JObject;
@@ -652,6 +946,13 @@ namespace POWERCAT.Plugins.ConversationKpi
             return property?.Value;
         }
 
+        /// <summary>
+        /// Creates a plan step context from a transcript JSON token.
+        /// </summary>
+        /// <param name="sourceToken">The source JSON token for the plan step.</param>
+        /// <param name="index">The transcript activity index.</param>
+        /// <param name="sessionContext">The session context for the activity.</param>
+        /// <returns>The created plan step context.</returns>
         private static PlanStepContext CreatePlanStepContext(JToken sourceToken, int index, SessionContext sessionContext)
         {
             if (sourceToken != null && sourceToken.Type == JTokenType.String)
@@ -679,6 +980,14 @@ namespace POWERCAT.Plugins.ConversationKpi
             };
         }
 
+        /// <summary>
+        /// Resolves the session context for an activity based on the next session info activity.
+        /// </summary>
+        /// <param name="sessionInfoActivities">The session info activities in the transcript.</param>
+        /// <param name="activityIndex">The current activity index.</param>
+        /// <param name="conversationId">The conversation identifier used to build the session id.</param>
+        /// <param name="agentId">The agent identifier used to build the session id.</param>
+        /// <returns>The resolved session context.</returns>
         private static SessionContext ResolveSessionContext(List<Activity> sessionInfoActivities, int activityIndex, string conversationId, string agentId)
         {
             var sessionInfo = sessionInfoActivities.FirstOrDefault(activity => activity.index > activityIndex);
