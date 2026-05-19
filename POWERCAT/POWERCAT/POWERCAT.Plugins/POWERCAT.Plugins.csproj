@@ -130,6 +130,7 @@
     <Compile Include="ConversationKpi\ProcessGenerativeAnswersArray.cs" />
     <Compile Include="ConversationKpi\ProcessKnowledgeSources.cs" />
     <Compile Include="ConversationKpi\ProcessSessionInsight.cs" />
+    <Compile Include="ConversationKpi\ProcessToolExecutions.cs" />
     <Compile Include="ConversationKpi\ProcessTrackedVariables.cs" />
     <Compile Include="ConversationKpi\ProcessTraversedComponents.cs" />
     <Compile Include="ConversationKpi\ProcessUnrecognizedUtterances.cs" />
