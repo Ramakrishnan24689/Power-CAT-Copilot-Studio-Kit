@@ -134,7 +134,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                     StepType = ResolveStepType(triggeredStep, finishedStep),
                     ExecutionTimeSeconds = finishedStep == null ? (double?)null : ParseExecutionTimeSeconds(finishedStep.ExecutionTime),
                     ExecutionStatus = executionStatus,
-                    Succeeded = string.Equals(executionStatus, "Succeeded", StringComparison.OrdinalIgnoreCase),
                     FailureMessage = string.Equals(executionStatus, "Failed", StringComparison.OrdinalIgnoreCase)
                         ? GetFailureMessage(finishedStep)
                         : null
@@ -157,7 +156,6 @@ namespace POWERCAT.Plugins.ConversationKpi
                     StepType = ResolveStepType(receivedStep, null),
                     ExecutionTimeSeconds = null,
                     ExecutionStatus = "Skipped",
-                    Succeeded = false,
                     FailureMessage = null
                 });
             }

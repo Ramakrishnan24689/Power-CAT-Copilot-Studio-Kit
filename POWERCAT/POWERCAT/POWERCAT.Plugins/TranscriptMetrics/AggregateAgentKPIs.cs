@@ -211,8 +211,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     "cat_sessioninfo",
                     "cat_feedbackdetails",
                     "cat_connectedagentdetails",
-                    "cat_runcount",
-                    "cat_successfulruncount",
+                    "cat_runs",
+                    "cat_successfulruns",
                     "cat_totaldurationseconds"
                 ),
                 PageInfo = new PagingInfo
@@ -248,8 +248,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ConversationDate = dateValue.Value.Date.ToString("yyyy-MM-dd"),
                         DataSourceCode = entity.GetAttributeValue<OptionSetValue>("cat_datasourcecode")?.Value ?? 1,
                         ChannelId = entity.GetAttributeValue<string>("cat_channelid"),
-                        RunCount = entity.GetAttributeValue<int>("cat_runcount"),
-                        SuccessfulRunCount = entity.GetAttributeValue<int>("cat_successfulruncount"),
+                        RunCount = entity.GetAttributeValue<int>("cat_runs"),
+                        SuccessfulRunCount = entity.GetAttributeValue<int>("cat_successfulruns"),
                         TotalDurationSeconds = entity.GetAttributeValue<int>("cat_totaldurationseconds")
                     };
 

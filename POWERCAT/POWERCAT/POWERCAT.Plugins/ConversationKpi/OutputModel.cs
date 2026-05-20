@@ -76,7 +76,7 @@ namespace POWERCAT.Plugins.ConversationKpi
     {
         [JsonProperty("Session ID", Order = 1)]
         public string SessionID { get; set; }
-        [JsonProperty("Task Dialog Id", Order = 2)]
+        [JsonProperty("Component ID", Order = 2)]
         public string TaskDialogId { get; set; }
         [JsonProperty("Step Type", Order = 3)]
         public string StepType { get; set; }
@@ -84,9 +84,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public double? ExecutionTimeSeconds { get; set; }
         [JsonProperty("Execution Status", Order = 5)]
         public string ExecutionStatus { get; set; }
-        [JsonProperty("Succeeded", Order = 6)]
-        public bool Succeeded { get; set; }
-        [JsonProperty("Failure Message", Order = 7)]
+        [JsonProperty("Failure Message", Order = 6)]
         public string FailureMessage { get; set; }
     }
 

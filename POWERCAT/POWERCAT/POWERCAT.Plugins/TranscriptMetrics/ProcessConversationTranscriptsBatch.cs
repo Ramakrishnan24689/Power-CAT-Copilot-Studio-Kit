@@ -437,8 +437,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             entity["cat_connectedagentdetails"] = connectedAgentDetails.Count > 0 ? JsonConvert.SerializeObject(connectedAgentDetails) : null;
             entity["cat_datasourcecode"] = new OptionSetValue(dataSourceCode);
             entity["cat_sessioninfo"] = JsonConvert.SerializeObject(sessionInfoRows);
-            entity["cat_runcount"] = runCount;
-            entity["cat_successfulruncount"] = successfulRunCount;
+            entity["cat_runs"] = runCount;
+            entity["cat_successfulruns"] = successfulRunCount;
             entity["cat_totaldurationseconds"] = totalDurationSeconds;
             entity["cat_workflowstatus"] = new OptionSetValue(1);
             entity["ttlinseconds"] = 259200;
