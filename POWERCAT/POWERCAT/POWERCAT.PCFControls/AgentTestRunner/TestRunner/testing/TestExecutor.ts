@@ -500,6 +500,9 @@ export class TestRunner {
         );
       }
 
+      // Load attachment file data for test cases that have attachments enabled
+      await this.testSetOps.loadAttachmentsForTestCases(testCases);
+
       // Execute all tests
       const summary = await this.executeAllTests(
         testCases,

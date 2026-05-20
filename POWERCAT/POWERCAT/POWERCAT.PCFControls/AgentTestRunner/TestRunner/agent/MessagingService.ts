@@ -25,6 +25,7 @@ import type {
   AgentResponse,
   AgentTestCase,
   AdaptiveCard,
+  TestCaseAttachmentData,
 } from "../shared/models/DataModels";
 
 /**
@@ -177,6 +178,99 @@ export class MessagingService {
   }
 
   /**
+   * Sends a pvaSetContext event with external variables to the agent.
+   * Must be called after conversation creation but before sending the user message.
+   * @param conversationId - The conversation to send the event to
+   * @param externalVariablesJson - JSON string of external variables to set
+   */
+  private async sendExternalVariablesEvent(
+    conversationId: string,
+    externalVariablesJson: string
+  ): Promise<void> {
+    const client = this.conversationManager.getClient();
+    if (!client) {
+      throw new Error("Client not available for sending external variables");
+    }
+
+    const parsedValue = JSON.parse(externalVariablesJson);
+
+    const pvaSetContextActivity = {
+      type: "event",
+      name: "pvaSetContext",
+      value: parsedValue,
+    };
+
+    await client.sendActivity(
+      pvaSetContextActivity as unknown as Activity,
+      conversationId
+    );
+  }
+
+  /**
+   * Sends a startConversation event to trigger the Conversation Start topic.
+   * Used when the conversation was created without the start event (sendStartEvent=false)
+   * to allow pvaSetContext to be sent first.
+   * @param conversationId - The conversation to send the event to
+   * @returns The start activity responses from the agent
+   */
+  private async sendStartConversationEvent(
+    conversationId: string
+  ): Promise<Activity[]> {
+    const client = this.conversationManager.getClient();
+    if (!client) {
+      throw new Error("Client not available for sending start conversation event");
+    }
+
+    const startConversationActivity = {
+      type: "event",
+      name: "startConversation",
+    };
+
+    const activities = await client.sendActivity(
+      startConversationActivity as unknown as Activity,
+      conversationId
+    );
+
+    return activities || [];
+  }
+
+  /**
+   * Sends a message with an attachment to the agent using sendActivity.
+   * Used instead of askQuestionAsync when a test case has an attachment.
+   * @param message - Message text to send
+   * @param conversationId - The conversation ID
+   * @param attachmentData - The attachment file data
+   * @returns Array of response activities from the agent
+   */
+  private async sendMessageWithAttachment(
+    message: string,
+    conversationId: string,
+    attachmentData: TestCaseAttachmentData
+  ): Promise<Activity[]> {
+    const client = this.conversationManager.getClient();
+    if (!client) {
+      throw new Error("Client not available for sending message with attachment");
+    }
+
+    const messageActivity = {
+      type: "message",
+      text: message,
+      attachments: [
+        {
+          contentType: attachmentData.mimeType,
+          name: attachmentData.fileName,
+          contentUrl: `data:${attachmentData.mimeType};base64,${attachmentData.base64Content}`,
+        },
+      ],
+    };
+
+    return await client.sendActivity(
+      messageActivity as unknown as Activity,
+      conversationId
+    );
+  }
+
+  /**
    * Sends a message to the agent and processes the response.
    * Creates a new conversation and handles the complete message exchange.
    * @param message - Message text to send to the agent
@@ -192,16 +286,13 @@ export class MessagingService {
     let allActivities: Activity[] = [];
 
     try {
-      const result = await this.conversationManager.createConversation();
-      conversationId = result.conversationId;
+      const hasExternalVars = !!testCase?.externalVariablesJson;
 
-      // Include start conversation activity based on test case setting
-      if (
-        result.startActivity &&
-        (testCase?.isStartConversationEventSent ?? true)
-      ) {
-        allActivities.push(result.startActivity);
-      }
+      // When external variables exist, defer the startConversation event
+      // so pvaSetContext is sent first (variables must be set before Conversation Start topic fires)
+      // Order: Initiate → pvaSetContext → startConversation → utterance
+      const result = await this.conversationManager.createConversation(!hasExternalVars);
+      conversationId = result.conversationId;
 
       if (!conversationId) {
         throw new Error(
@@ -214,9 +305,35 @@ export class MessagingService {
         throw new Error("Client not available");
       }
 
+      if (hasExternalVars) {
+        // Send external variables BEFORE the start conversation event
+        await this.sendExternalVariablesEvent(conversationId, testCase!.externalVariablesJson!);
+
+        // Now send the startConversation event to trigger the Conversation Start topic
+        // (which can now read the external variables)
+        if (testCase?.isStartConversationEventSent ?? true) {
+          const startActivities = await this.sendStartConversationEvent(conversationId);
+          if (startActivities.length) {
+            allActivities.push(...startActivities);
+          }
+        }
+      } else {
+        // No external variables — start activity was already sent during createConversation(true)
+        if (
+          result.startActivity &&
+          (testCase?.isStartConversationEventSent ?? true)
+        ) {
+          allActivities.push(result.startActivity);
+        }
+      }
+
       let activities;
       try {
-        activities = await client.askQuestionAsync(message, conversationId);
+        if (testCase?.attachmentData) {
+          activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+        } else {
+          activities = await client.askQuestionAsync(message, conversationId);
+        }
       } catch (apiError) {
         // Handle token-related errors with refresh
         if (
@@ -228,10 +345,14 @@ export class MessagingService {
           await this.conversationManager.refreshToken();
           const refreshedClient = this.conversationManager.getClient();
           if (refreshedClient) {
-            activities = await refreshedClient.askQuestionAsync(
-              message,
-              conversationId
-            );
+            if (testCase?.attachmentData) {
+              activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+            } else {
+              activities = await refreshedClient.askQuestionAsync(
+                message,
+                conversationId
+              );
+            }
           } else {
             throw new Error("Failed to get refreshed client");
           }
@@ -335,7 +456,17 @@ export class MessagingService {
         throw new Error("Client not available for continuing conversation");
       }
 
-      const activities = await client.askQuestionAsync(message, conversationId);
+      // Send external variables as pvaSetContext event before the user message
+      if (testCase?.externalVariablesJson) {
+        await this.sendExternalVariablesEvent(conversationId, testCase.externalVariablesJson);
+      }
+
+      let activities;
+      if (testCase?.attachmentData) {
+        activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+      } else {
+        activities = await client.askQuestionAsync(message, conversationId);
+      }
 
       if (activities?.length) {
         allActivities = [...allActivities, ...activities];
@@ -424,6 +555,11 @@ export class MessagingService {
       const client = this.conversationManager.getClient();
       if (!client) {
         throw new Error("Client not available for invoke action");
+      }
+
+      // Send external variables as pvaSetContext event before the invoke action
+      if (testCase?.externalVariablesJson) {
+        await this.sendExternalVariablesEvent(conversationId, testCase.externalVariablesJson);
       }
 
       // Create a simple invoke activity object and cast to Activity

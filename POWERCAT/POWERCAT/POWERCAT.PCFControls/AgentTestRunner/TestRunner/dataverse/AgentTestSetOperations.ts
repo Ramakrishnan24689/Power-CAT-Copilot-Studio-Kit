@@ -18,7 +18,7 @@
  */
 
 import { DataverseOperationBase } from "./DataverseOperationBase";
-import type { AgentTestSet, AgentTestCase } from "../shared/models/DataModels";
+import type { AgentTestSet, AgentTestCase, TestCaseAttachmentData } from "../shared/models/DataModels";
 
 /**
  * Service for managing agent test set and test case operations in Microsoft Dataverse
@@ -97,6 +97,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
+            <attribute name="cat_includeattachment"/>
+            <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_name" />
             <filter type="and">
               <condition attribute="cat_copilottestsetid" operator="eq" value="${testSetId}" />
@@ -155,6 +157,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
+            <attribute name="cat_includeattachment"/>
+            <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_order" />
             <filter type="and">
               <condition attribute="cat_parent" operator="eq" value="${parentTestId}" />
@@ -214,6 +218,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
       order: entity.cat_order as number,
       critical: entity.cat_critical as boolean,
       cat_passthreshold: entity.cat_passthreshold as number,
+      includeAttachment: entity.cat_includeattachment as boolean,
+      attachmentFileName: entity.cat_attachmentfile_name as string,
     }));
   }
 
@@ -238,5 +244,125 @@ export class AgentTestSetOperations extends DataverseOperationBase {
         }
       }
     }
+  }
+
+  /**
+   * Download attachment file content from Dataverse File column
+   *
+   * @param testCaseId - GUID of the test case record
+   * @param fileName - Name of the file for MIME type detection
+   * @returns Promise resolving to TestCaseAttachmentData with base64 content
+   * @public
+   */
+  async getAttachmentFileContent(
+    testCaseId: string,
+    fileName: string
+  ): Promise<TestCaseAttachmentData> {
+    return this.executeOperation(async () => {
+      const orgUrl = this.getOrgUrl();
+      const url = `${orgUrl}/api/data/v9.2/cat_copilottests(${testCaseId})/cat_attachmentfile/$value`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Accept": "*/*",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to download attachment: ${response.status} ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const base64Content = await this.blobToBase64(blob);
+      const mimeType = this.getMimeType(fileName);
+
+      return {
+        fileName,
+        mimeType,
+        base64Content,
+      };
+    }, "Get attachment file content");
+  }
+
+  /**
+   * Load attachment data for all test cases that have attachments enabled
+   *
+   * @param testCases - Array of test cases to load attachments for
+   * @public
+   */
+  async loadAttachmentsForTestCases(testCases: AgentTestCase[]): Promise<void> {
+    const allCases = [...testCases];
+    // Include child tests
+    for (const tc of testCases) {
+      if (tc.childTests?.length) {
+        allCases.push(...tc.childTests);
+      }
+    }
+
+    for (const testCase of allCases) {
+      if (testCase.includeAttachment && testCase.attachmentFileName) {
+        try {
+          testCase.attachmentData = await this.getAttachmentFileContent(
+            testCase.id,
+            testCase.attachmentFileName
+          );
+        } catch {
+          // Attachment loading failed — test will proceed without it
+          testCase.attachmentData = undefined;
+        }
+      }
+    }
+  }
+
+  /**
+   * Convert Blob to base64 string
+   * @private
+   */
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // Remove the data:...;base64, prefix
+        const base64 = result.split(",")[1] || result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Determine MIME type from file name extension
+   * @private
+   */
+  private getMimeType(fileName: string): string {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    const mimeTypes: Record<string, string> = {
+      pdf: "application/pdf",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      bmp: "image/bmp",
+      svg: "image/svg+xml",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ppt: "application/vnd.ms-powerpoint",
+      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      txt: "text/plain",
+      csv: "text/csv",
+      json: "application/json",
+      xml: "application/xml",
+      zip: "application/zip",
+      mp3: "audio/mpeg",
+      mp4: "video/mp4",
+      wav: "audio/wav",
+    };
+    return mimeTypes[ext] || "application/octet-stream";
   }
 }
