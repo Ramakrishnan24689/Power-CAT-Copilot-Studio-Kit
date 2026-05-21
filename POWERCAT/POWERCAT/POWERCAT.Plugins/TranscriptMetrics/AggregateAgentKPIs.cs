@@ -248,8 +248,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         ConversationDate = dateValue.Value.Date.ToString("yyyy-MM-dd"),
                         DataSourceCode = entity.GetAttributeValue<OptionSetValue>("cat_datasourcecode")?.Value ?? 1,
                         ChannelId = entity.GetAttributeValue<string>("cat_channelid"),
-                        RunCount = entity.GetAttributeValue<int>("cat_runs"),
-                        SuccessfulRunCount = entity.GetAttributeValue<int>("cat_successfulruns"),
+                        Runs = entity.GetAttributeValue<int>("cat_runs"),
+                        SuccessfulRuns = entity.GetAttributeValue<int>("cat_successfulruns"),
                         TotalDurationSeconds = entity.GetAttributeValue<int>("cat_totaldurationseconds")
                     };
 
@@ -354,8 +354,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     {
                         // Process all SessionInfo items
                         ProcessSessionInfoItems(conversation.SessionInfo, kpi, string.Equals(kpi.ChannelId, "pva-autonomous", StringComparison.OrdinalIgnoreCase));
-                        kpi.RunCount += conversation.RunCount;
-                        kpi.SuccessfulRunCount += conversation.SuccessfulRunCount;
+                        kpi.Runs += conversation.Runs;
+                        kpi.SuccessfulRuns += conversation.SuccessfulRuns;
                         kpi.TotalDurationSeconds += conversation.TotalDurationSeconds;
                         AggregateConnectedAgentDetails(conversation.ConnectedAgentDetails, kpi, connectedAgentNameMap);
                         // Aggregate pre-processed feedback details
@@ -373,9 +373,9 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                         }
                     }
 
-                    if (kpi.RunCount > 0)
+                    if (kpi.Runs > 0)
                     {
-                        kpi.AverageDurationSeconds = (int)Math.Floor((double)kpi.TotalDurationSeconds / kpi.RunCount);
+                        kpi.AverageDurationSeconds = (int)Math.Floor((double)kpi.TotalDurationSeconds / kpi.Runs);
                     }
 
                     return kpi;
@@ -449,8 +449,8 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 entity["cat_feedbackdislikecount"] = kpi.FeedbackDislikeCount;
                 entity["cat_csatscore"] = kpi.CsatScore;
                 entity["cat_csatcount"] = kpi.CsatCount;
-                entity["cat_runs"] = kpi.RunCount;
-                entity["cat_successfulruns"] = kpi.SuccessfulRunCount;
+                entity["cat_runs"] = kpi.Runs;
+                entity["cat_successfulruns"] = kpi.SuccessfulRuns;
                 entity["cat_averagedurationseconds"] = kpi.AverageDurationSeconds;
                 entity["cat_connectedagentdetails"] = kpi.ConnectedAgentSummaries.Count > 0
                     ? JsonConvert.SerializeObject(kpi.ConnectedAgentSummaries)
