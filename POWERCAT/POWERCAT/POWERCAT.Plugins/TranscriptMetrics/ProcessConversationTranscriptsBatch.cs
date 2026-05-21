@@ -593,12 +593,22 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             return connectedAgentDetails;
         }
 
+        /// <summary>
+        /// Determines whether the task dialog identifier represents a connected agent invocation.
+        /// </summary>
+        /// <param name="taskDialogId">The task dialog identifier to evaluate.</param>
+        /// <returns><c>true</c> if the task dialog identifier matches a connected agent pattern; otherwise, <c>false</c>.</returns>
         private static bool IsConnectedAgentTaskDialogId(string taskDialogId)
         {
             return taskDialogId.IndexOf("InvokeConnectedAgentTaskAction", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 taskDialogId.IndexOf(".agent.", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        /// <summary>
+        /// Gets the connected agent type represented by the task dialog identifier.
+        /// </summary>
+        /// <param name="taskDialogId">The task dialog identifier to evaluate.</param>
+        /// <returns>The connected agent type, or <c>Unknown</c> when the type cannot be determined.</returns>
         private static string GetConnectedAgentType(string taskDialogId)
         {
             if (string.IsNullOrEmpty(taskDialogId))
