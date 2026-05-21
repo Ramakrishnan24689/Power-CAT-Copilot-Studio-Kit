@@ -317,6 +317,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// </summary>
         /// <param name="conversations">The list of conversation records to aggregate.</param>
         /// <param name="agentConfigurationDetails">The agent configuration details.</param>
+        /// <param name="connectedAgentNameMap">Dictionary mapping connected agent task dialog IDs to friendly agent names.</param>
         /// <returns>A list of KPI groups with aggregated metrics.</returns>
         private List<KpiGroup> AggregateKpis(
             List<ConversationRecord> conversations,
@@ -536,6 +537,13 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             return groupResults;
         }
 
+        /// <summary>
+        /// Aggregates connected agent details into summary records for the KPI group.
+        /// Maps task dialog IDs to friendly names and tracks total count and success count per agent.
+        /// </summary>
+        /// <param name="connectedAgentDetails">The list of connected agent detail records to aggregate.</param>
+        /// <param name="kpi">The KPI group to update with aggregated connected agent summaries.</param>
+        /// <param name="connectedAgentNameMap">Dictionary mapping task dialog IDs to friendly agent names.</param>
         private void AggregateConnectedAgentDetails(
             List<ConnectedAgentDetailRecord> connectedAgentDetails,
             KpiGroup kpi,
@@ -635,6 +643,7 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         /// </summary>
         /// <param name="sessionInfoList">The list of session info items to process.</param>
         /// <param name="kpi">The KPI group to update.</param>
+        /// <param name="excludeSessionCount">Indicates whether to skip incrementing the session count.</param>
         private void ProcessSessionInfoItems(List<SessionInfo> sessionInfoList, KpiGroup kpi, bool excludeSessionCount)
         {
             if (sessionInfoList == null)
