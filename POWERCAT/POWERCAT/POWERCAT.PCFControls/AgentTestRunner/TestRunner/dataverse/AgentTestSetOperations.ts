@@ -260,26 +260,63 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   ): Promise<TestCaseAttachmentData> {
     return this.executeOperation(async () => {
       const orgUrl = this.getOrgUrl();
+      // Dataverse Web API file column download endpoint:
+      //   /api/data/v9.2/<entitySetName>(<id>)/<filecolumnname>/$value
+      // IMPORTANT: must use the entity SET name (plural: cat_copilottests),
+      // NOT the entity logical name (singular: cat_copilottest). Using the
+      // singular form returns HTTP 400 with OData error 0x80060888
+      // (Content-type negotiation failed) instead of a proper octet-stream
+      // response.
       const url = `${orgUrl}/api/data/v9.2/cat_copilottests(${testCaseId})/cat_attachmentfile/$value`;
 
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          "Accept": "*/*",
+          "OData-MaxVersion": "4.0",
+          "OData-Version": "4.0",
+          "If-None-Match": "null",
+          "Accept": "application/octet-stream",
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to download attachment: ${response.status} ${response.statusText}`);
+        let errBody = "";
+        try {
+          errBody = await response.text();
+        } catch {
+          /* ignore */
+        }
+        throw new Error(
+          `Failed to download file from Dataverse: ${response.status} ${response.statusText}` +
+            (errBody ? ` — ${errBody.slice(0, 200)}` : "")
+        );
       }
 
       const blob = await response.blob();
+
+      // Copilot Studio rejects attachments larger than 15 MB. Fail fast here
+      // with a clear error instead of letting the activity send fail with a
+      // less specific error from the channel.
+      const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+      if (blob.size > MAX_ATTACHMENT_BYTES) {
+        throw new Error(
+          `Attachment "${fileName}" is ${(blob.size / 1024 / 1024).toFixed(2)} MB, ` +
+            `which exceeds the Copilot Studio 15 MB upload limit.`
+        );
+      }
+
+      const resolvedFileName =
+        response.headers.get("x-ms-file-name") || fileName || "attachment";
+      const resolvedMimeType =
+        response.headers.get("mimetype") ||
+        response.headers.get("content-type")?.split(";")[0] ||
+        this.getMimeType(resolvedFileName);
+
       const base64Content = await this.blobToBase64(blob);
-      const mimeType = this.getMimeType(fileName);
 
       return {
-        fileName,
-        mimeType,
+        fileName: resolvedFileName,
+        mimeType: resolvedMimeType,
         base64Content,
       };
     }, "Get attachment file content");
@@ -307,8 +344,11 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             testCase.id,
             testCase.attachmentFileName
           );
-        } catch {
-          // Attachment loading failed — test will proceed without it
+        } catch (error) {
+          console.error(
+            `Failed to load attachment for test "${testCase.name}":`,
+            error
+          );
           testCase.attachmentData = undefined;
         }
       }

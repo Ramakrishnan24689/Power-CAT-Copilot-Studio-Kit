@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ConversationManager.ts
  *
  * Copyright (c) Microsoft Corporation. All rights reserved.
@@ -185,10 +185,12 @@ export class ConversationManager {
   /**
    * Creates a new conversation with the CopilotStudio agent.
    * Sends the initial conversation start event and returns conversation details.
+   * @param sendStartEvent - Whether to send the startConversation event (default: true).
+   *   Pass false when external variables need to be set before the Conversation Start topic fires.
    * @returns Promise resolving to conversation ID and start activity.
    * @throws If the client is not initialized or conversation creation fails.
    */
-  async createConversation(): Promise<{
+  async createConversation(sendStartEvent = true): Promise<{
     conversationId: string;
     startActivity: Activity | null;
   }> {
@@ -203,19 +205,43 @@ export class ConversationManager {
       await this.createClientWithToken();
     }
 
-    // Always send start event as true to start the conversation
-    const startActivity = await this.client!.startConversationAsync(true);
-
-    if (!startActivity.conversation || !startActivity.conversation.id) {
+    let startActivity: Activity | undefined;
+    try {
+      startActivity = await this.client!.startConversationAsync(sendStartEvent);
+    } catch (err) {
       throw new Error(
         CONVERSATION_MANAGER_CONSTANTS.ERROR_MESSAGES.CONVERSATION_CREATION_FAILED
       );
     }
 
-    return {
-      conversationId: startActivity.conversation.id,
-      startActivity: startActivity,
-    };
+    if (sendStartEvent) {
+      // When start event is emitted, the SDK returns the greeting message activity
+      // which contains the conversation ID
+      if (!startActivity || !startActivity.conversation || !startActivity.conversation.id) {
+        throw new Error(
+          CONVERSATION_MANAGER_CONSTANTS.ERROR_MESSAGES.CONVERSATION_CREATION_FAILED
+        );
+      }
+      return {
+        conversationId: startActivity.conversation.id,
+        startActivity,
+      };
+    } else {
+      // When start event is NOT emitted (deferred for pvaSetContext), the SDK returns
+      // no Message-type activities (postRequestAsync filters them out).
+      // The conversation ID is set internally on the client from the response header.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conversationId = (this.client as any).conversationId as string;
+      if (!conversationId) {
+        throw new Error(
+          CONVERSATION_MANAGER_CONSTANTS.ERROR_MESSAGES.CONVERSATION_CREATION_FAILED
+        );
+      }
+      return {
+        conversationId,
+        startActivity: null,
+      };
+    }
   }
 
   /**

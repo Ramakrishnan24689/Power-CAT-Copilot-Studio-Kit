@@ -17,16 +17,34 @@
  *   const continuedResponse = await service.continueConversation(message, conversationId, testCase);
  */
 
-import type { Activity } from "@microsoft/agents-activity";
+import { Activity } from "@microsoft/agents-activity";
 import { ConversationManager } from "./ConversationManager";
 import { MessageProcessor } from "./MessageProcessor";
 import { ResponseValidationEngine } from "../shared/utils/ResponseValidationEngine";
+import { extractTextFromAttachment } from "./AttachmentTextExtractor";
 import type {
   AgentResponse,
   AgentTestCase,
   AdaptiveCard,
   TestCaseAttachmentData,
 } from "../shared/models/DataModels";
+
+/**
+ * Generates an RFC4122 v4 UUID using the Web Crypto API when available,
+ * falling back to Math.random when not.
+ */
+function generateUuid(): string {
+  const cryptoObj = (typeof crypto !== "undefined" ? crypto : undefined) as Crypto | undefined;
+  if (cryptoObj?.randomUUID) {
+    return cryptoObj.randomUUID();
+  }
+  // Fallback (RFC4122 v4)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 /**
  * MessagingService manages agent communication and response processing.
@@ -235,12 +253,91 @@ export class MessagingService {
   }
 
   /**
-   * Sends a message with an attachment to the agent using sendActivity.
-   * Used instead of askQuestionAsync when a test case has an attachment.
-   * @param message - Message text to send
-   * @param conversationId - The conversation ID
-   * @param attachmentData - The attachment file data
-   * @returns Array of response activities from the agent
+   * Returns true for attachment types Copilot Studio agents process natively
+   * (images via vision, PDFs via document AI). For these types, sending the
+   * binary alone is sufficient — the agent will read it directly. Forcing a
+   * "could not extract" envelope on these types is harmful because it
+   * suppresses the agent's own multimodal capabilities.
+   */
+  private isAgentNativelyHandled(
+    mimeType: string,
+    fileName: string
+  ): boolean {
+    const m = (mimeType || "").toLowerCase();
+    const n = (fileName || "").toLowerCase();
+    if (m === "application/pdf" || n.endsWith(".pdf")) return true;
+    if (m.startsWith("image/")) return true;
+    if (/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(n)) return true;
+    return false;
+  }
+
+  /**
+   * Builds the text body for an attachment-bearing message. Three modes:
+   *
+   * 1. Client-side extraction produced text (PPTX/DOCX/XLSX/TXT/CSV/JSON/XML/...)
+   *    → inline the text verbatim and tell the agent to use it. Prevents the
+   *    generative-answer topic from web-searching the user utterance.
+   *
+   * 2. No extracted text, but the format is one Copilot Studio handles natively
+   *    (PDF, PNG/JPEG/WEBP/GIF/BMP/SVG)
+   *    → send a minimal prompt that lets the agent's own vision / document AI
+   *    process the attached binary. Do NOT add a "could not read" guard
+   *    — that would suppress the agent's native capability.
+   *
+   * 3. No extracted text and not natively handled
+   *    → wrap the utterance in a guard that tells the agent an attachment is
+   *    present but unreadable client-side, and explicitly forbid web search
+   *    (prevents the generative-answer topic from returning irrelevant Bing
+   *    results).
+   *
+   * The binary file is always attached on the same activity regardless of mode.
+   */
+  private buildMessageWithExtractedText(
+    utterance: string,
+    attachmentData: TestCaseAttachmentData,
+    extractedText: string
+  ): string {
+    if (extractedText) {
+      return (
+        `The user has attached a file named "${attachmentData.fileName}" ` +
+        `(${attachmentData.mimeType}). The complete text content of this file is ` +
+        `included verbatim between the markers below. Please use only this ` +
+        `inlined file content to answer the user's request. Do not perform a ` +
+        `web search — the answer is contained in the content below.\n\n` +
+        `--- BEGIN ATTACHED FILE CONTENT (${attachmentData.fileName}) ---\n` +
+        `${extractedText}\n` +
+        `--- END ATTACHED FILE CONTENT ---\n\n` +
+        `User request:\n${utterance}`
+      );
+    }
+
+    if (this.isAgentNativelyHandled(attachmentData.mimeType, attachmentData.fileName)) {
+      return (
+        `The user has attached a file named "${attachmentData.fileName}" ` +
+        `(${attachmentData.mimeType}). Use your built-in document/vision ` +
+        `understanding to read the attached file and answer the request.\n\n` +
+        `User request:\n${utterance}`
+      );
+    }
+
+    return (
+      `The user has attached a binary file named "${attachmentData.fileName}" ` +
+      `(${attachmentData.mimeType}). The text content of this file could not be ` +
+      `extracted client-side by the test runner. Do not perform a web search. ` +
+      `Respond only based on (a) the file name and type and (b) the user's ` +
+      `request below. If you cannot fulfil the request without the file's ` +
+      `content, reply that you were unable to read the attached file.\n\n` +
+      `User request:\n${utterance}`
+    );
+  }
+
+  /**
+   * Sends one message activity containing both utterance text and attachment.
+   *
+   * The activity carries the original binary file in `attachments[0]`, and the
+   * `text` field is enriched with the file's client-side-extracted content (for
+   * supported formats) so the agent can summarize even without server-side
+   * binary parsing.
    */
   private async sendMessageWithAttachment(
     message: string,
@@ -249,25 +346,44 @@ export class MessagingService {
   ): Promise<Activity[]> {
     const client = this.conversationManager.getClient();
     if (!client) {
-      throw new Error("Client not available for sending message with attachment");
+      throw new Error("Client not initialized for attachment send");
     }
 
-    const messageActivity = {
-      type: "message",
-      text: message,
+    const extractedText = await extractTextFromAttachment(attachmentData);
+    const enrichedText = this.buildMessageWithExtractedText(
+      message,
+      attachmentData,
+      extractedText
+    );
+
+    const dataUri = `data:${attachmentData.mimeType};base64,${attachmentData.base64Content}`;
+    const activityId = generateUuid();
+    const activity = new Activity("message");
+
+    Object.assign(activity, {
+      id: activityId,
+      text: enrichedText,
+      textFormat: "plain",
+      locale: "en-US",
+      inputHint: "acceptingInput",
+      from: { id: "user", role: "user", name: "Agent Test Runner" },
       attachments: [
         {
           contentType: attachmentData.mimeType,
           name: attachmentData.fileName,
-          contentUrl: `data:${attachmentData.mimeType};base64,${attachmentData.base64Content}`,
+          contentUrl: dataUri,
+          content: {
+            name: attachmentData.fileName,
+            mimeType: attachmentData.mimeType,
+            data: attachmentData.base64Content,
+          },
         },
       ],
-    };
+    });
 
-    return await client.sendActivity(
-      messageActivity as unknown as Activity,
-      conversationId
-    );
+    const activities = await client.sendActivity(activity, conversationId);
+
+    return activities || [];
   }
 
   /**
@@ -329,6 +445,12 @@ export class MessagingService {
 
       let activities;
       try {
+        if (testCase?.includeAttachment === true && !testCase.attachmentData) {
+          throw new Error(
+            `Attachment is enabled for test "${testCase.name}" but attachment data could not be loaded.`
+          );
+        }
+
         if (testCase?.attachmentData) {
           activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
         } else {
