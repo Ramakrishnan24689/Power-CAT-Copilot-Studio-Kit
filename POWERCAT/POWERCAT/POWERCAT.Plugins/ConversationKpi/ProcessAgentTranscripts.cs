@@ -93,6 +93,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ProcessFeedbackDetails processFeedbackDetails = new ProcessFeedbackDetails();
                     ProcessKnowledgeSources processKnowledgeSources = new ProcessKnowledgeSources();
                     ProcessUserPrompts processUserPrompts = new ProcessUserPrompts();
+                    ProcessToolExecutions processToolExecutions = new ProcessToolExecutions();
 
                     foreach (Entity agentTranscript in agentTranscriptList.Entities)
                     {
@@ -168,6 +169,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 UserPrompts = processUserPrompts.ProcessForUserPrompts(indexedModels, conversationId, agentId),
                                 ConversationTranscriptId = conversationTranscriptId.ToString(),
                                 CopyFullTranscript = agentTranscript.GetAttributeValue<bool>("cat_iscopyfulltranscriptenabled"),
+                                ChannelId = ExtractFirstChannelIdFromActivities(indexedModels),
                                 SessionDetails = processSessionInsight.ProcessTranscript(indexedModels, conversationId, agentId),
                                 ConversationInfoDetails = processSessionInsight.ProcessConversationInfoDetails(transcriptModel),
                                 TrackedVariables = processTrackedVariables.ProcessForTrackedVariables(indexedModels, trackedVaribales, conversationId, agentId),
@@ -177,6 +179,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                                 GenerativeAnswersList = processGenerativeAnswersArray.ProcessForGenerativeAnswers(indexedModels, conversationId, agentId),
                                 FeedbackDetails = processFeedbackDetails.ProcessForFeedbackDetails(indexedModels, conversationId, agentId),
                                 KnowledgeSourcesList = processKnowledgeSources.ProcessForKnowledgeSources(indexedModels, conversationId, agentId),
+                                ToolExecutionsList = processToolExecutions.ProcessForToolExecutions(indexedModels, conversationId, agentId),
                             };
                             processDetails.GlobalSessionDetail = processSessionInsight.GetGlobalDetails(processDetails.SessionDetails);
                             processDetailsList.Add(processDetails);
@@ -322,6 +325,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_conversationid"] = processDetails.ConversationId;
                     ConversationKpi["cat_conversationdate"] = processDetails.ConversationDate;
                     ConversationKpi["cat_conversationduration"] = processDetails.ConversationInfoDetails?.ConversationDuration;
+                    ConversationKpi["cat_channelid"] = processDetails.ChannelId;
                     ConversationKpi["cat_globaloutcomecode"] = new OptionSetValue((int)processDetails.GlobalSessionDetail?.GlobalOutcome);
                     if (processDetails.GlobalSessionDetail?.AvgCsat > 0) {
                         ConversationKpi["cat_csat"] = Convert.ToDecimal(processDetails.GlobalSessionDetail?.AvgCsat);
@@ -342,6 +346,7 @@ namespace POWERCAT.Plugins.ConversationKpi
                     ConversationKpi["cat_generativeanswers"] = JsonConvert.SerializeObject(processDetails.GenerativeAnswersList);
                     ConversationKpi["cat_feedbackdetails"] = JsonConvert.SerializeObject(processDetails.FeedbackDetails);
                     ConversationKpi["cat_knowledgesources"] = JsonConvert.SerializeObject(processDetails.KnowledgeSourcesList);
+                    ConversationKpi["cat_toolexecutions"] = JsonConvert.SerializeObject(processDetails.ToolExecutionsList);
                     entityCollection.Entities.Add(ConversationKpi);
                 }
             }
@@ -400,6 +405,33 @@ namespace POWERCAT.Plugins.ConversationKpi
                 _tracingService.Trace($"An error occurred in method ExecuteBatchRequests. Details: {ex.Message}");
                 throw ex;
             }
+        }
+
+        /// <summary>
+        /// Gets the first channel id from transcript activities.
+        /// </summary>
+        /// <param name="activities">Transcript activities.</param>
+        /// <returns>The first channel id found, otherwise Unknown.</returns>
+        private string ExtractFirstChannelIdFromActivities(List<Activity> activities)
+        {
+            if (activities == null || activities.Count == 0)
+            {
+                return "Unknown";
+            }
+
+            foreach (var activity in activities)
+            {
+                string type = activity.type;
+                bool isValidType = type == "event" || type == "message" || type == "conversationUpdate";
+                string activityChannelId = activity.channelId ?? activity.valueToken?["channelId"]?.ToString();
+
+                if (isValidType && !string.IsNullOrEmpty(activityChannelId))
+                {
+                    return activityChannelId;
+                }
+            }
+
+            return "Unknown";
         }
 
         /// <summary>

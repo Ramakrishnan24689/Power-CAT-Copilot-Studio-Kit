@@ -43,6 +43,18 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [DataMember(Name = "feedbackdetails")]
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; }
+
+        [DataMember(Name = "connectedagentdetails")]
+        public List<ConnectedAgentDetailRecord> ConnectedAgentDetails { get; set; }
+
+        [DataMember(Name = "Runs")]
+        public int Runs { get; set; }
+
+        [DataMember(Name = "SuccessfulRuns")]
+        public int SuccessfulRuns { get; set; }
+
+        [DataMember(Name = "TotalDurationSeconds")]
+        public int TotalDurationSeconds { get; set; }
     }
 
     /// <summary>
@@ -254,6 +266,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
         public int FeedbackDislikeCount { get; set; }
         public int CsatScore { get; set; }
         public int CsatCount { get; set; }
+        public int Runs { get; set; }
+        public int SuccessfulRuns { get; set; }
+        public int TotalDurationSeconds { get; set; }
+        public int AverageDurationSeconds { get; set; }
+        public List<ConnectedAgentSummaryRecord> ConnectedAgentSummaries { get; set; } = new List<ConnectedAgentSummaryRecord>();
         public List<FeedbackDetailRecord> FeedbackDetails { get; set; } = new List<FeedbackDetailRecord>();
 
         /// <summary>
@@ -284,5 +301,41 @@ namespace POWERCAT.Plugins.TranscriptMetrics
 
         [JsonProperty("Feedback Reaction")]
         public string FeedbackReaction { get; set; }
+    }
+
+    public class ConnectedAgentDetailRecord
+    {
+        [JsonProperty("TaskDialogId")]
+        public string TaskDialogId { get; set; }
+
+        [JsonProperty("IsSuccess")]
+        public bool IsSuccess { get; set; }
+
+        [JsonProperty("Type")]
+        public string Type { get; set; }
+    }
+
+    public class ConnectedAgentSummaryRecord
+    {
+        [JsonProperty("Agent")]
+        public string AgentName { get; set; }
+
+        [JsonProperty("Type")]
+        public string Type { get; set; }
+
+        [JsonProperty("Count")]
+        public int TotalCount { get; set; }
+
+        [JsonProperty("Success")]
+        public int SuccessCount { get; set; }
+    }
+
+    public class ConnectedAgentDefinitionInput
+    {
+        [JsonProperty("schemaname")]
+        public string SchemaName { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
     }
 }

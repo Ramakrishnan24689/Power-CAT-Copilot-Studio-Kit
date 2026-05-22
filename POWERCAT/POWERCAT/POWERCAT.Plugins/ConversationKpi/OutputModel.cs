@@ -18,6 +18,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public List<GenerativeAnswers> GenerativeAnswersList { get; set; } = new List<GenerativeAnswers>();
         public List<FeedbackDetails> FeedbackDetails { get; set; } = new List<FeedbackDetails>();
         public List<KnowledgeSource> KnowledgeSourcesList { get; set; } = new List<KnowledgeSource>();
+        public List<ToolExecution> ToolExecutionsList { get; set; } = new List<ToolExecution>();
         public ConversationInfoDetail ConversationInfoDetails { get; set; }
         public string AgentConfigurationId { get; set; }
         public string AgentId { get; set; }
@@ -27,6 +28,7 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string UserPrompts { get; set; }
         public string ConversationTranscriptId { get; set; }
         public bool CopyFullTranscript { get; set; }
+        public string ChannelId { get; set; }
     }
 
     public class GlobalSessionDetail
@@ -68,6 +70,22 @@ namespace POWERCAT.Plugins.ConversationKpi
         public string EndTimeUtc { get; set; }
         [JsonProperty("Outcome Reason", Order = 9)]
         public string OutcomeReason { get; set; }
+    }
+
+    public class ToolExecution
+    {
+        [JsonProperty("Session ID", Order = 1)]
+        public string SessionID { get; set; }
+        [JsonProperty("Component ID", Order = 2)]
+        public string TaskDialogId { get; set; }
+        [JsonProperty("Step Type", Order = 3)]
+        public string StepType { get; set; }
+        [JsonProperty("Execution Time Seconds", Order = 4)]
+        public double? ExecutionTimeSeconds { get; set; }
+        [JsonProperty("Execution Status", Order = 5)]
+        public string ExecutionStatus { get; set; }
+        [JsonProperty("Failure Message", Order = 6)]
+        public string FailureMessage { get; set; }
     }
 
     public class ConversationTurn
