@@ -145,7 +145,11 @@ namespace POWERCAT.Plugins.TranscriptMetrics
             }
             return default;
         }
-
+        /// <summary>
+        /// Parses connected agent definitions JSON and creates a case-insensitive mapping of schema names to display names.
+        /// </summary>
+        /// <param name="connectedAgentDefinitionsJson">JSON string containing connected agent definitions with SchemaName and Name properties.</param>
+        /// <returns>A case-insensitive dictionary mapping agent schema names to their display names. Returns empty dictionary if input is null, empty, or parsing fails.</returns>
         private Dictionary<string, string> GetConnectedAgentNameMap(string connectedAgentDefinitionsJson)
         {
             const string methodName = nameof(GetConnectedAgentNameMap);
