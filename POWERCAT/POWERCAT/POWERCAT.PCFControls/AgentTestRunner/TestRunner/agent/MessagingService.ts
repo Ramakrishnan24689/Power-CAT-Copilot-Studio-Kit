@@ -22,6 +22,7 @@ import { ConversationManager } from "./ConversationManager";
 import { MessageProcessor } from "./MessageProcessor";
 import { ResponseValidationEngine } from "../shared/utils/ResponseValidationEngine";
 import { extractTextFromAttachment } from "./AttachmentTextExtractor";
+import { detectAuthorizationAllowAction } from "./AuthorizationCardHandler";
 import type {
   AgentResponse,
   AgentTestCase,
@@ -387,6 +388,140 @@ export class MessagingService {
   }
 
   /**
+   * Auto-allow handling for the connector authorization adaptive card.
+   *
+   * Copilot Studio agents that use connectors (SharePoint, Dataverse, Power
+   * Automate, etc.) inject an "Allow / Cancel" adaptive card as the FIRST
+   * response on every new conversation. If the test response is that card,
+   * the test fails because the card is not the real answer. This helper
+   * detects the card, sends the Allow invoke (`adaptiveCard/action`) using the
+   * card's own payload, and returns the continuation activities so the caller
+   * can treat them as the real response for validation.
+   *
+   * Emits diagnostic console output prefixed with `[AgentTestRunner v3.1.142
+   * AutoAllow]` so the path can be traced in browser DevTools when debugging.
+   *
+   * Loops up to MAX_AUTO_ALLOW_ITERATIONS times so chained connector prompts
+   * (e.g. the agent invokes a second connector right after the first Allow)
+   * are also dismissed automatically in a single test run.
+   *
+   * @param responseActivities Activities just returned by the agent.
+   * @param conversationId Current conversation ID.
+   * @returns `{ intermediateAuthActivities, finalActivities }` when at least one
+   *   Allow was submitted; otherwise `null`. `intermediateAuthActivities` is the
+   *   concatenation of every auth-card response we dismissed; `finalActivities`
+   *   is the real continuation (auth-card free, unless we hit the iteration cap
+   *   or an invoke failed mid-loop).
+   */
+  private async autoAllowConnectorAuthorization(
+    responseActivities: Activity[],
+    conversationId: string
+  ): Promise<{ intermediateAuthActivities: Activity[]; finalActivities: Activity[] } | null> {
+    const tag = "[AgentTestRunner v3.1.142 AutoAllow]";
+    const MAX_AUTO_ALLOW_ITERATIONS = 10;
+
+    let current = responseActivities;
+    let detected = detectAuthorizationAllowAction(current);
+    console.info(
+      `${tag} scan: activities=${current?.length ?? 0} conversationId=${conversationId} detected=${!!detected}`
+    );
+    if (!detected) return null;
+
+    if (!this.conversationManager.getClient()) {
+      console.warn(`${tag} skipping: no client available`);
+      return null;
+    }
+
+    // Submit one invoke (adaptiveCard/action). Refresh the token once on 401/
+    // Unauthorized/token errors and retry — mirrors invokeAdaptiveCardAction.
+    const sendInvoke = async (payload: unknown): Promise<Activity[]> => {
+      const invokeActivity = new Activity("invoke");
+      Object.assign(invokeActivity, {
+        id: generateUuid(),
+        name: "adaptiveCard/action",
+        value: payload,
+        from: { id: "user", role: "user", name: "Agent Test Runner" },
+        locale: "en-US",
+      });
+
+      const runOnce = async (): Promise<Activity[]> => {
+        const c = this.conversationManager.getClient();
+        if (!c) throw new Error("client unavailable");
+        console.info(`${tag} sending invoke adaptiveCard/action ...`);
+        const t0 = Date.now();
+        const result = await c.sendActivity(invokeActivity, conversationId);
+        const ms = Date.now() - t0;
+        console.info(
+          `${tag} invoke returned in ${ms}ms — got ${result?.length ?? 0} continuation activities`
+        );
+        return result || [];
+      };
+
+      try {
+        return await runOnce();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const stack = err instanceof Error ? err.stack : "";
+        console.warn(`${tag} invoke threw: ${message}\n${stack}`);
+        if (
+          err instanceof Error &&
+          (message.includes("401") ||
+            message.includes("Unauthorized") ||
+            message.includes("token"))
+        ) {
+          console.info(`${tag} retrying invoke after token refresh ...`);
+          await this.conversationManager.refreshToken();
+          return await runOnce();
+        }
+        throw err;
+      }
+    };
+
+    const intermediateAuthActivities: Activity[] = [];
+
+    for (let iteration = 1; iteration <= MAX_AUTO_ALLOW_ITERATIONS; iteration++) {
+      console.info(
+        `${tag} iteration ${iteration}/${MAX_AUTO_ALLOW_ITERATIONS} — detected Allow payload: ${JSON.stringify(detected.actionPayload)}`
+      );
+
+      // Preserve the auth card we're about to dismiss in the visible response.
+      intermediateAuthActivities.push(...current);
+
+      let continuation: Activity[];
+      try {
+        continuation = await sendInvoke(detected.actionPayload);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`${tag} iteration ${iteration} invoke failed: ${message}`);
+        // First iteration failure → caller falls back to the original card.
+        // Later iteration failure → surface what we have so far, with the
+        // failed auth card as the "final" so the test result reflects reality.
+        if (iteration === 1) return null;
+        return { intermediateAuthActivities, finalActivities: current };
+      }
+
+      const nextDetected = detectAuthorizationAllowAction(continuation);
+      if (!nextDetected) {
+        console.info(
+          `${tag} iteration ${iteration} — no more auth cards. final activities=${continuation.length}`
+        );
+        return { intermediateAuthActivities, finalActivities: continuation };
+      }
+
+      console.info(
+        `${tag} iteration ${iteration} — another auth card detected in continuation, looping`
+      );
+      current = continuation;
+      detected = nextDetected;
+    }
+
+    console.warn(
+      `${tag} hit max iterations (${MAX_AUTO_ALLOW_ITERATIONS}) — returning latest continuation as final`
+    );
+    return { intermediateAuthActivities, finalActivities: current };
+  }
+
+  /**
    * Sends a message to the agent and processes the response.
    * Creates a new conversation and handles the complete message exchange.
    * @param message - Message text to send to the agent
@@ -480,6 +615,23 @@ export class MessagingService {
           }
         } else {
           throw apiError;
+        }
+      }
+
+      // Auto-handle the connector authorization "Allow / Cancel" adaptive card.
+      // When present in the first response, submit Allow transparently and use
+      // the continuation activities as the real response for validation. Loops
+      // internally to handle chained connector prompts. The auth card(s) are
+      // preserved in `allActivities` so the user-visible response still shows
+      // the connector handshake.
+      if (activities?.length) {
+        const allowResult = await this.autoAllowConnectorAuthorization(
+          activities,
+          conversationId
+        );
+        if (allowResult) {
+          allActivities = [...allActivities, ...allowResult.intermediateAuthActivities];
+          activities = allowResult.finalActivities;
         }
       }
 
@@ -588,6 +740,21 @@ export class MessagingService {
         activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
       } else {
         activities = await client.askQuestionAsync(message, conversationId);
+      }
+
+      // Auto-handle the connector authorization "Allow / Cancel" adaptive card
+      // on continued conversations too (a new connector can be referenced
+      // mid-conversation, triggering the prompt on a later turn). Loops to
+      // handle chained connector prompts.
+      if (activities?.length) {
+        const allowResult = await this.autoAllowConnectorAuthorization(
+          activities,
+          conversationId
+        );
+        if (allowResult) {
+          allActivities = [...allActivities, ...allowResult.intermediateAuthActivities];
+          activities = allowResult.finalActivities;
+        }
       }
 
       if (activities?.length) {
