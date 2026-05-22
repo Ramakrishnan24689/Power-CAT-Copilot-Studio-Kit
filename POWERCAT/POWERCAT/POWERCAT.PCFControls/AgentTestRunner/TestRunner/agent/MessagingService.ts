@@ -197,63 +197,6 @@ export class MessagingService {
   }
 
   /**
-   * Sends a pvaSetContext event with external variables to the agent.
-   * Must be called after conversation creation but before sending the user message.
-   * @param conversationId - The conversation to send the event to
-   * @param externalVariablesJson - JSON string of external variables to set
-   */
-  private async sendExternalVariablesEvent(
-    conversationId: string,
-    externalVariablesJson: string
-  ): Promise<void> {
-    const client = this.conversationManager.getClient();
-    if (!client) {
-      throw new Error("Client not available for sending external variables");
-    }
-
-    const parsedValue = JSON.parse(externalVariablesJson);
-
-    const pvaSetContextActivity = {
-      type: "event",
-      name: "pvaSetContext",
-      value: parsedValue,
-    };
-
-    await client.sendActivity(
-      pvaSetContextActivity as unknown as Activity,
-      conversationId
-    );
-  }
-
-  /**
-   * Sends a startConversation event to trigger the Conversation Start topic.
-   * Used when the conversation was created without the start event (sendStartEvent=false)
-   * to allow pvaSetContext to be sent first.
-   * @param conversationId - The conversation to send the event to
-   * @returns The start activity responses from the agent
-   */
-  private async sendStartConversationEvent(
-    conversationId: string
-  ): Promise<Activity[]> {
-    const client = this.conversationManager.getClient();
-    if (!client) {
-      throw new Error("Client not available for sending start conversation event");
-    }
-
-    const startConversationActivity = {
-      type: "event",
-      name: "startConversation",
-    };
-
-    const activities = await client.sendActivity(
-      startConversationActivity as unknown as Activity,
-      conversationId
-    );
-
-    return activities || [];
-  }
-
-  /**
    * Returns true for attachment types Copilot Studio agents process natively
    * (images via vision, PDFs via document AI). For these types, sending the
    * binary alone is sufficient — the agent will read it directly. Forcing a
@@ -499,13 +442,16 @@ export class MessagingService {
     let allActivities: Activity[] = [];
 
     try {
-      const hasExternalVars = !!testCase?.externalVariablesJson;
-
-      // When external variables exist, defer the startConversation event
-      // so pvaSetContext is sent first (variables must be set before Conversation Start topic fires)
-      // Order: Initiate → pvaSetContext → startConversation → utterance
-      const result = await this.conversationManager.createConversation(!hasExternalVars);
+      const result = await this.conversationManager.createConversation();
       conversationId = result.conversationId;
+
+      // Include start conversation activity based on test case setting
+      if (
+        result.startActivity &&
+        (testCase?.isStartConversationEventSent ?? true)
+      ) {
+        allActivities.push(result.startActivity);
+      }
 
       if (!conversationId) {
         throw new Error(
@@ -516,28 +462,6 @@ export class MessagingService {
       const client = this.conversationManager.getClient();
       if (!client) {
         throw new Error("Client not available");
-      }
-
-      if (hasExternalVars) {
-        // Send external variables BEFORE the start conversation event
-        await this.sendExternalVariablesEvent(conversationId, testCase!.externalVariablesJson!);
-
-        // Now send the startConversation event to trigger the Conversation Start topic
-        // (which can now read the external variables)
-        if (testCase?.isStartConversationEventSent ?? true) {
-          const startActivities = await this.sendStartConversationEvent(conversationId);
-          if (startActivities.length) {
-            allActivities.push(...startActivities);
-          }
-        }
-      } else {
-        // No external variables — start activity was already sent during createConversation(true)
-        if (
-          result.startActivity &&
-          (testCase?.isStartConversationEventSent ?? true)
-        ) {
-          allActivities.push(result.startActivity);
-        }
       }
 
       let activities;
@@ -691,11 +615,6 @@ export class MessagingService {
         throw new Error("Client not available for continuing conversation");
       }
 
-      // Send external variables as pvaSetContext event before the user message
-      if (testCase?.externalVariablesJson) {
-        await this.sendExternalVariablesEvent(conversationId, testCase.externalVariablesJson);
-      }
-
       let activities;
       if (testCase?.attachmentData) {
         activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
@@ -806,11 +725,6 @@ export class MessagingService {
       const client = this.conversationManager.getClient();
       if (!client) {
         throw new Error("Client not available for invoke action");
-      }
-
-      // Send external variables as pvaSetContext event before the invoke action
-      if (testCase?.externalVariablesJson) {
-        await this.sendExternalVariablesEvent(conversationId, testCase.externalVariablesJson);
       }
 
       // Create a simple invoke activity object and cast to Activity
