@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ConversationManager.ts
  *
  * Copyright (c) Microsoft Corporation. All rights reserved.

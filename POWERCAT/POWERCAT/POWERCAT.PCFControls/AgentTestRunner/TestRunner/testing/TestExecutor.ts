@@ -288,14 +288,6 @@ export class TestRunner {
         ? TEST_EXECUTION.ATTACHMENT_RETRY_MAX_ATTEMPTS
         : 1;
 
-    console.log(
-      `[TestExecutor] sendMessageWithAttachmentRetry for "${testCase.name}": ` +
-      `includeAttachment=${testCase.includeAttachment}, ` +
-      `attachmentData exists? ${!!testCase.attachmentData}, ` +
-      `attachmentData.fileName=${testCase.attachmentData?.fileName}, ` +
-      `base64Length=${testCase.attachmentData?.base64Content.length ?? 0}`
-    );
-
     let lastResponse: AgentResponse | undefined;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {

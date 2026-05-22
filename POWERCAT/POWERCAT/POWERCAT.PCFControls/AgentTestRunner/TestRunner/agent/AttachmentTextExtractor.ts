@@ -222,11 +222,7 @@ export async function extractTextFromAttachment(
       text = await extractFromXlsx(bytes);
     }
     return truncate(text);
-  } catch (err) {
-    console.warn(
-      `AttachmentTextExtractor: extraction failed for "${attachment.fileName}" (${attachment.mimeType}):`,
-      err
-    );
+  } catch {
     return "";
   }
 }
