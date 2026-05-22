@@ -132,24 +132,15 @@ function findAllowDataInCardContent(
  * The caller should invoke `adaptiveCard/action` with the returned
  * `actionPayload` as the activity's `value` to authorize the connection.
  *
- * Emits diagnostic console output prefixed with
- * `[AgentTestRunner v3.1.142 AuthCardDetect]` so the path can be traced in
- * browser DevTools when debugging.
- *
  * @param activities Activities just returned from the agent (most recent turn).
  * @returns AuthorizationAllowAction with the verbatim Allow payload, or null.
  */
 export function detectAuthorizationAllowAction(
   activities: Activity[] | undefined
 ): AuthorizationAllowAction | null {
-  const tag = "[AgentTestRunner v3.1.142 AuthCardDetect]";
-
   if (!activities || !Array.isArray(activities) || activities.length === 0) {
-    console.info(`${tag} skip: no activities`);
     return null;
   }
-
-  let cardCount = 0;
 
   for (const activity of activities) {
     if (!activity.attachments || !Array.isArray(activity.attachments)) continue;
@@ -158,21 +149,14 @@ export function detectAuthorizationAllowAction(
       if (!attachment || attachment.contentType !== ADAPTIVE_CARD_CONTENT_TYPE) {
         continue;
       }
-      cardCount += 1;
       if (!isObject(attachment.content)) continue;
 
       const allowData = findAllowDataInCardContent(attachment.content);
       if (allowData) {
-        console.info(
-          `${tag} MATCH activities=${activities.length} cards=${cardCount} payload=${JSON.stringify(allowData)}`
-        );
         return { actionPayload: allowData };
       }
     }
   }
 
-  console.info(
-    `${tag} no match — activities=${activities.length} adaptiveCards=${cardCount}`
-  );
   return null;
 }
