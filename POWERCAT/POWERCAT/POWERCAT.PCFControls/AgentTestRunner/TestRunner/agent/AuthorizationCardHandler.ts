@@ -4,18 +4,9 @@
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License.
  *
- * Detects the Copilot Studio connector authorization adaptive card ("Connect
- * to continue" — Allow / Cancel) that the platform injects on the first
- * conversation turn for any agent that uses a connector (SharePoint, Dataverse,
- * Power Automate, etc.). When detected, returns the Allow submit payload so the
- * caller can invoke `adaptiveCard/action` to authorize the connection in the
- * same test turn — eliminating the need for an extra manual "Allow" test case.
- *
- * Stable detection signature (verified across Copilot Studio connector
- * adapters): an adaptive card attachment whose `Action.Submit` `data` element
- * contains `{ id: "submit", action: "Allow", ... }`. The same `data` object is
- * sent back verbatim as the invoke `value`, so future schema additions to the
- * payload propagate automatically.
+ * Detects the Copilot Studio connector authorization adaptive card
+ * ("Connect to continue" — Allow / Cancel) and returns the Allow submit
+ * payload so the caller can authorize the connection in the same test turn.
  *
  * Exports:
  *   - detectAuthorizationAllowAction(activities) → { actionPayload } | null
@@ -23,40 +14,27 @@
 
 import type { Activity } from "@microsoft/agents-activity";
 
-/**
- * Adaptive card content type used by Copilot Studio (matches MessageProcessor).
- */
+/** Adaptive card content type used by Copilot Studio. */
 const ADAPTIVE_CARD_CONTENT_TYPE = "application/vnd.microsoft.card.adaptive";
 
-/**
- * Action element types that carry submit data in an adaptive card.
- */
+/** Action element types that carry submit data in an adaptive card. */
 const SUBMIT_ACTION_TYPES = new Set<string>([
   "Action.Submit",
   "Action.Execute",
 ]);
 
-/**
- * Detected Allow payload, ready to be sent as the `value` of an
- * `adaptiveCard/action` invoke activity.
- */
+/** Detected Allow payload, used as the invoke activity's `value`. */
 export interface AuthorizationAllowAction {
   /** Verbatim `data` object from the matched Allow submit action. */
   actionPayload: Record<string, unknown>;
 }
 
-/**
- * Type guard: non-null object.
- */
+/** Type guard: non-null object. */
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/**
- * Returns true if the given submit-data object matches the Copilot Studio
- * authorization card's "Allow" action. Case-insensitive comparison on both
- * fields because some adapter variants emit `"allow"` lowercase.
- */
+/** Returns true if the submit-data object matches the "Allow" action. */
 function isAllowSubmitData(data: unknown): data is Record<string, unknown> {
   if (!isObject(data)) return false;
   const id = typeof data.id === "string" ? data.id.toLowerCase() : "";
@@ -64,10 +42,7 @@ function isAllowSubmitData(data: unknown): data is Record<string, unknown> {
   return id === "submit" && action === "allow";
 }
 
-/**
- * Walks an adaptive card element tree (actions[] and nested ActionSet bodies)
- * and returns the first Allow submit `data` payload found.
- */
+/** Walks an adaptive card element tree and returns the first Allow submit data. */
 function findAllowDataInCardContent(
   content: Record<string, unknown>
 ): Record<string, unknown> | null {
@@ -82,7 +57,7 @@ function findAllowDataInCardContent(
     }
   }
 
-  // Body elements may contain ActionSet items whose actions[] hold submits.
+  // Body may contain ActionSet items whose actions[] hold submits.
   if (Array.isArray(content.body)) {
     for (const element of content.body) {
       if (!isObject(element)) continue;
@@ -96,7 +71,7 @@ function findAllowDataInCardContent(
           }
         }
       }
-      // Defensive recursion for containers (Container, ColumnSet, Column).
+      // Recurse into Container / ColumnSet / Column children.
       if (Array.isArray(element.items) || Array.isArray(element.columns)) {
         const nested = findAllowDataInCardContent(element);
         if (nested) return nested;
@@ -104,7 +79,7 @@ function findAllowDataInCardContent(
     }
   }
 
-  // Container / Column flattening — items[] or columns[] may carry more body-like trees.
+  // Container.items[] / ColumnSet.columns[] may carry more body-like trees.
   if (Array.isArray(content.items)) {
     for (const item of content.items) {
       if (isObject(item)) {
@@ -126,13 +101,10 @@ function findAllowDataInCardContent(
 }
 
 /**
- * Scans the given activities for a connector authorization adaptive card.
- * Returns the Allow submit payload if found, otherwise null.
+ * Scans activities for a connector authorization adaptive card and returns
+ * the Allow submit payload if found, otherwise null.
  *
- * The caller should invoke `adaptiveCard/action` with the returned
- * `actionPayload` as the activity's `value` to authorize the connection.
- *
- * @param activities Activities just returned from the agent (most recent turn).
+ * @param activities Activities returned from the agent (most recent turn).
  * @returns AuthorizationAllowAction with the verbatim Allow payload, or null.
  */
 export function detectAuthorizationAllowAction(

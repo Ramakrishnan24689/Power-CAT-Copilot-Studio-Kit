@@ -260,13 +260,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   ): Promise<TestCaseAttachmentData> {
     return this.executeOperation(async () => {
       const orgUrl = this.getOrgUrl();
-      // Dataverse Web API file column download endpoint:
-      //   /api/data/v9.2/<entitySetName>(<id>)/<filecolumnname>/$value
-      // IMPORTANT: must use the entity SET name (plural: cat_copilottests),
-      // NOT the entity logical name (singular: cat_copilottest). Using the
-      // singular form returns HTTP 400 with OData error 0x80060888
-      // (Content-type negotiation failed) instead of a proper octet-stream
-      // response.
+      // File-column download endpoint requires the entity SET name (plural),
+      // not the logical name. Singular returns OData 0x80060888.
       const url = `${orgUrl}/api/data/v9.2/cat_copilottests(${testCaseId})/cat_attachmentfile/$value`;
 
       const response = await fetch(url, {
@@ -294,9 +289,7 @@ export class AgentTestSetOperations extends DataverseOperationBase {
 
       const blob = await response.blob();
 
-      // Copilot Studio rejects attachments larger than 15 MB. Fail fast here
-      // with a clear error instead of letting the activity send fail with a
-      // less specific error from the channel.
+      // Copilot Studio rejects attachments > 15 MB; fail fast with a clear error.
       const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
       if (blob.size > MAX_ATTACHMENT_BYTES) {
         throw new Error(
@@ -344,11 +337,9 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             testCase.id,
             testCase.attachmentFileName
           );
-        } catch (error) {
-          console.error(
-            `Failed to load attachment for test "${testCase.name}":`,
-            error
-          );
+        } catch {
+          // Leave attachmentData undefined; MessagingService surfaces a clear
+          // error to the test result when the attachment cannot be loaded.
           testCase.attachmentData = undefined;
         }
       }
@@ -374,34 +365,24 @@ export class AgentTestSetOperations extends DataverseOperationBase {
   }
 
   /**
-   * Determine MIME type from file name extension
+   * Determine MIME type from file extension. Limited to the 8 supported
+   * formats; anything else returns `application/octet-stream` and is
+   * rejected by the upstream `isSupportedAttachmentType` guard.
+   * Used only when Dataverse omits both `mimetype` and `content-type` headers.
    * @private
    */
   private getMimeType(fileName: string): string {
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
     const mimeTypes: Record<string, string> = {
       pdf: "application/pdf",
+      txt: "text/plain",
+      csv: "text/csv",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       png: "image/png",
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
-      gif: "image/gif",
       webp: "image/webp",
-      bmp: "image/bmp",
-      svg: "image/svg+xml",
-      doc: "application/msword",
-      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      xls: "application/vnd.ms-excel",
-      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ppt: "application/vnd.ms-powerpoint",
-      pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      txt: "text/plain",
-      csv: "text/csv",
-      json: "application/json",
-      xml: "application/xml",
-      zip: "application/zip",
-      mp3: "audio/mpeg",
-      mp4: "video/mp4",
-      wav: "audio/wav",
+      gif: "image/gif",
     };
     return mimeTypes[ext] || "application/octet-stream";
   }

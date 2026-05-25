@@ -21,7 +21,6 @@ import { Activity } from "@microsoft/agents-activity";
 import { ConversationManager } from "./ConversationManager";
 import { MessageProcessor } from "./MessageProcessor";
 import { ResponseValidationEngine } from "../shared/utils/ResponseValidationEngine";
-import { extractTextFromAttachment } from "./AttachmentTextExtractor";
 import { detectAuthorizationAllowAction } from "./AuthorizationCardHandler";
 import type {
   AgentResponse,
@@ -45,6 +44,29 @@ function generateUuid(): string {
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+/**
+ * Allow-list of attachment types Copilot Studio can read natively:
+ * PDF, TXT, CSV, XLSX, PNG, JPEG, WEBP, GIF. Anything else is rejected.
+ */
+function isSupportedAttachmentType(mimeType: string, fileName: string): boolean {
+  const m = (mimeType || "").toLowerCase();
+  const n = (fileName || "").toLowerCase();
+
+  if (m === "application/pdf" || n.endsWith(".pdf")) return true;
+  if (/^image\/(png|jpe?g|webp|gif)$/.test(m)) return true;
+  if (/\.(png|jpe?g|webp|gif)$/i.test(n)) return true;
+  if (
+    m === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    n.endsWith(".xlsx")
+  ) {
+    return true;
+  }
+  if (/^text\/(plain|csv)$/i.test(m)) return true;
+  if (/\.(txt|csv)$/i.test(n)) return true;
+
+  return false;
 }
 
 /**
@@ -197,91 +219,8 @@ export class MessagingService {
   }
 
   /**
-   * Returns true for attachment types Copilot Studio agents process natively
-   * (images via vision, PDFs via document AI). For these types, sending the
-   * binary alone is sufficient — the agent will read it directly. Forcing a
-   * "could not extract" envelope on these types is harmful because it
-   * suppresses the agent's own multimodal capabilities.
-   */
-  private isAgentNativelyHandled(
-    mimeType: string,
-    fileName: string
-  ): boolean {
-    const m = (mimeType || "").toLowerCase();
-    const n = (fileName || "").toLowerCase();
-    if (m === "application/pdf" || n.endsWith(".pdf")) return true;
-    if (m.startsWith("image/")) return true;
-    if (/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(n)) return true;
-    return false;
-  }
-
-  /**
-   * Builds the text body for an attachment-bearing message. Three modes:
-   *
-   * 1. Client-side extraction produced text (PPTX/DOCX/XLSX/TXT/CSV/JSON/XML/...)
-   *    → inline the text verbatim and tell the agent to use it. Prevents the
-   *    generative-answer topic from web-searching the user utterance.
-   *
-   * 2. No extracted text, but the format is one Copilot Studio handles natively
-   *    (PDF, PNG/JPEG/WEBP/GIF/BMP/SVG)
-   *    → send a minimal prompt that lets the agent's own vision / document AI
-   *    process the attached binary. Do NOT add a "could not read" guard
-   *    — that would suppress the agent's native capability.
-   *
-   * 3. No extracted text and not natively handled
-   *    → wrap the utterance in a guard that tells the agent an attachment is
-   *    present but unreadable client-side, and explicitly forbid web search
-   *    (prevents the generative-answer topic from returning irrelevant Bing
-   *    results).
-   *
-   * The binary file is always attached on the same activity regardless of mode.
-   */
-  private buildMessageWithExtractedText(
-    utterance: string,
-    attachmentData: TestCaseAttachmentData,
-    extractedText: string
-  ): string {
-    if (extractedText) {
-      return (
-        `The user has attached a file named "${attachmentData.fileName}" ` +
-        `(${attachmentData.mimeType}). The complete text content of this file is ` +
-        `included verbatim between the markers below. Please use only this ` +
-        `inlined file content to answer the user's request. Do not perform a ` +
-        `web search — the answer is contained in the content below.\n\n` +
-        `--- BEGIN ATTACHED FILE CONTENT (${attachmentData.fileName}) ---\n` +
-        `${extractedText}\n` +
-        `--- END ATTACHED FILE CONTENT ---\n\n` +
-        `User request:\n${utterance}`
-      );
-    }
-
-    if (this.isAgentNativelyHandled(attachmentData.mimeType, attachmentData.fileName)) {
-      return (
-        `The user has attached a file named "${attachmentData.fileName}" ` +
-        `(${attachmentData.mimeType}). Use your built-in document/vision ` +
-        `understanding to read the attached file and answer the request.\n\n` +
-        `User request:\n${utterance}`
-      );
-    }
-
-    return (
-      `The user has attached a binary file named "${attachmentData.fileName}" ` +
-      `(${attachmentData.mimeType}). The text content of this file could not be ` +
-      `extracted client-side by the test runner. Do not perform a web search. ` +
-      `Respond only based on (a) the file name and type and (b) the user's ` +
-      `request below. If you cannot fulfil the request without the file's ` +
-      `content, reply that you were unable to read the attached file.\n\n` +
-      `User request:\n${utterance}`
-    );
-  }
-
-  /**
-   * Sends one message activity containing both utterance text and attachment.
-   *
-   * The activity carries the original binary file in `attachments[0]`, and the
-   * `text` field is enriched with the file's client-side-extracted content (for
-   * supported formats) so the agent can summarize even without server-side
-   * binary parsing.
+   * Sends a message activity carrying the user's utterance and the binary
+   * attachment as a data URI. The agent reads the attachment directly.
    */
   private async sendMessageWithAttachment(
     message: string,
@@ -293,20 +232,20 @@ export class MessagingService {
       throw new Error("Client not initialized for attachment send");
     }
 
-    const extractedText = await extractTextFromAttachment(attachmentData);
-    const enrichedText = this.buildMessageWithExtractedText(
-      message,
-      attachmentData,
-      extractedText
-    );
+    if (!isSupportedAttachmentType(attachmentData.mimeType, attachmentData.fileName)) {
+      throw new Error(
+        `Attachment type not supported: "${attachmentData.fileName}" ` +
+        `(${attachmentData.mimeType}). Supported types: PDF, TXT, CSV, XLSX, ` +
+        `PNG, JPEG, WEBP, GIF.`
+      );
+    }
 
     const dataUri = `data:${attachmentData.mimeType};base64,${attachmentData.base64Content}`;
-    const activityId = generateUuid();
     const activity = new Activity("message");
 
     Object.assign(activity, {
-      id: activityId,
-      text: enrichedText,
+      id: generateUuid(),
+      text: message,
       textFormat: "plain",
       locale: "en-US",
       inputHint: "acceptingInput",
@@ -326,32 +265,17 @@ export class MessagingService {
     });
 
     const activities = await client.sendActivity(activity, conversationId);
-
     return activities || [];
   }
 
   /**
-   * Auto-allow handling for the connector authorization adaptive card.
-   *
-   * Copilot Studio agents that use connectors (SharePoint, Dataverse, Power
-   * Automate, etc.) inject an "Allow / Cancel" adaptive card as the first
-   * response on every new conversation. If the test response is that card,
-   * the test fails because the card is not the real answer. This helper
-   * detects the card, sends the Allow invoke (`adaptiveCard/action`) using the
-   * card's own payload, and returns the continuation activities so the caller
-   * can treat them as the real response for validation.
-   *
-   * Loops up to MAX_AUTO_ALLOW_ITERATIONS times so chained connector prompts
-   * (e.g. the agent invokes a second connector right after the first Allow)
-   * are also dismissed automatically in a single test run.
+   * Detects and auto-dismisses the connector authorization adaptive card
+   * ("Allow / Cancel") by submitting Allow on the caller's behalf. Loops to
+   * handle chained connector prompts.
    *
    * @param responseActivities Activities just returned by the agent.
    * @param conversationId Current conversation ID.
-   * @returns The continuation activities (auth-card free) when at least one
-   *   Allow was submitted; otherwise `null`. If an invoke fails on the first
-   *   iteration the caller falls back to the original response; if it fails
-   *   on a later iteration or the iteration cap is hit, the most recent
-   *   continuation is returned as-is.
+   * @returns Continuation activities when Allow was submitted; otherwise null.
    */
   private async autoAllowConnectorAuthorization(
     responseActivities: Activity[],
@@ -366,8 +290,7 @@ export class MessagingService {
     const client = this.conversationManager.getClient();
     if (!client) return null;
 
-    // Submit one invoke (adaptiveCard/action). Refresh the token once on 401/
-    // Unauthorized/token errors and retry — mirrors invokeAdaptiveCardAction.
+    // Refresh the token once on 401/token errors and retry.
     const sendInvoke = async (payload: unknown): Promise<Activity[]> => {
       const invokeActivity = new Activity("invoke");
       Object.assign(invokeActivity, {
@@ -407,9 +330,7 @@ export class MessagingService {
       try {
         continuation = await sendInvoke(detected.actionPayload);
       } catch {
-        // First iteration failure → caller falls back to the original card.
-        // Later iteration failure → surface the latest continuation as final
-        // so the test result reflects the partial handshake.
+        // On first-iteration failure, return null so the caller can fall back.
         if (iteration === 1) return null;
         return current;
       }
@@ -504,12 +425,7 @@ export class MessagingService {
         }
       }
 
-      // Auto-handle the connector authorization "Allow / Cancel" adaptive card.
-      // When present in the first response, submit Allow transparently and use
-      // the continuation activities as the real response for validation. Loops
-      // internally to handle chained connector prompts. Dismissed auth cards
-      // are NOT surfaced to the visible response so the test result reflects
-      // only the agent's actual reply.
+      // Auto-dismiss the connector authorization adaptive card if present.
       if (activities?.length) {
         const finalActivities = await this.autoAllowConnectorAuthorization(
           activities,
@@ -622,12 +538,7 @@ export class MessagingService {
         activities = await client.askQuestionAsync(message, conversationId);
       }
 
-      // Auto-handle the connector authorization "Allow / Cancel" adaptive card
-      // on continued conversations too (a new connector can be referenced
-      // mid-conversation, triggering the prompt on a later turn). Loops to
-      // handle chained connector prompts. Dismissed auth cards are NOT
-      // surfaced to the visible response so the test result reflects only
-      // the agent's actual reply.
+      // Auto-dismiss the connector authorization adaptive card if present.
       if (activities?.length) {
         const finalActivities = await this.autoAllowConnectorAuthorization(
           activities,
