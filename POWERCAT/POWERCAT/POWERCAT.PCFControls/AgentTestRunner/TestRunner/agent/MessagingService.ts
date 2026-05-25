@@ -30,23 +30,6 @@ import type {
 } from "../shared/models/DataModels";
 
 /**
- * Generates an RFC4122 v4 UUID using the Web Crypto API when available,
- * falling back to Math.random when not.
- */
-function generateUuid(): string {
-  const cryptoObj = (typeof crypto !== "undefined" ? crypto : undefined) as Crypto | undefined;
-  if (cryptoObj?.randomUUID) {
-    return cryptoObj.randomUUID();
-  }
-  // Fallback (RFC4122 v4)
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-/**
  * Allow-list of attachment types Copilot Studio can read natively:
  * PDF, TXT, CSV, XLSX, PNG, JPEG, WEBP, GIF. Anything else is rejected.
  */
@@ -244,7 +227,6 @@ export class MessagingService {
     const activity = new Activity("message");
 
     Object.assign(activity, {
-      id: generateUuid(),
       text: message,
       textFormat: "plain",
       locale: "en-US",
@@ -294,7 +276,6 @@ export class MessagingService {
     const sendInvoke = async (payload: unknown): Promise<Activity[]> => {
       const invokeActivity = new Activity("invoke");
       Object.assign(invokeActivity, {
-        id: generateUuid(),
         name: "adaptiveCard/action",
         value: payload,
         from: { id: "user", role: "user", name: "Agent Test Runner" },
