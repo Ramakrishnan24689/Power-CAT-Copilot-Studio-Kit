@@ -17,15 +17,40 @@
  *   const continuedResponse = await service.continueConversation(message, conversationId, testCase);
  */
 
-import type { Activity } from "@microsoft/agents-activity";
+import { Activity } from "@microsoft/agents-activity";
 import { ConversationManager } from "./ConversationManager";
 import { MessageProcessor } from "./MessageProcessor";
 import { ResponseValidationEngine } from "../shared/utils/ResponseValidationEngine";
+import { detectAuthorizationAllowAction } from "./AuthorizationCardHandler";
 import type {
   AgentResponse,
   AgentTestCase,
   AdaptiveCard,
+  TestCaseAttachmentData,
 } from "../shared/models/DataModels";
+
+/**
+ * Allow-list of attachment types Copilot Studio can read natively:
+ * PDF, TXT, CSV, XLSX, PNG, JPEG, WEBP, GIF. Anything else is rejected.
+ */
+function isSupportedAttachmentType(mimeType: string, fileName: string): boolean {
+  const m = (mimeType || "").toLowerCase();
+  const n = (fileName || "").toLowerCase();
+
+  if (m === "application/pdf" || n.endsWith(".pdf")) return true;
+  if (/^image\/(png|jpe?g|webp|gif)$/.test(m)) return true;
+  if (/\.(png|jpe?g|webp|gif)$/i.test(n)) return true;
+  if (
+    m === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    n.endsWith(".xlsx")
+  ) {
+    return true;
+  }
+  if (/^text\/(plain|csv)$/i.test(m)) return true;
+  if (/\.(txt|csv)$/i.test(n)) return true;
+
+  return false;
+}
 
 /**
  * MessagingService manages agent communication and response processing.
@@ -177,6 +202,133 @@ export class MessagingService {
   }
 
   /**
+   * Sends a message activity carrying the user's utterance and the binary
+   * attachment as a data URI. The agent reads the attachment directly.
+   */
+  private async sendMessageWithAttachment(
+    message: string,
+    conversationId: string,
+    attachmentData: TestCaseAttachmentData
+  ): Promise<Activity[]> {
+    const client = this.conversationManager.getClient();
+    if (!client) {
+      throw new Error("Client not initialized for attachment send");
+    }
+
+    if (!isSupportedAttachmentType(attachmentData.mimeType, attachmentData.fileName)) {
+      throw new Error(
+        `Attachment type not supported: "${attachmentData.fileName}" ` +
+        `(${attachmentData.mimeType}). Supported types: PDF, TXT, CSV, XLSX, ` +
+        `PNG, JPEG, WEBP, GIF.`
+      );
+    }
+
+    const dataUri = `data:${attachmentData.mimeType};base64,${attachmentData.base64Content}`;
+    const activity = new Activity("message");
+
+    Object.assign(activity, {
+      text: message,
+      textFormat: "plain",
+      locale: "en-US",
+      inputHint: "acceptingInput",
+      from: { id: "user", role: "user", name: "Agent Test Runner" },
+      attachments: [
+        {
+          contentType: attachmentData.mimeType,
+          name: attachmentData.fileName,
+          contentUrl: dataUri,
+          content: {
+            name: attachmentData.fileName,
+            mimeType: attachmentData.mimeType,
+            data: attachmentData.base64Content,
+          },
+        },
+      ],
+    });
+
+    const activities = await client.sendActivity(activity, conversationId);
+    return activities || [];
+  }
+
+  /**
+   * Detects and auto-dismisses the connector authorization adaptive card
+   * ("Allow / Cancel") by submitting Allow on the caller's behalf. Loops to
+   * handle chained connector prompts.
+   *
+   * @param responseActivities Activities just returned by the agent.
+   * @param conversationId Current conversation ID.
+   * @returns Continuation activities when Allow was submitted; otherwise null.
+   */
+  private async autoAllowConnectorAuthorization(
+    responseActivities: Activity[],
+    conversationId: string
+  ): Promise<Activity[] | null> {
+    const MAX_AUTO_ALLOW_ITERATIONS = 10;
+
+    let current = responseActivities;
+    let detected = detectAuthorizationAllowAction(current);
+    if (!detected) return null;
+
+    const client = this.conversationManager.getClient();
+    if (!client) return null;
+
+    // Refresh the token once on 401/token errors and retry.
+    const sendInvoke = async (payload: unknown): Promise<Activity[]> => {
+      const invokeActivity = new Activity("invoke");
+      Object.assign(invokeActivity, {
+        name: "adaptiveCard/action",
+        value: payload,
+        from: { id: "user", role: "user", name: "Agent Test Runner" },
+        locale: "en-US",
+      });
+
+      const runOnce = async (): Promise<Activity[]> => {
+        const c = this.conversationManager.getClient();
+        if (!c) throw new Error("client unavailable");
+        const result = await c.sendActivity(invokeActivity, conversationId);
+        return result || [];
+      };
+
+      try {
+        return await runOnce();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (
+          err instanceof Error &&
+          (message.includes("401") ||
+            message.includes("Unauthorized") ||
+            message.includes("token"))
+        ) {
+          await this.conversationManager.refreshToken();
+          return await runOnce();
+        }
+        throw err;
+      }
+    };
+
+    for (let iteration = 1; iteration <= MAX_AUTO_ALLOW_ITERATIONS; iteration++) {
+      let continuation: Activity[];
+      try {
+        continuation = await sendInvoke(detected.actionPayload);
+      } catch {
+        // On first-iteration failure, return null so the caller can fall back.
+        if (iteration === 1) return null;
+        return current;
+      }
+
+      const nextDetected = detectAuthorizationAllowAction(continuation);
+      if (!nextDetected) {
+        return continuation;
+      }
+
+      current = continuation;
+      detected = nextDetected;
+    }
+
+    return current;
+  }
+
+  /**
    * Sends a message to the agent and processes the response.
    * Creates a new conversation and handles the complete message exchange.
    * @param message - Message text to send to the agent
@@ -216,7 +368,17 @@ export class MessagingService {
 
       let activities;
       try {
-        activities = await client.askQuestionAsync(message, conversationId);
+        if (testCase?.includeAttachment === true && !testCase.attachmentData) {
+          throw new Error(
+            `Attachment is enabled for test "${testCase.name}" but attachment data could not be loaded.`
+          );
+        }
+
+        if (testCase?.attachmentData) {
+          activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+        } else {
+          activities = await client.askQuestionAsync(message, conversationId);
+        }
       } catch (apiError) {
         // Handle token-related errors with refresh
         if (
@@ -228,15 +390,30 @@ export class MessagingService {
           await this.conversationManager.refreshToken();
           const refreshedClient = this.conversationManager.getClient();
           if (refreshedClient) {
-            activities = await refreshedClient.askQuestionAsync(
-              message,
-              conversationId
-            );
+            if (testCase?.attachmentData) {
+              activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+            } else {
+              activities = await refreshedClient.askQuestionAsync(
+                message,
+                conversationId
+              );
+            }
           } else {
             throw new Error("Failed to get refreshed client");
           }
         } else {
           throw apiError;
+        }
+      }
+
+      // Auto-dismiss the connector authorization adaptive card if present.
+      if (activities?.length) {
+        const finalActivities = await this.autoAllowConnectorAuthorization(
+          activities,
+          conversationId
+        );
+        if (finalActivities) {
+          activities = finalActivities;
         }
       }
 
@@ -335,7 +512,23 @@ export class MessagingService {
         throw new Error("Client not available for continuing conversation");
       }
 
-      const activities = await client.askQuestionAsync(message, conversationId);
+      let activities;
+      if (testCase?.attachmentData) {
+        activities = await this.sendMessageWithAttachment(message, conversationId, testCase.attachmentData);
+      } else {
+        activities = await client.askQuestionAsync(message, conversationId);
+      }
+
+      // Auto-dismiss the connector authorization adaptive card if present.
+      if (activities?.length) {
+        const finalActivities = await this.autoAllowConnectorAuthorization(
+          activities,
+          conversationId
+        );
+        if (finalActivities) {
+          activities = finalActivities;
+        }
+      }
 
       if (activities?.length) {
         allActivities = [...allActivities, ...activities];

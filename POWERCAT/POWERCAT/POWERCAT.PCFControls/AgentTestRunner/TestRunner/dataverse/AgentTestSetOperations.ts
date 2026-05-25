@@ -18,7 +18,7 @@
  */
 
 import { DataverseOperationBase } from "./DataverseOperationBase";
-import type { AgentTestSet, AgentTestCase } from "../shared/models/DataModels";
+import type { AgentTestSet, AgentTestCase, TestCaseAttachmentData } from "../shared/models/DataModels";
 
 /**
  * Service for managing agent test set and test case operations in Microsoft Dataverse
@@ -97,6 +97,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
+            <attribute name="cat_includeattachment"/>
+            <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_name" />
             <filter type="and">
               <condition attribute="cat_copilottestsetid" operator="eq" value="${testSetId}" />
@@ -155,6 +157,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
+            <attribute name="cat_includeattachment"/>
+            <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_order" />
             <filter type="and">
               <condition attribute="cat_parent" operator="eq" value="${parentTestId}" />
@@ -214,6 +218,8 @@ export class AgentTestSetOperations extends DataverseOperationBase {
       order: entity.cat_order as number,
       critical: entity.cat_critical as boolean,
       cat_passthreshold: entity.cat_passthreshold as number,
+      includeAttachment: entity.cat_includeattachment as boolean,
+      attachmentFileName: entity.cat_attachmentfile_name as string,
     }));
   }
 
@@ -238,5 +244,146 @@ export class AgentTestSetOperations extends DataverseOperationBase {
         }
       }
     }
+  }
+
+  /**
+   * Download attachment file content from Dataverse File column
+   *
+   * @param testCaseId - GUID of the test case record
+   * @param fileName - Name of the file for MIME type detection
+   * @returns Promise resolving to TestCaseAttachmentData with base64 content
+   * @public
+   */
+  async getAttachmentFileContent(
+    testCaseId: string,
+    fileName: string
+  ): Promise<TestCaseAttachmentData> {
+    return this.executeOperation(async () => {
+      const orgUrl = this.getOrgUrl();
+      // File-column download endpoint requires the entity SET name (plural),
+      // not the logical name. Singular returns OData 0x80060888.
+      const url = `${orgUrl}/api/data/v9.2/cat_copilottests(${testCaseId})/cat_attachmentfile/$value`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "OData-MaxVersion": "4.0",
+          "OData-Version": "4.0",
+          "If-None-Match": "null",
+          "Accept": "application/octet-stream",
+        },
+      });
+
+      if (!response.ok) {
+        let errBody = "";
+        try {
+          errBody = await response.text();
+        } catch {
+          /* ignore */
+        }
+        throw new Error(
+          `Failed to download file from Dataverse: ${response.status} ${response.statusText}` +
+            (errBody ? ` — ${errBody.slice(0, 200)}` : "")
+        );
+      }
+
+      const blob = await response.blob();
+
+      // Copilot Studio rejects attachments > 15 MB; fail fast with a clear error.
+      const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+      if (blob.size > MAX_ATTACHMENT_BYTES) {
+        throw new Error(
+          `Attachment "${fileName}" is ${(blob.size / 1024 / 1024).toFixed(2)} MB, ` +
+            `which exceeds the Copilot Studio 15 MB upload limit.`
+        );
+      }
+
+      const resolvedFileName =
+        response.headers.get("x-ms-file-name") || fileName || "attachment";
+      const resolvedMimeType =
+        response.headers.get("mimetype") ||
+        response.headers.get("content-type")?.split(";")[0] ||
+        this.getMimeType(resolvedFileName);
+
+      const base64Content = await this.blobToBase64(blob);
+
+      return {
+        fileName: resolvedFileName,
+        mimeType: resolvedMimeType,
+        base64Content,
+      };
+    }, "Get attachment file content");
+  }
+
+  /**
+   * Load attachment data for all test cases that have attachments enabled
+   *
+   * @param testCases - Array of test cases to load attachments for
+   * @public
+   */
+  async loadAttachmentsForTestCases(testCases: AgentTestCase[]): Promise<void> {
+    const allCases = [...testCases];
+    // Include child tests
+    for (const tc of testCases) {
+      if (tc.childTests?.length) {
+        allCases.push(...tc.childTests);
+      }
+    }
+
+    for (const testCase of allCases) {
+      if (testCase.includeAttachment && testCase.attachmentFileName) {
+        try {
+          testCase.attachmentData = await this.getAttachmentFileContent(
+            testCase.id,
+            testCase.attachmentFileName
+          );
+        } catch {
+          // Leave attachmentData undefined; MessagingService surfaces a clear
+          // error to the test result when the attachment cannot be loaded.
+          testCase.attachmentData = undefined;
+        }
+      }
+    }
+  }
+
+  /**
+   * Convert Blob to base64 string
+   * @private
+   */
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // Remove the data:...;base64, prefix
+        const base64 = result.split(",")[1] || result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Determine MIME type from file extension. Limited to the 8 supported
+   * formats; anything else returns `application/octet-stream` and is
+   * rejected by the upstream `isSupportedAttachmentType` guard.
+   * Used only when Dataverse omits both `mimetype` and `content-type` headers.
+   * @private
+   */
+  private getMimeType(fileName: string): string {
+    const ext = fileName.split(".").pop()?.toLowerCase() || "";
+    const mimeTypes: Record<string, string> = {
+      pdf: "application/pdf",
+      txt: "text/plain",
+      csv: "text/csv",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+    };
+    return mimeTypes[ext] || "application/octet-stream";
   }
 }

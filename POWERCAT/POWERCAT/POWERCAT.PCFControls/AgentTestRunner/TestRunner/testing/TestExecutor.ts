@@ -31,6 +31,7 @@ import type {
   AgentTestCase,
   AgentConfiguration,
   AgentTestRun,
+  AgentResponse,
   TestExecutionSummary,
 } from "../shared/models/DataModels";
 
@@ -48,6 +49,8 @@ const TEST_EXECUTION = {
   MULTITURN_TEST_TYPE: 5,
   CONCURRENCY_LIMIT: 10,
   DEFAULT_HISTORY_LIMIT: 50000,
+  ATTACHMENT_RETRY_MAX_ATTEMPTS: 2,
+  ATTACHMENT_RETRY_DELAY_MS: 4000,
 } as const;
 
 // Constants for test run status
@@ -249,10 +252,7 @@ export class TestRunner {
       } else {
         // Note: Invoke actions are only supported for multiturn child tests (testTypeCode: 5)
         // Single-turn tests should use regular message sending
-        agentResponse = await this.messagingService.sendMessage(
-          testCase.testUtterance,
-          testCase
-        );
+        agentResponse = await this.sendMessageWithAttachmentRetry(testCase);
       }
 
       // Create test result record and get the result code
@@ -275,6 +275,66 @@ export class TestRunner {
     } catch (error) {
       return { success: false, resultCode: RESULT_CODES.ERROR }; // Error code
     }
+  }
+
+  /**
+   * Sends a test message and retries once for transient attachment-related failures.
+   */
+  private async sendMessageWithAttachmentRetry(
+    testCase: AgentTestCase
+  ): Promise<AgentResponse> {
+    const maxAttempts =
+      testCase.includeAttachment === true
+        ? TEST_EXECUTION.ATTACHMENT_RETRY_MAX_ATTEMPTS
+        : 1;
+
+    let lastResponse: AgentResponse | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const response = await this.messagingService.sendMessage(
+        testCase.testUtterance,
+        testCase
+      );
+      lastResponse = response;
+
+      if (!this.isTransientAttachmentFailure(response, testCase)) {
+        return response;
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, TEST_EXECUTION.ATTACHMENT_RETRY_DELAY_MS)
+        );
+      }
+    }
+
+    return lastResponse!;
+  }
+
+  /**
+   * Detects known transient responses where the attachment was not processed yet
+   * or the service was temporarily unavailable.
+   */
+  private isTransientAttachmentFailure(
+    response: AgentResponse,
+    testCase: AgentTestCase
+  ): boolean {
+    if (!testCase.includeAttachment) {
+      return false;
+    }
+
+    const message = (response.message || "").toLowerCase();
+    const error = (response.error || "").toLowerCase();
+
+    return (
+      message.includes("did not return any content") ||
+      message.includes("cannot be provided at this time") ||
+      message.includes("re-upload") ||
+      message.includes("agent is currently unavailable") ||
+      message.includes("usage limit") ||
+      error.includes("timeout") ||
+      error.includes("unavailable")
+    );
   }
 
   /**
@@ -499,6 +559,9 @@ export class TestRunner {
           "No test cases found for this test run. Please check your test set configuration."
         );
       }
+
+      // Load attachment file data for test cases that have attachments enabled
+      await this.testSetOps.loadAttachmentsForTestCases(testCases);
 
       // Execute all tests
       const summary = await this.executeAllTests(

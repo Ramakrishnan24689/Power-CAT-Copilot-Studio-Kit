@@ -67,6 +67,15 @@ export interface AgentTestSet {
 }
 
 /**
+ * Attachment data fetched from Dataverse file column
+ */
+export interface TestCaseAttachmentData {
+  fileName: string;
+  mimeType: string;
+  base64Content: string;
+}
+
+/**
  * Individual test case configuration with validation settings
  */
 export interface AgentTestCase {
@@ -93,6 +102,9 @@ export interface AgentTestCase {
   childTests?: AgentTestCase[]; // Child test cases for multiturn conversations
   order?: number; // Child test execution order
   critical?: boolean; // Critical test failure impact on parent execution
+  includeAttachment?: boolean; // Whether to include an attachment with the test utterance
+  attachmentFileName?: string; // File name from Dataverse file column
+  attachmentData?: TestCaseAttachmentData; // Loaded attachment data (populated at runtime)
 }
 
 /**
