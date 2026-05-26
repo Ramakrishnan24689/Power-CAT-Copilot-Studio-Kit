@@ -175,6 +175,8 @@ Use this if you need to recreate the flow manually.
 
 **HTTP Webhook** (dispatches GitHub + waits for callback):
 
+> The `parameters(...)` values below reference the environment variables configured in Step 6.
+
 | Field | Value |
 |-------|-------|
 | Method | POST |
