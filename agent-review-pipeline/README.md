@@ -1,15 +1,15 @@
 # Agent Review Pipeline
 
-Part of the **Copilot Studio Kit** — a set of tools for managing, monitoring, and governing Copilot Studio agents at scale.
+Part of the **Copilot Studio Kit** - a set of tools for managing, monitoring, and governing Copilot Studio agents at scale.
 
 ## What is the Agent Review Tool?
 
-The Agent Review Tool evaluates Copilot Studio agents against design best practices — checking naming conventions, topic structure, knowledge source configuration, instruction quality, and more. It produces a scored report highlighting what needs attention before an agent goes to production.
+The Agent Review Tool evaluates Copilot Studio agents against design best practices - checking naming conventions, topic structure, knowledge source configuration, instruction quality, and more. It produces a scored report highlighting what needs attention before an agent goes to production.
 
 The tool is available in two forms:
 
-- **Code App** — interactive UI inside Power Apps for on-demand reviews
-- **Pipeline (this repo)** — automated CI/CD gate that runs the same checks on every deployment
+- **Code App** - interactive UI inside Power Apps for on-demand reviews
+- **Pipeline (this repo)** - automated CI/CD gate that runs the same checks on every deployment
 
 ## Agent Review Pipeline
 
@@ -34,7 +34,7 @@ Automated quality gate for agents deployed via Power Platform Pipelines. When a 
 
 ## Setup
 
-**📖 [CI/CD Setup Guide](docs/Agent%20Review%20Pipeline%20-%20CICD%20Setup%20Guide.md)** — step-by-step instructions for your organization.
+**📖 [CI/CD Setup Guide](docs/Agent%20Review%20Pipeline%20-%20CICD%20Setup%20Guide.md)** - step-by-step instructions for your organization.
 
 ## License
 

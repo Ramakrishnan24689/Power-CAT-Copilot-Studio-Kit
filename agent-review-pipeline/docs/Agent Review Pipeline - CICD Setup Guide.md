@@ -189,7 +189,7 @@ Use this if you need to recreate the flow manually.
 
 **If no** → Same action, Status: `30`, Comments: score details
 
-**⚠️ Error handler**: Always call `UpdatePreDeploymentStepStatus` with status 30 on failure — otherwise the pipeline hangs forever.
+**⚠️ Error handler**: Always call `UpdatePreDeploymentStepStatus` with status 30 on failure - otherwise the pipeline hangs forever.
 
 ---
 
@@ -212,5 +212,5 @@ Use this if you need to recreate the flow manually.
 | Auth fails (401) | SPN not added as Application User in pipeline host env |
 | Artifact 403 | SPN missing security role |
 | PredictV2 404 | AI prompts not published in environment. Open Copilot Studio Kit solution → AI prompts → verify both are published |
-| Pipeline stuck "pending" | Flow errored — add error handler that always calls status 30 |
+| Pipeline stuck "pending" | Flow errored - add error handler that always calls status 30 |
 | Callback never arrives | Check GitHub Actions tab for failed workflow runs |
