@@ -197,6 +197,17 @@ Use this if you need to recreate the flow manually.
 
 ---
 
+## PDF Report
+
+Each evaluation run produces a PDF report uploaded as a GitHub Actions artifact. The report includes:
+- Score cards (overall, pattern, instruction)
+- Failed patterns with affected topics and recommendations
+- Instruction compliance issues
+
+The artifact URL is included in the pipeline deployment comments, so reviewers can access the full report directly from the pipeline stage history.
+
+---
+
 ## Customization
 
 | What | How |
