@@ -204,7 +204,7 @@ Each evaluation run produces a PDF report uploaded as a GitHub Actions artifact.
 - Failed patterns with affected topics and recommendations
 - Instruction compliance issues
 
-The artifact URL is included in the pipeline deployment comments, so reviewers can access the full report directly from the pipeline stage history.
+The artifact URL is included in the pre-deployment comments, so reviewers can access the full report directly from the pipeline stage history.
 
 ---
 
