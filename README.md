@@ -1,22 +1,194 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# Power CAT Copilot Studio Kit
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+The **Power CAT Copilot Studio Kit** is a comprehensive set of capabilities designed to augment [Microsoft Copilot Studio](https://aka.ms/CopilotStudio). The kit helps makers develop, govern, and test custom agents, use a large language model to validate AI-generated content, optimize prompts, and track aggregated key performance indicators of their custom agents.
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+<img width="1879" height="1136" alt="new_landing_page" src="https://github.com/user-attachments/assets/e0dbbb47-d92b-489e-b517-a0b9cc336b81" />
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+# Features
+## Testing capabilities  
+Copilot Studio Kit allows makers to configure agents, tests and test sets, and use them to batch test their custom agents. Test runs produce detailed results including latencies, observed responses and run level aggregates. Different test types include response match, attachment match, topic match, multi-turn and generative answers which leverages AI Builder for response analysis. 
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+***Copilot Studio Kit test automation now supports user-defined rubrics for generative answers.***
 
-mcskit
+More information on [testing capabilities](./TESTING_CAPABILITIES.md) 
+
+## Compliance Hub
+Compliance Hub helps organizations define and enforce governance policies for Copilot Studio agents at scale. It continuously evaluates agent configurations collected via Agent Inventory against configurable risk thresholds, automatically creating compliance cases when violations are detected and tracking them through an SLA-driven review lifecycle.
+
+Administrators can configure thresholds, risk levels, SLA timers and enforcement actions (manual review, quarantine, delete), while makers are guided to remediate issues through Teams/Outlook notifications, intake forms, and dashboards showing open cases and compliance posture. This enables makers to innovate freely within Copilot Studio, while ensuring a consistent, auditable level of compliance across all agents.
+
+More information on [Compliance Hub](./COMPLIANCE_HUB.md) 
+
+## Agent Insights Hub (Preview)
+Agent Insights Hub is a comprehensive analytics and monitoring dashboard for Microsoft Copilot Studio agents. It aggregates telemetry from Azure Application Insights, and Conversation Transcripts to provide visibility into agent performance, conversation metrics, topic and tool analytics, error tracking, and credit consumption — all from a single unified interface. The dashboard includes KPI cards with trend indicators, time-series charts, transcript analysis with CSAT scores, and flexible filtering by agent, date range, channel, and data mode. It supports on-demand syncs up to 365 days of historical data, scheduled daily syncs, and Excel export for offline reporting.
+
+More information on [Agent Insights Hub](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_INSIGHTS_HUB.md)
+
+## Agent Debugger
+
+**Agent Debugger** is a diagnostic tool inside the **Copilot Studio Kit Admin** app that lets administrators load any recorded conversation and inspect every decision the agent made — step by step, with timing, token usage, knowledge sources, arguments, and observations — without leaving the Power Platform.
+
+More information on [Agent Debugger](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_DEBUGGER.md)
+
+## Agent Library (Preview)
+The Agent Library is a centralized hub within the Copilot Studio Kit that helps makers discover, install, and manage pre-built agent templates and reusable components. Instead of building agents from scratch, you can browse a curated catalog of ready-to-use templates (Custom Agent and Declarative Agent) and components, install them directly into your environment, and customize them to fit your business needs.
+
+More information on [Agent Library](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_LIBRARY.md)
+
+## Component Library (Preview)
+The Component Library is a collection of ready-to-use, pre-built components for Microsoft Copilot Studio — packaged as component collections so you can import only the ones you need. The new app lets you easily browse and add the component to your environment. Add the component to your agent like you would with any component collection. Use agent instructions to control when and how each component is invoked — no custom development required.
+
+More information on [Component Library](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/COMPONENT_LIBRARY.md)
+
+## Rubrics refinement
+Rubrics Refinement is a powerful capability in Copilot Studio Kit that enables you to create, test, and iteratively improve reusable evaluation standards (rubrics) for AI-generated responses. This feature helps ensure that AI grading of your agent's responses aligns with human judgment and organizational quality standards.
+
+More information on [Rubrics Refinement](./RubricRefinement/01-rubrics-refinement-overview.md) 
+
+## Conversation KPIs
+Conversation KPIs are designed to help makers track and analyze the performance of their custom agents. This feature complements the existing analytics built-in the Copilot Studio and simplifies the process of understanding conversation outcomes by providing aggregated data in Dataverse rather than requiring you to analyze the complex conversation transcripts. 
+
+More information on [conversation KPIs](./CONVERSATION_KPIS.md)
+
+## SharePoint synchronization
+SharePoint synchronization allows makers to configure periodical selective content synchronization from SharePoint locations to custom agent knowledge base as files.
+
+More information on [SharePoint synchronization](./FILE_SYNCHRONIZATION.md)
+
+## Prompt Advisor
+Prompt Advisor allows makers to develop effective prompts while learning useful prompt engineering skills. Prompts entered in the advisor tool will be analyzed and receive a confidence evaluation with detailed reasoning for the score. Advisor also provides a list of suggested refined prompts implementing various prompt techniques. Makers can select from these optimized prompts to iteratively refine and improve their input.
+
+More information on [Prompt Advisor](./PROMPT_ADVISOR.md)
+
+## Webchat Playground
+Webchat Playground simplifies customizing the appearance and behavior of the copilot agent webchat, including colors, fonts, thumbnails and initials. Easy to use UI allows makers to define the look and feel of their webchat, and HTML is generated with the specified styles. 
+
+More information on [Webchat Playground](./WEBCHAT_PLAYGROUND.md)
+
+## Adaptive Cards Gallery
+Adaptive Cards Gallery provides makers with a dozen built-in adaptive card templates for different scenarios. They demonstrate the extensibility of the adaptive card visuals and behavior, and provide examples on the agent side implementation as well on things like dynamic data binding.
+
+More information on [Adaptive Cards Gallery](./ADAPTIVE_CARDS_GALLERY.md)
+
+## Agent Inventory
+Agent Inventory provides administrators with a tenant-wide view to all Copilot Studio custom agents in their organization, including detailed information on the features they are using, authentication mode, knowledge sources, orchestration type and more. Agent Inventory ships with a dashboard and the data can be exported for use in other applications.
+
+More information on [Agent Inventory](./AGENT_INVENTORY.md)
+
+## Agent Review Tool
+Agent Review Tool is a solution analysis tool that can be used to review your agents for any potential issues or anti-patterns that might have negative impact on the performance or the security of your agent. After analyzing the solution, Agent Review Tool presents the findings in easy to interpret format, with severity and details on how to address the issue.
+
+More information on [Agent Review Tool](./AGENT_REVIEW_TOOL.md)
+
+## PowerShield
+PowerShield enables organizations using the Power Platform to manage connector access through a structured, approval-based workflow for Data Loss Prevention (DLP) policies. It provides a self-service experience for makers to request connector access via a guided 5-step wizard, and a review interface for administrators to approve, reject, or manage those requests. Every DLP policy change is traceable to a PowerShield request, ensuring governance compliance and auditability.
+
+Administrators can configure blocked connectors, compliance questionnaires, and notification settings, while makers create requests scoped to Service Trees and Environment Containers. PowerShield automatically handles DLP policy creation, conflict resolution with existing policies, and per-environment fulfillment tracking.
+
+More information on [PowerShield](./POWER_SHIELD.md)
+
+## Conversation Analyzer
+Conversation Analyzer allows makers to analyze the conversations of their custom agents using custom prompts to get additional insights.
+
+More information on [Conversation Analyzer](./CONVERSATION_ANALYZER.md)
+
+## Agent Value Summary dashboard
+
+The Agent Value Component is a modular tool for classifying agents in Microsoft Copilot Studio by type, behavior, and value, helping organizations understand their role, align them with strategy, and measure their impact. Results are presented visually on Agent Value dashboard.
+
+More information on [Agent Value dashboard](./AGENT_VALUE_SUMMARY_DASHBOARD.md)
+
+## Automated testing using Power Platform Pipelines (Advanced)
+
+This feature allows users to automate the testing and deployment of Copilot Studio custom agents using Power Platform Pipelines. The goal is to ensure that agents are automatically validated through test runs before they are deployed to target environments (production). By integrating Power Automate flows with Dataverse and the Copilot Studio Kit, this approach introduces a quality gate into the deployment process. Only agents that pass the required amount of test cases are allowed to proceed, ensuring higher reliability and reducing manual intervention. This method supports continuous delivery practices and enhances the overall governance of the deployment lifecycle.
+
+More information on [automated testing using Power Platform Pipelines](./AUTOMATED_TESTING.md)
+
+# Setup instructions and documentation
+
+There is a Setup Wizard in the Kit which allows easy editing of connection references and environment variables as well as turning on cloud flows. After deploying the Kit from either AppSource or GitHub, you may access the Setup Wizard from the Home-page of the Copilot Studio Kit. Please see additional information [here](./SETUP_WIZARD.md).
+
+- [Prerequisites](./PREREQUISITES.md)
+- [Installation instructions](./INSTALLATION_INSTRUCTIONS.md)
+- [Configure users and teams](/SETUP_USERS_AND_TEAMS.md)
+- [Configure agents](./CONFIGURE_COPILOTS.md)
+- [Configure tests](./CONFIGURE_TESTS.md)
+- [Run tests](./RUN_TESTS.md)
+- [Analyze test results](./ANALYZE_TEST_RESULTS.md)
+- [Troubleshooting](./TROUBLESHOOT.md)
+
+Optionally
+- [Enable user authentication support](./ENABLE-AUTHENTICATION.md)
+- [Enable Application Insights support](./ENABLE-APPINSIGHTS.md)
+
+For information on required licenses on Power Platform, and AI builder credits consumption, please see [Prerequisites](./PREREQUISITES.md)
+
+# Known limitations
+
+As of the latest release:
+- Custom agent end user authentication support in test automation is limited Entra Id V2 with SSO.
+
+## Latest release
+
+The latest shipped version is available via **[Releases](https://github.com/microsoft/Powercat-Copilotstudio-Accelerator/releases)**. From there, you can download the latest version of all managed solutions that have been tested and are ready for use. 
+
+Stay up to date with our releases by **subscribing** to them: 
+1. Select **Watch**
+2. Select **Custom** > **Releases** > **Apply** to receive notifications about our releases
+
+# About this GitHub repo
+
+The Power CAT Copilot Studio Kit GitHub Repo contains the source, releases, issues and backlog items of all components that are part of the Power CAT Copilot Studio Kit.
+
+## Submit a feature request
+
+Let us know by filing an issue. 
+Before submitting your issue please search the [issues](https://github.com/microsoft/Powercat-Copilotstudio-Accelerator/issues) to ensure your issue has not already been reported
+
+If your bug or feature request has already been reported, join the conversation by commenting and adding your reaction. Please use reactions to vote and not "+1" comments.
+- 👍: upvote
+- 👎: downvote
+
+## Microsoft Open Source Code of Conduct
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+
+Resources:
+
+- [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/)
+- [Microsoft Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
+- Contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions or concerns
+
+## Trademarks 
+
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft’s Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party’s policies.
+
+## Security
+
+Microsoft takes the security of our software products and services seriously, which includes all source code repositories managed through our GitHub organizations, which include [Microsoft](https://github.com/Microsoft), [Azure](https://github.com/Azure), [DotNet](https://github.com/dotnet), [AspNet](https://github.com/aspnet), [Xamarin](https://github.com/xamarin), and [our GitHub organizations](https://opensource.microsoft.com/).
+
+If you believe you have found a security vulnerability in any Microsoft-owned repository that meets Microsoft's [Microsoft's definition of a security vulnerability](https://docs.microsoft.com/en-us/previous-versions/tn-archive/cc751383(v=technet.10)), please report it to us as described below.
+
+## Reporting Security Issues
+
+**Please do not report security vulnerabilities through public GitHub issues.**
+
+Instead, please report them to the Microsoft Security Response Center (MSRC) at [https://msrc.microsoft.com/create-report](https://msrc.microsoft.com/create-report).
+
+If you prefer to submit without logging in, send email to [secure@microsoft.com](mailto:secure@microsoft.com).  If possible, encrypt your message with our PGP key; please download it from the the [Microsoft Security Response Center PGP Key page](https://www.microsoft.com/en-us/msrc/pgp-key-msrc).
+
+You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Additional information can be found at [microsoft.com/msrc](https://www.microsoft.com/msrc).
+
+Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
+
+  * Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
+  * Full paths of source file(s) related to the manifestation of the issue
+  * The location of the affected source code (tag/branch/commit or direct URL)
+  * Any special configuration required to reproduce the issue
+  * Step-by-step instructions to reproduce the issue
+  * Proof-of-concept or exploit code (if possible)
+  * Impact of the issue, including how an attacker might exploit the issue
+
+This information will help us triage your report more quickly.
+
+If you are reporting for a bug bounty, more complete reports can contribute to a higher bounty award. Please visit our [Microsoft Bug Bounty Program](https://microsoft.com/msrc/bounty) page for more details about our active programs.

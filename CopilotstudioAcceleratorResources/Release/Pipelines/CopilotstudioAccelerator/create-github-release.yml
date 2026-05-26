@@ -1,0 +1,204 @@
+# Pipeline to create a Github release for the CoE Starter Kit solution
+parameters:
+- name: ReleaseMonthNumber
+  type: number
+- name: ReleaseYearNumber
+  type: number
+- name: CloseMilestoneIssues
+  type: boolean
+  default: false
+- name: DraftRelease
+  type: boolean
+  default: true
+- name: HotfixReleaseNumber
+  type: number
+  default: 0
+- name: PrepareAppSourcePackage
+  type: boolean
+  default: false
+- name: PreparePackageDeployerPackage
+  type: boolean
+  default: false
+  
+trigger: none
+pr: none
+resources:
+  repositories:
+  - repository: PipelineRepo  # repository name (DO NOT CHANGE THIS VALUE) 
+    type: github
+    ref: Rajeev-ts-release #main # If your pipeline templates are in a branch other than the default branch specify the branch here. Otherwise the default branch will be used by default.
+    endpoint: powercat-alm # Specifies the GitHub service connection for this setup.
+    name: Microsoft/coe-alm-accelerator-templates  #This is the name of the repo in the current project in Azure Devops that has the pipeline templates. If the repo is in a different project you can specify the project and repo using the format ProjectContainingTheBuildTemplates/RepositoryContainingTheBuildTemplates (https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema?view=azure-devops&tabs=schema%2Cparameter-schema#type)
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+- group: alm-accelerator-variable-group
+
+steps:
+# Checkout our GitHub Branch
+- checkout: self
+  displayName: 'Checkout Source Branch'
+
+# Download the artifacts from the latest deployment of CopilotStudioAccelerator to production.
+- task: DownloadPipelineArtifact@2
+  inputs:
+    source: 'specific'
+    project: 'Power-CAT-Copilot-Studio-Kit'
+    pipeline: '2359' #Production buildId
+    runVersion: 'latest'
+    patterns: '**/CopilotStudioAccelerator*.zip'
+  displayName: 'Download Copilot Studio Accelerator solution'
+
+- powershell: |
+    Write-Host "Listing contents of $(Pipeline.Workspace)\drop:"
+    Get-ChildItem -Path "$(Pipeline.Workspace)\drop" -Recurse | ForEach-Object {
+        Write-Host $_.FullName
+    }
+  displayName: 'List downloaded artifacts'
+
+- powershell: |
+
+    # Create folders
+    New-Item -Path $(Pipeline.Workspace)\releaseassets -ItemType Directory -Force | Out-Null
+    New-Item -Path $(Pipeline.Workspace)\assetstaging -ItemType Directory -Force | Out-Null
+
+    # Copy managed ZIP to staging
+    Copy-Item '$(Pipeline.Workspace)\drop\*managed.zip' -Destination '$(Pipeline.Workspace)\assetstaging' -Verbose
+
+    # Copy static collateral files
+    Copy-Item '$(Build.SourcesDirectory)\Power-CAT-Copilot-Studio-Kit\CopilotstudioAcceleratorResources\Release\Collateral\CopilotstudioAccelerator\*.*' -Destination '$(Pipeline.Workspace)\assetstaging' -Verbose
+
+    # Check and copy Conversation.KPIs.zip (case-insensitive, non-recursive)
+    Write-Host "Checking for Conversation.KPIs.zip in the /Release/ folder..."
+    $releaseFolder = "$(Build.SourcesDirectory)\Power-CAT-Copilot-Studio-Kit\CopilotstudioAcceleratorResources\Release\"
+    $kpiFile = Get-ChildItem -Path $releaseFolder -Filter '*.zip' | Where-Object { $_.Name -ieq 'Conversation.KPIs.zip' }
+
+    if ($kpiFile) {
+        Write-Host "Found '$($kpiFile.Name)'. Copying to releaseassets..."
+        Copy-Item -Path $kpiFile.FullName -Destination "$(Pipeline.Workspace)\releaseassets" -Force
+        Write-Host "Conversation.KPIs.zip successfully copied."
+    } else {
+        Write-Host "Conversation.KPIs.zip not found. Skipping."
+    }
+
+    # Copy all files from Artefacts folder to release assets
+    Write-Host "Checking for files in the /Release/Artefacts/ folder..."
+    $artifactsFolder = "$(Build.SourcesDirectory)\Power-CAT-Copilot-Studio-Kit\CopilotstudioAcceleratorResources\Release\Artefacts\"
+    
+    if (Test-Path $artifactsFolder) {
+        Write-Host "Artifacts folder found. Copying all files to releaseassets..."
+        $artifactFiles = Get-ChildItem -Path $artifactsFolder -File -Recurse
+        
+        if ($artifactFiles) {
+            foreach ($file in $artifactFiles) {
+                Write-Host "Copying artifact file: $($file.Name)"
+                Copy-Item -Path $file.FullName -Destination "$(Pipeline.Workspace)\releaseassets" -Force
+            }
+            Write-Host "Successfully copied $($artifactFiles.Count) artifact file(s) to release assets."
+        } else {
+            Write-Host "Artifacts folder is empty. No files to copy."
+        }
+    } else {
+        Write-Host "Artifacts folder not found at: $artifactsFolder. Skipping artifact file copying."
+    }
+
+    <#
+    # Compress to CopilotStudioKit.zip
+    Write-Host "Creating CopilotStudioKit.zip (Managed + Collateral)..."
+    $compress = @{
+      Path = '$(Pipeline.Workspace)\assetstaging\*.*'
+      CompressionLevel = 'Fastest'
+      DestinationPath = '$(Pipeline.Workspace)\releaseassets\CopilotStudioKit.zip'
+    }
+    Compress-Archive @compress
+    Write-Host "CopilotStudioKit.zip created."
+    #>
+
+    # Copy original managed zip to releaseassets
+    Write-Host "Copying managed solution zip from drop to releaseassets..."
+    Copy-Item '$(Pipeline.Workspace)\drop\*managed.zip' -Destination '$(Pipeline.Workspace)\releaseassets' -Verbose
+
+    # Cleanup drop and assetstaging
+    Remove-Item $(Pipeline.Workspace)\drop\*managed.zip -Recurse -Force -Confirm:$false -Verbose
+    Remove-Item $(Pipeline.Workspace)\assetstaging -Recurse -Force -Confirm:$false -Verbose
+    New-Item -Path $(Pipeline.Workspace)\assetstaging -ItemType Directory -Force | Out-Null
+
+    # Copy unmanaged ZIP (excluding *managed.zip) to assetstaging
+    Write-Host "Looking for unmanaged CopilotStudioAccelerator ZIP in drop folder..."
+    $unmanagedZip = Get-ChildItem '$(Pipeline.Workspace)\drop' -Filter 'CopilotStudioAccelerator*.zip' | Where-Object { $_.Name -notlike '*_managed.zip' }
+
+    if ($unmanagedZip) {
+        foreach ($file in $unmanagedZip) {
+            Write-Host "Copying unmanaged ZIP: $($file.Name)"
+            Copy-Item -Path $file.FullName -Destination '$(Pipeline.Workspace)\assetstaging' -Verbose
+        }
+    } else {
+        Write-Host "No unmanaged CopilotStudioAccelerator ZIP found. Skipping unmanaged packaging."
+    }
+
+    # Move unmanaged ZIP from assetstaging to releaseassets and rename
+    Write-Host "Renaming unmanaged solution ZIPs with build number..."
+    Get-ChildItem '$(Pipeline.Workspace)\assetstaging\CopilotStudioAccelerator*.zip' | Where-Object { $_.Name -notlike '*_managed.zip' } | ForEach-Object {
+      $original = $_.FullName
+      $newName = $_.Name -replace '^CopilotStudioAccelerator', 'CopilotStudioKit'
+      $newPath = Join-Path -Path '$(Pipeline.Workspace)\releaseassets' -ChildPath $newName
+      Move-Item -Path $original -Destination $newPath
+      Write-Host "Moved and renamed '$($_.Name)' to '$newName'"
+    }
+    
+    <#
+    # Compress to CopilotStudioKit-Unmanaged.zip
+    Write-Host "Creating CopilotStudioKit-Unmanaged.zip..."
+    $compress = @{
+      Path = '$(Pipeline.Workspace)\assetstaging\*.*'
+      CompressionLevel = 'Fastest'
+      DestinationPath = '$(Pipeline.Workspace)/releaseassets/CopilotStudioKit-Unmanaged.zip'
+    }
+    Compress-Archive @compress
+    Write-Host "CopilotStudioKit-Unmanaged.zip created."
+    #>
+
+    # Rename the build-numbered managed ZIP
+    Write-Host "Renaming managed solution ZIPs with build number..."
+    Get-ChildItem '$(Pipeline.Workspace)\releaseassets\CopilotStudioAccelerator*_managed.zip' | ForEach-Object {
+      $original = $_.FullName
+      $newName = $_.Name -replace '^CopilotStudioAccelerator', 'CopilotStudioKit'
+      $newPath = Join-Path -Path $_.DirectoryName -ChildPath $newName
+      Rename-Item -Path $original -NewName $newName
+      Write-Host "Renamed '$($_.Name)' to '$newName'"
+    }
+
+    # Set release metadata variables
+    $templateTag = 'CopilotStudioKit-$(ReleaseMonthName)${{parameters.ReleaseYearNumber}}'
+    $templateTitle = 'Copilot Studio Kit $(ReleaseMonthName) ${{parameters.ReleaseYearNumber}}'
+    if(${{parameters.HotfixReleaseNumber}} -ne 0) {
+        $templateTag = 'CopilotStudioKit-$(ReleaseMonthName)${{parameters.ReleaseYearNumber}}-HF${{parameters.HotfixReleaseNumber}}'
+        $templateTitle = 'Copilot Studio Kit $(ReleaseMonthName) ${{parameters.ReleaseYearNumber}} - Hotfix ${{parameters.HotfixReleaseNumber}}'
+    }
+    Write-Host "TemplateTag set to: $templateTag"
+    Write-Host "TemplateTitle set to: $templateTitle"
+    Write-Host "##vso[task.setvariable variable=TemplateTag]$templateTag"
+    Write-Host "##vso[task.setvariable variable=TemplateTitle]$templateTitle"
+
+  displayName: 'Prepare release assets'
+  
+- template: Pipelines\Templates\create-release-github.yml@PipelineRepo
+  parameters:
+    gitHubApiUrl: 'microsoft/Power-CAT-Copilot-Studio-Kit'
+    solutionName: 'CopilotStudioAccelerator'
+    solutionDisplayName: 'Copilot Studio Kit'
+    releaseMonth: ${{parameters.ReleaseMonthNumber}}
+    releaseYear: ${{parameters.ReleaseYearNumber}}
+    connectionName: 'powercat-alm'
+    releaseNotesPath: 'Power-CAT-Copilot-Studio-Kit/CopilotstudioAcceleratorResources/Release/Notes/'
+    issueClosingComment: 'This has been fixed in the latest release.'
+    closeIssues: ${{parameters.CloseMilestoneIssues}}
+    isDraft: ${{parameters.DraftRelease}}
+    isPreRelease: false
+    hotfixReleaseNumber: ${{parameters.HotfixReleaseNumber}}
+    queryHeadingDelimited: ""
+    prepareAppSourcePackage: ${{parameters.PrepareAppSourcePackage}}
+    preparePackageDeployerPackage: ${{parameters.PreparePackageDeployerPackage}}
+    projectName: "Power-CAT-Copilot-Studio-Kit"
+    packageConfigurationFilePath: "Power-CAT-Copilot-Studio-Kit/PowerCAT.PackageDeployer.Package/PowerCAT.Package.Settings.json"
