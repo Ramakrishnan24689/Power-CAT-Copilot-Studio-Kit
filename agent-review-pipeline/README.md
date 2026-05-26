@@ -1,6 +1,6 @@
 # Agent Review Pipeline
 
-Part of the **Copilot Studio Kit** - a set of tools to help organizations manage Copilot Studio agents at scale.
+Part of the **Copilot Studio Kit** - a set of tools for managing, monitoring, and governing Copilot Studio agents at scale.
 
 ## What is the Agent Review Tool?
 
