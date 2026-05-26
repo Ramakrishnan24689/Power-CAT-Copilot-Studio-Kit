@@ -206,6 +206,8 @@ Each evaluation run produces a PDF report uploaded as a GitHub Actions artifact.
 
 The artifact URL is included in the pre-deployment comments, so reviewers can access the full report directly from the pipeline stage history.
 
+![Pre-deployment Comments](../media/pre-deployment_comments.png)
+
 ---
 
 ## Customization
