@@ -1,39 +1,30 @@
 # Agent Review Pipeline
 
-Automated quality gate for Copilot Studio agents deployed via Power Platform Pipelines. Evaluates agents using pattern detection + AI analysis and blocks substandard deployments.
+Automated quality gate for Copilot Studio agents deployed via Power Platform Pipelines.
 
-**📖 [CI/CD Setup Guide](docs/CI-CD-SETUP-GUIDE.md)** — full setup instructions for your organization.
+Evaluates agents against design best practices using deterministic pattern detection and AI-powered analysis, then approves or rejects the deployment based on a configurable score threshold.
 
-## Local CLI
+![Architecture](media/ART-Architecture.png)
 
-```bash
-npm install
-npm run build
-node dist/index.js --zip path\to\solution.zip
-```
+## How It Works
 
-Optional file output:
+1. **Power Platform Pipeline** triggers a pre-deployment step
+2. **Power Automate Flow** dispatches a GitHub Actions workflow via webhook
+3. **GitHub Action** downloads the solution ZIP, parses agent configuration, runs AI evaluation, scores, and generates a PDF report
+4. **Callback** returns scores to the flow, which approves or rejects the pipeline stage
 
-```bash
-node dist/index.js --zip path\to\solution.zip --output result.json
-```
+## What Gets Evaluated
 
-## GitHub Action inputs
+| Stage | Method | What it checks |
+|-------|--------|----------------|
+| Parse & Detect | Deterministic | Missing model names, descriptions, variable naming, excessive tools |
+| Design Patterns | AI (PredictV2) | Topic design, knowledge sources, conversation flow, error handling |
+| Instruction Compliance | AI (PredictV2) | Whether agent follows its own system instructions |
 
-- `artifact_url`: Dataverse artifact download URL
-- `callback_url`: Power Automate webhook URL
-- `callback_secret`: Optional callback validation secret
+## Setup
 
-## Example workflow step
+**📖 [CI/CD Setup Guide](docs/Agent%20Review%20Pipeline%20-%20CICD%20Setup%20Guide.md)** — step-by-step instructions for your organization.
 
-```yaml
-- uses: ./agent-review-pipeline
-  with:
-    artifact_url: ${{ inputs.artifact_url }}
-    callback_url: ${{ inputs.callback_url }}
-    callback_secret: ${{ secrets.CALLBACK_SECRET }}
-  env:
-    CLIENT_ID: ${{ secrets.CLIENT_ID }}
-    TENANT_ID: ${{ secrets.TENANT_ID }}
-    CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-```
+## License
+
+Part of the [Copilot Studio Kit](https://github.com/Ramakrishnan24689/Power-CAT-Copilot-Studio-Kit).
