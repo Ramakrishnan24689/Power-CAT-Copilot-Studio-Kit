@@ -88,7 +88,7 @@ This role is based on Basic User with two additional org-level permissions:
 
 ### 4. Set Up GitHub Repo
 
-Clone or fork the [Agent Review Pipeline](https://github.com/Ramakrishnan24689/Power-CAT-Copilot-Studio-Kit/tree/main/agent-review-pipeline) folder from the Copilot Studio Kit repository, or copy the following into your own repo:
+Clone or fork the [Agent Review Pipeline](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/tree/main/agent-review-pipeline) folder from the Copilot Studio Kit repository, or copy the following into your own repo:
 
 ```
 your-repo/
