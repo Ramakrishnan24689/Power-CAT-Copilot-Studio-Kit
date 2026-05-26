@@ -484,7 +484,10 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                 DateTime endTimeUtc;
                 var startTimeValue = activity["value"]?["startTimeUtc"]?.ToString();
                 var endTimeValue = activity["value"]?["endTimeUtc"]?.ToString();
+                var sessionType = activity["value"]?["type"]?.ToString();
+                var outcome = activity["value"]?["outcome"]?.ToString();
                 var outcomeReason = activity["value"]?["outcomeReason"]?.ToString();
+                var impliedSuccessValue = activity["value"]?["impliedSuccess"]?.ToString();
 
                 if (!DateTime.TryParse(startTimeValue, out startTimeUtc) ||
                     !DateTime.TryParse(endTimeValue, out endTimeUtc) ||
@@ -493,9 +496,22 @@ namespace POWERCAT.Plugins.TranscriptMetrics
                     continue;
                 }
 
-                if (!string.IsNullOrEmpty(outcomeReason) &&
+                bool impliedSuccess;
+                var isSuccessfulRun = bool.TryParse(impliedSuccessValue, out impliedSuccess) &&
+                    impliedSuccess;
+
+                if (!isSuccessfulRun &&
+                    !(string.Equals(sessionType, "Unengaged", StringComparison.OrdinalIgnoreCase) &&
+                      string.Equals(outcomeReason, "NoError", StringComparison.OrdinalIgnoreCase) &&
+                      string.Equals(outcome, "None", StringComparison.OrdinalIgnoreCase)) &&
+                    !string.IsNullOrEmpty(outcomeReason) &&
                     (!outcomeReason.Contains("Error") ||
                      string.Equals(outcomeReason, "NoError", StringComparison.OrdinalIgnoreCase)))
+                {
+                    isSuccessfulRun = true;
+                }
+
+                if (isSuccessfulRun)
                 {
                     successfulRunCount++;
                 }
