@@ -24,6 +24,17 @@ Agent Insights Hub is a comprehensive analytics and monitoring dashboard for Mic
 
 More information on [Agent Insights Hub](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_INSIGHTS_HUB.md)
 
+## Agent Debugger
+
+**Agent Debugger** is a diagnostic tool inside the **Copilot Studio Kit Admin** app that lets administrators load any recorded conversation and inspect every decision the agent made — step by step, with timing, token usage, knowledge sources, arguments, and observations — without leaving the Power Platform.
+
+More information on [Agent Debugger](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_DEBUGGER.md)
+
+## Agent Library (Preview)
+The Agent Library is a centralized hub within the Copilot Studio Kit that helps makers discover, install, and manage pre-built agent templates and reusable components. Instead of building agents from scratch, you can browse a curated catalog of ready-to-use templates (Custom Agent and Declarative Agent) and components, install them directly into your environment, and customize them to fit your business needs.
+
+More information on [Agent Library](https://github.com/microsoft/Power-CAT-Copilot-Studio-Kit/blob/main/AGENT_LIBRARY.md)
+
 ## Component Library (Preview)
 The Component Library is a collection of ready-to-use, pre-built components for Microsoft Copilot Studio — packaged as component collections so you can import only the ones you need. The new app lets you easily browse and add the component to your environment. Add the component to your agent like you would with any component collection. Use agent instructions to control when and how each component is invoked — no custom development required.
 
@@ -68,6 +79,13 @@ More information on [Agent Inventory](./AGENT_INVENTORY.md)
 Agent Review Tool is a solution analysis tool that can be used to review your agents for any potential issues or anti-patterns that might have negative impact on the performance or the security of your agent. After analyzing the solution, Agent Review Tool presents the findings in easy to interpret format, with severity and details on how to address the issue.
 
 More information on [Agent Review Tool](./AGENT_REVIEW_TOOL.md)
+
+## PowerShield
+PowerShield enables organizations using the Power Platform to manage connector access through a structured, approval-based workflow for Data Loss Prevention (DLP) policies. It provides a self-service experience for makers to request connector access via a guided 5-step wizard, and a review interface for administrators to approve, reject, or manage those requests. Every DLP policy change is traceable to a PowerShield request, ensuring governance compliance and auditability.
+
+Administrators can configure blocked connectors, compliance questionnaires, and notification settings, while makers create requests scoped to Service Trees and Environment Containers. PowerShield automatically handles DLP policy creation, conflict resolution with existing policies, and per-environment fulfillment tracking.
+
+More information on [PowerShield](./POWER_SHIELD.md)
 
 ## Conversation Analyzer
 Conversation Analyzer allows makers to analyze the conversations of their custom agents using custom prompts to get additional insights.
