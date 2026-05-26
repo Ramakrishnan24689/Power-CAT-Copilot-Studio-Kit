@@ -49,6 +49,8 @@ Into the **pipeline host environment**, in order:
 1. **Copilot Studio Kit** (if not already imported)
 2. **Agent Review Pipeline**
 
+> The Copilot Studio Kit must be in the pipeline host environment because the AI prompts used for evaluation run there.
+
 Verify AI prompts are published after import.
 
 ---
