@@ -368,9 +368,9 @@ export class MessagingService {
 
       let activities;
       try {
-        if (testCase?.includeAttachment === true && !testCase.attachmentData) {
+        if (testCase?.attachmentFileName && !testCase.attachmentData) {
           throw new Error(
-            `Attachment is enabled for test "${testCase.name}" but attachment data could not be loaded.`
+            `Attachment file "${testCase.attachmentFileName}" is configured for test "${testCase.name}" but the attachment data could not be loaded.`
           );
         }
 

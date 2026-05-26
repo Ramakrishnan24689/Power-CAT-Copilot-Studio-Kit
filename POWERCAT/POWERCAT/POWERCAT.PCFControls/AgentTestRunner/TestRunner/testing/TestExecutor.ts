@@ -283,10 +283,9 @@ export class TestRunner {
   private async sendMessageWithAttachmentRetry(
     testCase: AgentTestCase
   ): Promise<AgentResponse> {
-    const maxAttempts =
-      testCase.includeAttachment === true
-        ? TEST_EXECUTION.ATTACHMENT_RETRY_MAX_ATTEMPTS
-        : 1;
+    const maxAttempts = testCase.attachmentFileName
+      ? TEST_EXECUTION.ATTACHMENT_RETRY_MAX_ATTEMPTS
+      : 1;
 
     let lastResponse: AgentResponse | undefined;
 
@@ -319,7 +318,7 @@ export class TestRunner {
     response: AgentResponse,
     testCase: AgentTestCase
   ): boolean {
-    if (!testCase.includeAttachment) {
+    if (!testCase.attachmentFileName) {
       return false;
     }
 
