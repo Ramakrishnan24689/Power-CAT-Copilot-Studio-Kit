@@ -97,7 +97,6 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
-            <attribute name="cat_includeattachment"/>
             <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_name" />
             <filter type="and">
@@ -157,7 +156,6 @@ export class AgentTestSetOperations extends DataverseOperationBase {
             <attribute name="cat_parent"/>
             <attribute name="cat_order"/>
             <attribute name="cat_critical"/>
-            <attribute name="cat_includeattachment"/>
             <attribute name="cat_attachmentfile_name"/>
             <order attribute="cat_order" />
             <filter type="and">
@@ -218,7 +216,6 @@ export class AgentTestSetOperations extends DataverseOperationBase {
       order: entity.cat_order as number,
       critical: entity.cat_critical as boolean,
       cat_passthreshold: entity.cat_passthreshold as number,
-      includeAttachment: entity.cat_includeattachment as boolean,
       attachmentFileName: entity.cat_attachmentfile_name as string,
     }));
   }
@@ -331,7 +328,7 @@ export class AgentTestSetOperations extends DataverseOperationBase {
     }
 
     for (const testCase of allCases) {
-      if (testCase.includeAttachment && testCase.attachmentFileName) {
+      if (testCase.attachmentFileName) {
         try {
           testCase.attachmentData = await this.getAttachmentFileContent(
             testCase.id,

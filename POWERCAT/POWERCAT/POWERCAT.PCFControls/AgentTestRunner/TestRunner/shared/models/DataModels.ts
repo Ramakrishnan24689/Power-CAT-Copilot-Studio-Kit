@@ -102,8 +102,7 @@ export interface AgentTestCase {
   childTests?: AgentTestCase[]; // Child test cases for multiturn conversations
   order?: number; // Child test execution order
   critical?: boolean; // Critical test failure impact on parent execution
-  includeAttachment?: boolean; // Whether to include an attachment with the test utterance
-  attachmentFileName?: string; // File name from Dataverse file column
+  attachmentFileName?: string; // File name from Dataverse file column; presence signals that an attachment should be uploaded with the test utterance
   attachmentData?: TestCaseAttachmentData; // Loaded attachment data (populated at runtime)
 }
 
