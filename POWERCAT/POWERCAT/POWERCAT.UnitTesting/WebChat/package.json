@@ -23,7 +23,7 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.0",
-    "swiper": "^11.1.9",
+    "swiper": "^12.2.0",
     "ts-mockito": "^2.6.1"
   },
   "devDependencies": {
